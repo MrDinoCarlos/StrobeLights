@@ -1,0 +1,342 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "index": 0,
+    "entries": [
+      {
+        "threshold": 6800,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/strobe"
+        }
+      },
+      {
+        "threshold": 6800.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6801,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/create"
+        }
+      },
+      {
+        "threshold": 6801.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6802,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/power_on"
+        }
+      },
+      {
+        "threshold": 6802.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6803,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/power_off"
+        }
+      },
+      {
+        "threshold": 6803.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6804,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/discovery"
+        }
+      },
+      {
+        "threshold": 6804.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6805,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/teleport"
+        }
+      },
+      {
+        "threshold": 6805.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6806,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/pulse"
+        }
+      },
+      {
+        "threshold": 6806.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6807,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/color"
+        }
+      },
+      {
+        "threshold": 6807.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6808,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/timing"
+        }
+      },
+      {
+        "threshold": 6808.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6809,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/static"
+        }
+      },
+      {
+        "threshold": 6809.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6810,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/brightness"
+        }
+      },
+      {
+        "threshold": 6810.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6811,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/camera_flash"
+        }
+      },
+      {
+        "threshold": 6811.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6812,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/rename"
+        }
+      },
+      {
+        "threshold": 6812.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6813,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/move"
+        }
+      },
+      {
+        "threshold": 6813.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6814,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/delete"
+        }
+      },
+      {
+        "threshold": 6814.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6815,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/resource_pack"
+        }
+      },
+      {
+        "threshold": 6815.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6816,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/flash_power"
+        }
+      },
+      {
+        "threshold": 6816.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6817,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/back"
+        }
+      },
+      {
+        "threshold": 6817.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6818,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/close"
+        }
+      },
+      {
+        "threshold": 6818.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6819,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/previous"
+        }
+      },
+      {
+        "threshold": 6819.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6820,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/next"
+        }
+      },
+      {
+        "threshold": 6820.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6821,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/color_swatch",
+          "tints": [
+            {
+              "type": "minecraft:custom_model_data",
+              "index": 0,
+              "default": 16777215
+            }
+          ]
+        }
+      },
+      {
+        "threshold": 6821.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6822,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/no_strobes"
+        }
+      },
+      {
+        "threshold": 6822.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/paper"
+    }
+  }
+}

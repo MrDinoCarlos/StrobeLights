@@ -1,0 +1,10 @@
+{
+  "flashbang": {
+    "sounds": [
+      {
+        "name": "strobelights:flashbang",
+        "stream": false
+      }
+    ]
+  }
+}

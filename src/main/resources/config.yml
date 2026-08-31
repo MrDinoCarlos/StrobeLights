@@ -1,0 +1,135 @@
+# ==============================================================================
+#                              STROBELIGHTS
+#                  Invisible 3D RGB lighting for Paper 1.21.4
+# ==============================================================================
+# Plugin:      StrobeLights
+# Author:      MrDino
+# Version:     0.8.13
+# Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
+# Website:     https://mrdino.es/wiki/category/strobelights/
+# Discord:     https://discord.gg/ddyfucfZpy
+# License:     See THIRD_PARTY_NOTICES.md and the bundled pack license
+# ==============================================================================
+# Vanilla Fabulous graphics: full 3D RGB lighting and colored camera flash.
+# Fast/Fancy or modified renderers: invisible vanilla white LIGHT fallback.
+
+branding:
+  website: 'https://mrdino.es/wiki/category/strobelights/'
+  discord: 'https://discord.gg/ddyfucfZpy'
+
+language:
+  # English fallback. Player GUIs/messages follow their Minecraft client locale.
+  default: 'en'
+  use-client-locale: true
+
+resource-pack:
+  enabled: true
+  required: true
+  send-delay-ticks: 10
+  # Replace serverip.com with the public server address. Leaving this example
+  # URL unchanged produces a red console warning and an admin join title.
+  # The HTTP port must differ from Minecraft's and be allowed by the firewall.
+  public-url: 'http://serverip.com:8250/strobelights/{token}.zip'
+  embedded:
+    enabled: true
+    bind-address: '0.0.0.0'
+    port: 8250
+
+render:
+  # 128 blocks, like Light Painter Universal. The technical display remains at
+  # the exact saved source and disables client frustum culling, so it can be
+  # rendered from above, below and every side without following the camera.
+  display-view-range: 128.0
+  # Solid-block occlusion is mandatory and cannot be disabled: neither normal
+  # lights, discovery previews nor scene flashes cross walls. Frustum culling
+  # is disabled for the invisible source, so the shader receives it from above,
+  # below, every side and behind while the player is within render range.
+
+timing:
+  # GUI: normal click changes 1 tick, 20 above 200; Shift changes 100.
+  # At this maximum, one more slower click switches the light to STATIC.
+  maximum-refresh-ticks: 1200
+
+discovery:
+  enabled: true
+  # Nearby strobes are shown to this player as steady RGB lights and editable
+  # handles only with clear line of sight. They never show through blocks and
+  # never change the saved on/off state of the strobes.
+  range: 32.0
+  minimum-light-level: 10
+
+easy-armor-stands:
+  # Soft integration with EasyArmorStands v2 on Paper 1.21.4.
+  # Holding the /eas give tool automatically enables discovery. Moving a
+  # StrobeLights handle moves the exact invisible light point.
+  enabled: true
+  auto-discovery-with-tool: true
+  # EasyArmorStands uses the display bounding box for ray selection.
+  selection-box-size: 1.0
+
+teleport:
+  # Keeps a player just outside a surface-mounted point. Air points use only
+  # the vertical offset.
+  outward-offset: 1.25
+  vertical-offset: 0.25
+
+vanilla-fallback:
+  # Real invisible Minecraft light. Fast/Fancy and clients whose rendering
+  # mods do not run vanilla post effects still receive visible white lighting.
+  # In vanilla Fabulous it is a base while the resource pack adds RGB color.
+  enabled: true
+  # Minecraft's block-light engine may not display an on/off phase this short
+  # before it changes again. Keep only the white fallback stable at or below
+  # this speed so incompatible renderers never remain completely dark.
+  # Set to 0 to force the white fallback to copy every strobe phase.
+  stabilize-at-or-below-refresh-ticks: 10
+
+flashbang:
+  # RGB resource-pack post effect. It uses each strobe's color, does not apply
+  # Blindness/Darkness and is sent only to eligible players.
+  radius: 16.0
+  require-looking-at-light: true
+  require-line-of-sight: true
+
+throwable-flashbang:
+  # /strobe flash give <player>. Every throw is fixed at white RGB, 15/15
+  # scene light, EXTREME screen flash and 200% configured flash power.
+  throw-velocity: 1.35
+  # Fuse begins when the projectile hits a block or entity. 20 ticks = 1 s.
+  detonation-delay-ticks: 20
+  # Failsafe: if no impact event ever arrives, the projectile still detonates
+  # at its last position after this flight time. 100 ticks = 5 seconds.
+  maximum-flight-ticks: 100
+  # Unconditional vanilla cue at the physical impact. Unlike blindness, it is
+  # not cancelled when every player is outside the effect radius, is looking
+  # away or has no resource pack. Volume 8 carries roughly 128 blocks.
+  detonation-cue-volume: 8.0
+  detonation-cue-pitch: 1.6
+  # Within full-effect-distance the camera flash uses its maximum strength and
+  # maximum duration. Both decrease smoothly to zero at radius, so nearby
+  # players stay blinded longer than distant players. 20 ticks = 1 s.
+  radius: 24.0
+  full-effect-distance: 5.0
+  effect-falloff-exponent: 1.2
+  maximum-screen-flash-duration-ticks: 100
+  # The white 3D light is independent of the directional camera flash. A
+  # player looking away can still see the environment light up.
+  # Players can see the fixed environmental pulse independently of the
+  # 24-block camera-blindness radius. It is capped by display-view-range.
+  scene-view-range: 128.0
+  # Kept long enough for both the shader and vanilla light engine to show the
+  # floor and surrounding area, including to players looking away.
+  scene-light-duration-ticks: 60
+  require-looking-at-light: true
+  require-line-of-sight: true
+  # Custom strobelights:flashbang sound. 4.0 is the current maximum volume at
+  # close range; it fades independently to silence at sound-radius.
+  sound-radius: 32.0
+  full-volume-distance: 5.0
+  sound-falloff-exponent: 1.0
+  sound-volume: 4.0
+  sound-pitch: 1.0
+
+limits:
+  maximum-strobes: 256
+  maximum-name-length: 32
