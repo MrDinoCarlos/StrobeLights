@@ -37,9 +37,9 @@ flat out float marker;
 flat out vec4 markerPayload;
 out float scale;
 
-// The invisible item model only anchors a 3x3 micro-carrier. The core fragment
-// shader writes its faint technical bits after this vertex shader recognizes
-// the opaque, uniform source texture.
+// The invisible item model anchors a three-pixel guarded carrier. The core
+// fragment shader writes opaque technical bytes after this vertex shader
+// recognizes the opaque, uniform source texture.
 #define HALFMARKER tmp.z / 64.0
 
 float opz(vec4 pos, float factor, float bias) {
@@ -215,7 +215,7 @@ void main() {
     bool encodedTechnicalCarrier = isCameraFlash(encodedValue)
         || isSourceLight(encodedValue);
     // Keep the atlas source opaque, like Light Painter's proven 1.20.1 carrier.
-    // The core fragment shader, not the item texture, creates the low-alpha
+    // The core fragment shader, not the item texture, creates the guarded
     // technical pixels consumed by the Fabulous transparency pipeline.
     bool markerAlpha = tmpcol.a >= 254.5 / 255.0;
     // Blue-dominant textures carry source lights and green-dominant textures

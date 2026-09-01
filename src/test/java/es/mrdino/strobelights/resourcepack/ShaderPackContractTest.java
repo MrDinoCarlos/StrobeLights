@@ -187,13 +187,16 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void transportsMarkersThroughLightPaintersItemEntityDepthRoute()
+    void transportsMarkersAsOpaqueGuardedBytesThroughItemEntityDepthRoute()
         throws IOException {
         Path core = PACK.resolve(
             "assets/minecraft/shaders/core/"
                 + "rendertype_item_entity_translucent_cull.fsh"
         );
         Path filter = PACK.resolve("assets/minecraft/shaders/program/filter.fsh");
+        Path filterDefinition = PACK.resolve(
+            "assets/minecraft/shaders/program/filter.json"
+        );
         Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
         Path aggregateDefinition = PACK.resolve(
             "assets/minecraft/shaders/program/aggregate_6.json"
@@ -201,15 +204,23 @@ class ShaderPackContractTest {
         Path pipeline = PACK.resolve("assets/minecraft/shaders/post/transparency.json");
 
         assertContains(core, "inverse(uvPerPixel) * (texCoord2 - vec2(0.5))");
-        assertContains(core, "fragColor = vec4(bitColor * 0.5, 2.0 / 255.0)");
+        assertContains(core, "vec4(194.0, 69.0, 253.0, 255.0)");
+        assertContains(core, "vec4(markerPayload.rgb, 1.0)");
+        assertContains(core, "vec4(61.0, 186.0, 2.0, 255.0)");
+        assertNotContains(core, "2.0 / 255.0");
+        assertNotContains(core, "bitColor * 0.5");
         assertContains(core, "gl_FragDepth = centerDepth * LIGHTDEPTH");
         assertContains(filter, "if (depth < LIGHTDEPTH)");
         assertContains(filter, "depth / LIGHTDEPTH");
-        assertContains(filter, "int encodedValue = 0");
-        assertContains(
-            filter,
-            "encodedValue |= triplet << (payloadIndex * 3)"
-        );
+        assertContains(filter, "bool leftGuard(vec4 color)");
+        assertContains(filter, "ivec4(194, 69, 253, 255)");
+        assertContains(filter, "bool rightGuard(vec4 color)");
+        assertContains(filter, "ivec4(61, 186, 2, 255)");
+        assertContains(filter, "candidate.a >= 254.5 / 255.0");
+        assertContains(filter, "outColor = vec4(candidate.rgb, 1.0)");
+        assertContains(filterDefinition, "\"DiffuseSize\"");
+        assertNotContains(filter, "payloadIndex");
+        assertNotContains(filter, "cellBytes.a - 2");
         assertContains(aggregate, "texture(ItemEntityDepthSampler, samplepos).r");
         assertContains(aggregateDefinition, "\"ItemEntityDepthSampler\"");
         assertNotContains(aggregateDefinition, "\"MainDepthSampler\"");

@@ -25,11 +25,6 @@ in float scale;
 
 out vec4 fragColor;
 
-int markerValue(vec3 color) {
-    ivec3 bytes = ivec3(floor(color * 255.0 + 0.5));
-    return (bytes.r << 16) | (bytes.g << 8) | bytes.b;
-}
-
 void main() {
     bool gui = isGUI(ProjMat);
 
@@ -59,29 +54,25 @@ void main() {
 
         vec2 pixelOffset = inverse(uvPerPixel) * (texCoord2 - vec2(0.5));
         ivec2 cell = ivec2(floor(pixelOffset + vec2(0.5)));
-        if (abs(cell.x) > 1 || abs(cell.y) > 1) {
+        // Transport one payload pixel between two opaque guards. Minecraft's
+        // item-entity render type multiplies RGB by source alpha, so the old
+        // 2/255 carrier was quantized away on real 1.20.1 framebuffers even
+        // though an isolated probe could recover it. Opaque bytes survive the
+        // vanilla and OptiFine paths exactly; the transparency compositor
+        // removes every carrier pixel through the reserved depth route below.
+        if (abs(cell.x) > 1 || cell.y != 0) {
             discard;
         }
 
         float centerDepth = gl_FragCoord.z
             - pixelOffset.x * dFdx(gl_FragCoord.z)
             - pixelOffset.y * dFdy(gl_FragCoord.z);
-        int cellIndex = (cell.y + 1) * 3 + cell.x + 1;
-        int encodedValue = markerValue(markerPayload.rgb);
-        if (cellIndex == 4) {
-            // The anchor changes a normal scene pixel by roughly one percent.
-            fragColor = vec4(vec3(0.4), 5.0 / 255.0);
+        if (cell.x < 0) {
+            fragColor = vec4(194.0, 69.0, 253.0, 255.0) / 255.0;
+        } else if (cell.x == 0) {
+            fragColor = vec4(markerPayload.rgb, 1.0);
         } else {
-            int payloadIndex = cellIndex < 4 ? cellIndex : cellIndex - 1;
-            int triplet = (encodedValue >> (payloadIndex * 3)) & 7;
-            vec3 bitColor = vec3(
-                float(triplet & 1),
-                float((triplet >> 1) & 1),
-                float((triplet >> 2) & 1)
-            );
-            // Premultiplied RGBA8 stores each channel as exactly zero or one,
-            // while direct Fast/Fancy rendering remains visually negligible.
-            fragColor = vec4(bitColor * 0.5, 2.0 / 255.0);
+            fragColor = vec4(61.0, 186.0, 2.0, 255.0) / 255.0;
         }
         gl_FragDepth = centerDepth * LIGHTDEPTH;
     }
