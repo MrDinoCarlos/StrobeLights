@@ -19,6 +19,8 @@ class ShaderPackContractTest {
     @Test
     void targetsMinecraft12111AndContainsTheLightPipeline() throws IOException {
         assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 75");
+        assertContains(PACK.resolve("pack.mcmeta"), "\"min_format\": 75");
+        assertContains(PACK.resolve("pack.mcmeta"), "\"max_format\": 75");
         assertContains(
             PACK.resolve("assets/minecraft/post_effect/transparency.json"),
             "minecraft:post/light"
@@ -75,6 +77,12 @@ class ShaderPackContractTest {
                 "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
             ),
             "ModelViewMat * vec4(Position, 1.0)"
+        );
+        assertContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            ),
+            "tmp = ModelViewMat * vec4(vec3(0.5), 1.0)"
         );
         assertContains(
             PACK.resolve(
@@ -140,6 +148,9 @@ class ShaderPackContractTest {
     void transportsMarkersThroughTheOptiFineCompatibleColorAttachment()
         throws IOException {
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
+        Path coreVertex = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        );
         Path core = PACK.resolve(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
         );
@@ -149,6 +160,13 @@ class ShaderPackContractTest {
 
         assertNotContains(utils, "DEPTHCODEPRECISION");
         assertNotContains(utils, "decodeLightPositionDepth");
+        assertContains(coreVertex, "flat out float marker");
+        assertContains(coreVertex, "flat out vec4 markerPayload");
+        assertContains(coreVertex, "markerPayload = vertexColor");
+        assertContains(core, "flat in float marker");
+        assertContains(core, "flat in vec4 markerPayload");
+        assertContains(core, "markerValue(markerPayload.rgb)");
+        assertNotContains(core, "markerValue(vertexColor.rgb)");
         assertContains(core, "inverse(uvPerPixel) * (texCoord2 - vec2(0.5))");
         assertContains(core, "fragColor = vec4(vec3(0.4), 5.0 / 255.0)");
         assertContains(core, "fragColor = vec4(bitColor * 0.5, 2.0 / 255.0)");

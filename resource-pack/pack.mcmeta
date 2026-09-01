@@ -1,6 +1,8 @@
 {
   "pack": {
     "pack_format": 75,
+    "min_format": 75,
+    "max_format": 75,
     "description": "StrobeLights 0.9.6 - hidden carrier and white strobe fix - Paper 1.21.11"
   }
 }

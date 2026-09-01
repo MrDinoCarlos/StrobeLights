@@ -22,7 +22,8 @@ out vec4 vertexColor;
 out vec2 texCoord0;
 out vec2 texCoord2;
 out vec4 glpos;
-out float marker;
+flat out float marker;
+flat out vec4 markerPayload;
 
 float opz(vec4 pos, float factor, float bias) {
     return (((pos.z / pos.w + 1.0) * 0.5 * factor + bias) * 2.0 - 1.0) * pos.w;
@@ -111,6 +112,7 @@ void main() {
     vertexColor = minecraft_mix_light(Light0_Direction, Light1_Direction, Normal, Color)
         * texelFetch(Sampler2, UV2 / 16, 0);
     texCoord0 = UV0;
+    markerPayload = vec4(0.0);
 
     vec4 tmpcol = texture(Sampler0, UV0);
     vec4 tmp = ModelViewMat * vec4(Position, 1.0);
@@ -124,6 +126,12 @@ void main() {
     marker = float(!gui && markerAlpha && markerTextureCarrier);
 
     if (marker > 0.0) {
+        // Every vertex of the microscopic model must use the same carrier
+        // center. Using Position here made the expanded quad inherit four
+        // slightly different view-space coordinates. Near an offscreen-mode
+        // boundary those vertices could encode different projections, so the
+        // 3x3 payload disappeared for a frame while the camera was moving.
+        tmp = ModelViewMat * vec4(vec3(0.5), 1.0);
         vertexColor = vec4(Color.rgb, 1.0);
         int encodedValue = markerValue(vertexColor.rgb);
         if (!isCameraFlash(encodedValue)) {
@@ -145,6 +153,7 @@ void main() {
                 lightExpansionCode
             );
         }
+        markerPayload = vertexColor;
 
         if (gl_VertexID % 4 == 0) {
             tmp.xy += vec2(-HALFMARKER, HALFMARKER);
