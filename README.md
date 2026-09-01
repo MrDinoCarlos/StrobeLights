@@ -10,11 +10,13 @@ detonation cue.
 
 - Paper 1.20.1 and Java 17.
 - Players must accept the resource pack sent by the server (3D shaders and GUI icons).
-- **Vanilla or OptiFine with Fabulous graphics:** full screen-space 3D RGB lighting.
-- **OptiFine:** external shaderpacks must remain disabled so Minecraft can run the
-  Fabulous transparency pipeline supplied by StrobeLights.
-- **Fast/Fancy or renderers that replace that pipeline:** automatic white vanilla
-  light fallback using invisible `LIGHT` blocks.
+- **Vanilla with Fabulous graphics:** full screen-space 3D RGB lighting.
+- **OptiFine 1.20.1:** models, GUI icons, flashbang gameplay and the white vanilla
+  light fallback work normally. Full RGB additionally requires an installation
+  that exposes and runs Fabulous; clients limited to Fast/Fancy cannot execute
+  the vanilla transparency pipeline.
+- **External shaderpacks or renderers that replace that pipeline:** automatic
+  white vanilla light fallback using invisible `LIGHT` blocks.
 
 The 0.9 renderer reconstructs every light at its real, fixed world position.
 Its technical display disables client frustum culling and always transports its
@@ -267,11 +269,11 @@ The HTTP port must be open over TCP and differ from the Minecraft port.
   vanilla Fabulous post chain still receive this fallback; RGB requires that
   vanilla post chain to run. The fallback is created and removed on every
   strobe phase, including rapid white strobes.
-- OptiFine can render the full RGB effect when graphics are set to Fabulous,
-  no external OptiFine shaderpack is active and the StrobeLights resource pack
-  is loaded. Its zoom keeps the same physical light radius. An external
-  shaderpack can replace the transparency pipeline;
-  affected clients then retain Minecraft's real white `LIGHT` fallback.
+- OptiFine 1.20.1 can render the full RGB effect only when that installation
+  exposes Fabulous, no external shaderpack is active and the StrobeLights pack
+  is loaded. If its Graphics control offers only Fast/Fancy, flash particles,
+  sound, models and Minecraft's real white `LIGHT` fallback still work, but the
+  custom RGB transparency pass cannot run.
 - The OptiFine carrier contract is protected by automated tests: marker
   detection uses the dedicated neutral texture with an alpha-relative RGB
   check, never an absolute near-white threshold or fog/hand heuristics. The

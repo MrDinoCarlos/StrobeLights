@@ -37,8 +37,8 @@ resource-pack:
   loaded: "StrobeLights: pack {revision} cargado. Fabulosos activa RGB; los shaderpacks externos pueden bloquearlo."
   prompt: "StrobeLights {revision}: luz 3D y flash de cámara RGB."
   compatibility:
-    optifine: "OptiFine listo: usa Fabulosos y desactiva shaderpacks externos para obtener todo el RGB."
-    fabulous-hint: "¿No ves todo el RGB? Activa Fabulosos y desactiva los shaderpacks externos."
+    optifine: "OptiFine 1.20.1: usa Fabulosos si está disponible y desactiva shaderpacks externos; si no, seguirá activa la luz blanca de respaldo."
+    fabulous-hint: "¿No ves todo el RGB? Activa Fabulosos si tu cliente lo ofrece y desactiva los shaderpacks externos."
   unconfigured:
     console: "CONFIGURACIÓN DE STROBELIGHTS PENDIENTE: resource-pack.public-url sigue usando la dirección por defecto ({url}). Configura la URL pública del servidor en config.yml."
     title: "StrobeLights no está configurado"

@@ -10,9 +10,10 @@
 # Discord:     https://discord.gg/ddyfucfZpy
 # License:     See THIRD_PARTY_NOTICES.md and the bundled pack license
 # ==============================================================================
-# Vanilla or OptiFine with Fabulous: full 3D RGB lighting and camera flash.
-# OptiFine shaderpacks must be OFF; Fast/Fancy or replaced render pipelines use
-# the invisible vanilla white LIGHT fallback.
+# Vanilla Fabulous: full 3D RGB lighting and camera flash.
+# OptiFine 1.20.1 gets full RGB only if that installation exposes Fabulous;
+# Fast/Fancy, external shaderpacks and replaced pipelines use the invisible
+# vanilla white LIGHT fallback while flashbang gameplay remains functional.
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
@@ -38,9 +39,9 @@ resource-pack:
 
 client-compatibility-notices:
   # One short chat notice after the pack loads. A client brand containing
-  # OptiFine/OptiFabric gets the specific Fabulous/no-shaderpack reminder. Minecraft
-  # does not report its graphics mode, so every other client receives the
-  # conditional Fabulous/no-shaderpack hint without claiming detection.
+  # OptiFine/OptiFabric gets a conditional Fabulous/fallback reminder. Minecraft
+  # does not report its graphics mode, so every other client receives a hint
+  # that accounts for clients where Fabulous is not available.
   enabled: false
   delay-ticks: 20
 

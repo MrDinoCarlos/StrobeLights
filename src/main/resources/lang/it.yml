@@ -37,8 +37,8 @@ resource-pack:
   loaded: "StrobeLights: pack {revision} caricato. Favolosa abilita RGB; gli shaderpack esterni possono bloccarlo."
   prompt: "StrobeLights {revision}: luce 3D e flash RGB della telecamera."
   compatibility:
-    optifine: "OptiFine pronto: usa Favolosa e disattiva gli shaderpack esterni per il RGB completo."
-    fabulous-hint: "Non vedi il RGB completo? Attiva Favolosa e disattiva gli shaderpack esterni."
+    optifine: "OptiFine 1.20.1: usa Favolosa se disponibile e disattiva gli shaderpack esterni; altrimenti resta attiva la luce bianca di riserva."
+    fabulous-hint: "Non vedi il RGB completo? Attiva Favolosa se il client la offre e disattiva gli shaderpack esterni."
   unconfigured:
     console: "CONFIGURAZIONE STROBELIGHTS RICHIESTA: resource-pack.public-url usa ancora l'indirizzo predefinito ({url}). Configura l'URL pubblico del server in config.yml."
     title: "StrobeLights non è configurato"
