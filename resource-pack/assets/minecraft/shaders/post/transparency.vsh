@@ -1,16 +1,27 @@
-#version 150
+#version 330
 
-in vec4 Position;
-
-uniform mat4 ProjMat;
-uniform vec2 OutSize;
+layout(std140) uniform SamplerInfo {
+    vec2 OutSize;
+    vec2 DiffuseSize;
+    vec2 DiffuseDepthSize;
+    vec2 TranslucentSize;
+    vec2 TranslucentDepthSize;
+    vec2 ItemEntitySize;
+    vec2 ItemEntityDepthSize;
+    vec2 ParticlesSize;
+    vec2 ParticlesDepthSize;
+    vec2 CloudsSize;
+    vec2 CloudsDepthSize;
+    vec2 WeatherSize;
+    vec2 WeatherDepthSize;
+};
 
 out vec2 texCoord;
 out vec2 oneTexel;
 
 void main() {
-    vec4 outPos = ProjMat * vec4(Position.xy, 0.0, 1.0);
-    gl_Position = vec4(outPos.xy, 0.2, 1.0);
-    texCoord = Position.xy / OutSize;
+    vec2 uv = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+    gl_Position = vec4(uv * 2.0 + vec2(-1.0), 0.0, 1.0);
+    texCoord = uv;
     oneTexel = 1.0 / OutSize;
 }

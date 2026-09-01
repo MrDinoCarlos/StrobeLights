@@ -1,5 +1,3 @@
-#version 150
-
 #define BIG 1000000
 #define FIXEDPOINT 1000.0
 #define DSCALE 10.0

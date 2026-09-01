@@ -1,26 +1,19 @@
-#version 150
+#version 330
 
 #moj_import <minecraft:fog.glsl>
+#moj_import <minecraft:dynamictransforms.glsl>
+#moj_import <minecraft:projection.glsl>
 #moj_import <minecraft:utils.glsl>
 
 uniform sampler2D Sampler0;
 
-uniform mat4 ProjMat;
-
-uniform vec4 ColorModulator;
-uniform float FogStart;
-uniform float FogEnd;
-uniform vec4 FogColor;
-
-in float vertexDistance;
+in float sphericalVertexDistance;
+in float cylindricalVertexDistance;
 in vec4 vertexColor;
 in vec2 texCoord0;
-in vec2 texCoord1;
 in vec2 texCoord2;
-in vec4 normal;
 in vec4 glpos;
 in float marker;
-in float scale;
 
 out vec4 fragColor;
 
@@ -31,21 +24,32 @@ int markerValue(vec3 color) {
 
 void main() {
     bool gui = isGUI(ProjMat);
-
-    
     if (marker < 0.5) {
         vec4 color = texture(Sampler0, texCoord0);
+#ifdef ALPHA_CUTOUT
+        if (color.a < ALPHA_CUTOUT) {
+            discard;
+        }
+#else
         if (color.a < 0.1) {
             discard;
         }
+#endif
         color *= vertexColor * ColorModulator;
-        fragColor = linear_fog(color, vertexDistance, FogStart, FogEnd, FogColor);
+        fragColor = apply_fog(
+            color,
+            sphericalVertexDistance,
+            cylindricalVertexDistance,
+            FogEnvironmentalStart,
+            FogEnvironmentalEnd,
+            FogRenderDistanceStart,
+            FogRenderDistanceEnd,
+            FogColor
+        );
         fragColor.a = fragColor.a < 0.1 ? 0.1 : fragColor.a;
-
         if (!gui && gl_FragCoord.z <= LIGHTDEPTH) {
             gl_FragDepth = LIGHTDEPTH + 10e-7;
-        }
-        else {
+        } else {
             gl_FragDepth = gl_FragCoord.z;
         }
     } else {
@@ -68,7 +72,6 @@ void main() {
         int cellIndex = (cell.y + 1) * 3 + cell.x + 1;
         int encodedValue = markerValue(vertexColor.rgb);
         if (cellIndex == 4) {
-            // The anchor changes a normal scene pixel by roughly one percent.
             fragColor = vec4(vec3(0.4), 5.0 / 255.0);
         } else {
             int payloadIndex = cellIndex < 4 ? cellIndex : cellIndex - 1;
@@ -78,8 +81,6 @@ void main() {
                 float((triplet >> 1) & 1),
                 float((triplet >> 2) & 1)
             );
-            // Premultiplied RGBA8 stores each channel as exactly zero or one,
-            // while direct Fast/Fancy rendering remains visually negligible.
             fragColor = vec4(bitColor * 0.5, 2.0 / 255.0);
         }
         gl_FragDepth = centerDepth * LIGHTDEPTH;

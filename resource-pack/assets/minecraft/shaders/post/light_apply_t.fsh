@@ -1,8 +1,8 @@
-#version 150
+#version 330
  
 uniform sampler2D DiffuseSampler;
 uniform sampler2D LightMapSampler;
-uniform float Intensity;
+const float Intensity = 1.0;
  
 in vec2 texCoord;
 

@@ -1,31 +1,22 @@
-#version 150
+#version 330
 
-in vec4 Position;
-
-uniform mat4 ProjMat;
-uniform vec2 DiffuseSize;
-uniform vec2 OutSize;
-uniform float FOV;
+layout(std140) uniform SamplerInfo {
+    vec2 OutSize;
+    vec2 DiffuseSize;
+    vec2 ItemEntityDepthSize;
+    vec2 ColoredCentersSize;
+};
 
 out vec2 texCoord;
 flat out vec2 inOneTexel;
 flat out float inAspectRatio;
 flat out float conversionK;
 
-void main(){
-    float x = -1.0; 
-    float y = -1.0;
-    if (Position.x > 0.001){
-        x = 1.0;
-    }
-    if (Position.y > 0.001){
-        y = 1.0;
-    }
-
+void main() {
+    vec2 uv = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+    gl_Position = vec4(uv * 2.0 + vec2(-1.0), 0.0, 1.0);
     inAspectRatio = DiffuseSize.x / DiffuseSize.y;
     inOneTexel = 1.0 / DiffuseSize;
-    texCoord = Position.xy / OutSize;
-    conversionK = tan(FOV / 360.0 * 3.14159265358979) * 2.0;
-
-    gl_Position = vec4(x, y, 0.2, 1.0);
+    texCoord = uv;
+    conversionK = tan(70.0 / 360.0 * 3.14159265358979) * 2.0;
 }

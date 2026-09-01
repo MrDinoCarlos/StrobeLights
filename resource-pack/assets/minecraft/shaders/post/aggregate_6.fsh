@@ -1,13 +1,18 @@
-#version 150
+#version 330
 
 #moj_import <minecraft:utils.glsl>
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D ItemEntityDepthSampler;
 uniform sampler2D ColoredCentersSampler;
-uniform vec2 DiffuseSize;
-uniform float Step;
-uniform float Test;
+layout(std140) uniform SamplerInfo {
+    vec2 OutSize;
+    vec2 DiffuseSize;
+    vec2 ItemEntityDepthSize;
+    vec2 ColoredCentersSize;
+};
+const float Step = 8.0;
+const float Test = 0.0;
 
 in vec2 texCoord;
 flat in vec2 inOneTexel;
