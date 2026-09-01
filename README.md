@@ -283,9 +283,12 @@ The HTTP port must be open over TCP and differ from the Minecraft port.
   and flash use independent, opaque, uniform textures sampled explicitly at mip
   zero, preventing atlas filtering and OptiFine alpha handling from corrupting
   the input. The invisible zero-scale model follows Light Painter's fixed
-  `ItemDisplay` contract. After recognition, nine low-alpha pixels carry the
-  packet and compressed source depth inside `itemEntity`; the transparency
-  composite removes them from the visible scene. Fast/Fancy never opens that
+  `ItemDisplay` contract. The pack pins Minecraft 1.20.1's complete core-shader
+  JSON contract: its blend state, all six vertex attributes and the
+  `IViewRotMat` binding used by both Vanilla and OptiFine I6. After recognition,
+  nine low-alpha pixels carry the packet and compressed source depth inside
+  `itemEntity`; the transparency composite removes them from the visible scene.
+  Fast/Fancy never opens that
   target and continues to show only the vanilla white fallback.
 - After the pack loads, clients whose reported brand explicitly identifies
   OptiFine can receive a short translated reminder of those settings.

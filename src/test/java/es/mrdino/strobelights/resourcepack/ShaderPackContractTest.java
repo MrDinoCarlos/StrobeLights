@@ -56,18 +56,38 @@ class ShaderPackContractTest {
         }) {
             assertContains(pipeline, target);
         }
-        Path core = PACK.resolve(
+        Path coreDefinition = PACK.resolve(
             "assets/minecraft/shaders/core/"
                 + "rendertype_item_entity_translucent_cull.json"
         );
+        assertContains(coreDefinition, "\"blend\": {");
         assertContains(
-            core,
+            coreDefinition,
             "\"vertex\": \"rendertype_item_entity_translucent_cull\""
         );
         assertNotContains(
-            core,
+            coreDefinition,
             "minecraft:core/rendertype_item_entity_translucent_cull"
         );
+        assertContains(coreDefinition, "\"attributes\": [");
+        assertContains(coreDefinition, "\"Position\"");
+        assertContains(coreDefinition, "\"Color\"");
+        assertContains(coreDefinition, "\"UV0\"");
+        assertContains(coreDefinition, "\"UV1\"");
+        assertContains(coreDefinition, "\"UV2\"");
+        assertContains(coreDefinition, "\"Normal\"");
+        assertContains(coreDefinition, "\"IViewRotMat\"");
+        Path coreVertex = PACK.resolve(
+            "assets/minecraft/shaders/core/"
+                + "rendertype_item_entity_translucent_cull.vsh"
+        );
+        assertContains(coreVertex, "uniform mat3 IViewRotMat");
+        assertContains(coreVertex, "in vec3 Position");
+        assertContains(coreVertex, "in vec4 Color");
+        assertContains(coreVertex, "in vec2 UV0");
+        assertContains(coreVertex, "in vec2 UV1");
+        assertContains(coreVertex, "in ivec2 UV2");
+        assertContains(coreVertex, "in vec3 Normal");
     }
 
     @Test
