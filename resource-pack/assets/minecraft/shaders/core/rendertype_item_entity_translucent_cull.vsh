@@ -33,7 +33,8 @@ out vec2 texCoord1;
 out vec2 texCoord2;
 out vec4 normal;
 out vec4 glpos;
-out float marker;
+flat out float marker;
+flat out vec4 markerPayload;
 out float scale;
 
 // The quad only supplies a 3x3 micro-carrier. Each cell is nearly transparent
@@ -159,6 +160,7 @@ void main() {
     texCoord0 = UV0;
     texCoord1 = UV1;
     normal = ProjMat * ModelViewMat * vec4(Normal, 0.0);
+    markerPayload = vec4(0.0);
 
     vec4 tmpcol = texture(Sampler0, UV0);
     vec4 tmp = ModelViewMat * vec4(Position, 1.0);
@@ -191,6 +193,11 @@ void main() {
     );
 
     if (marker > 0.0) {
+        // Every vertex must share one carrier origin. Retaining each baked
+        // vertex position can leave the expanded micro-quad edge-on or make
+        // neighboring vertices choose different off-screen encodings while
+        // the camera moves, especially through OptiFine's item renderer.
+        tmp = ModelViewMat * vec4(vec3(0.5), 1.0);
         // Do not multiply the payload by the atlas RGB. OptiFine may
         // premultiply that texel, but the custom tint still owns the marker.
         vertexColor = vec4(Color.rgb, 1.0);
@@ -214,6 +221,7 @@ void main() {
                 lightExpansionCode
             );
         }
+        markerPayload = vertexColor;
         
         if (gl_VertexID % 4 == 0) {
             tmp.xy += vec2(-HALFMARKER, HALFMARKER);

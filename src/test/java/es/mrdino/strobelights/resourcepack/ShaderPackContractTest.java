@@ -87,6 +87,7 @@ class ShaderPackContractTest {
         );
         assertContains(manager, "Material.LEATHER_HORSE_ARMOR");
         assertContains(manager, "LeatherArmorMeta meta");
+        assertNotContains(manager, "display.setBillboard(Display.Billboard.FIXED)");
         assertNotContains(
             PACK.resolve("assets/minecraft/models/item/potion.json"),
             "\"custom_model_data\": 6700"
@@ -126,6 +127,24 @@ class ShaderPackContractTest {
                 "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
             ),
             "ModelViewMat * vec4(Position, 1.0)"
+        );
+        assertContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            ),
+            "ModelViewMat * vec4(vec3(0.5), 1.0)"
+        );
+        assertContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            ),
+            "flat out vec4 markerPayload"
+        );
+        assertContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+            ),
+            "flat in vec4 markerPayload"
         );
         assertContains(
             PACK.resolve(

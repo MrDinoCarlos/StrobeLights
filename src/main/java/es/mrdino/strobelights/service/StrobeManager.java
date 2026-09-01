@@ -929,7 +929,10 @@ public final class StrobeManager {
             display.setInvulnerable(true);
             display.setSilent(true);
             display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.HEAD);
-            display.setBillboard(Display.Billboard.FIXED);
+            // The technical model is a single microscopic face. Keep its
+            // world anchor fixed, but face the carrier toward the camera so
+            // OptiFine cannot cull it when the player looks across its edge.
+            display.setBillboard(Display.Billboard.CENTER);
             display.setBrightness(new Display.Brightness(15, 15));
             display.setShadowRadius(0.0f);
             display.setShadowStrength(0.0f);
@@ -1690,7 +1693,8 @@ public final class StrobeManager {
             display.setInvulnerable(true);
             display.setSilent(true);
             display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.HEAD);
-            display.setBillboard(Display.Billboard.FIXED);
+            // Camera flashes use the same one-face technical carrier.
+            display.setBillboard(Display.Billboard.CENTER);
             display.setBrightness(new Display.Brightness(15, 15));
             display.setShadowRadius(0.0f);
             display.setShadowStrength(0.0f);

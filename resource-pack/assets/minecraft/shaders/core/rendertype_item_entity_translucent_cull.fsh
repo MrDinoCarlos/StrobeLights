@@ -19,7 +19,8 @@ in vec2 texCoord1;
 in vec2 texCoord2;
 in vec4 normal;
 in vec4 glpos;
-in float marker;
+flat in float marker;
+flat in vec4 markerPayload;
 in float scale;
 
 out vec4 fragColor;
@@ -66,7 +67,7 @@ void main() {
             - pixelOffset.x * dFdx(gl_FragCoord.z)
             - pixelOffset.y * dFdy(gl_FragCoord.z);
         int cellIndex = (cell.y + 1) * 3 + cell.x + 1;
-        int encodedValue = markerValue(vertexColor.rgb);
+        int encodedValue = markerValue(markerPayload.rgb);
         if (cellIndex == 4) {
             // The anchor changes a normal scene pixel by roughly one percent.
             fragColor = vec4(vec3(0.4), 5.0 / 255.0);
