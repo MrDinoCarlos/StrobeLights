@@ -89,10 +89,10 @@ vanilla-fallback:
 
 flashbang:
   # RGB resource-pack post effect. It uses each strobe's color, does not apply
-  # Blindness/Darkness and is sent only to eligible players.
+  # Blindness/Darkness and is sent only to eligible players. Opaque block
+  # occlusion is mandatory; glass blocks and panes let the effect through.
   radius: 16.0
   require-looking-at-light: true
-  require-line-of-sight: true
 
 throwable-flashbang:
   # /strobe flash give <player>. Every throw is fixed at white RGB, 15/15
@@ -125,7 +125,6 @@ throwable-flashbang:
   # floor and surrounding area, including to players looking away.
   scene-light-duration-ticks: 60
   require-looking-at-light: true
-  require-line-of-sight: true
   # Custom strobelights:flashbang sound. 4.0 is the current maximum volume at
   # close range; it fades independently to silence at sound-radius.
   sound-radius: 32.0

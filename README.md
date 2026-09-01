@@ -224,7 +224,6 @@ vanilla-fallback:
 flashbang:
   radius: 16.0
   require-looking-at-light: true
-  require-line-of-sight: true
 
 throwable-flashbang:
   throw-velocity: 1.35
@@ -239,7 +238,6 @@ throwable-flashbang:
   scene-view-range: 128.0
   scene-light-duration-ticks: 60
   require-looking-at-light: true
-  require-line-of-sight: true
   sound-radius: 32.0
   full-volume-distance: 5.0
   sound-falloff-exponent: 1.0
@@ -256,11 +254,10 @@ The HTTP port must be open over TCP and differ from the Minecraft port.
 
 ## Notes
 
-- RGB lighting does not require the source itself to be visible and does not
-  project silhouettes, black bands or screen-space shadows. Its fixed source
-  remains available above, below, on every side and outside the frame. The white
-  fallback continues to use Minecraft's normal block-light engine and its wall
-  propagation rules.
+- RGB lighting is delivered only while the player has an unobstructed path to
+  the source. Every non-air block stops it regardless of RGB size, except glass
+  blocks and panes. The white fallback also follows Minecraft's normal
+  block-light propagation rules.
 - Per-strobe RGB size scales the physical light radius from `0.25x` to `4.00x`
   in Fabulous mode. Fast/Fancy uses Minecraft's white `LIGHT` fallback, whose
   propagation radius is controlled by the vanilla light engine and therefore
