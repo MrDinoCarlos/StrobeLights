@@ -1,10 +1,10 @@
-#version 150
+#version 330
 
 #moj_import <minecraft:utils.glsl>
 
 uniform sampler2D DiffuseDepthSampler;
 uniform sampler2D LightsSampler;
-uniform float Range;
+const float Range = 128.0;
 
 in vec2 texCoord;
 flat in vec2 oneTexel;

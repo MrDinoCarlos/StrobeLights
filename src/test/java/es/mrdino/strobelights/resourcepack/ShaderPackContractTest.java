@@ -164,10 +164,7 @@ class ShaderPackContractTest {
             aggregate,
             "texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH"
         );
-        assertContains(
-            pipeline,
-            "\"sampler_name\": \"Diffuse\",\n                    \"target\": \"minecraft:item_entity\""
-        );
+        assertContains(pipeline, "\"vertex_shader\": \"minecraft:post/filter\"");
         assertNotContains(pipeline, "markerdata");
     }
 
