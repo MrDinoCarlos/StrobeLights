@@ -141,4 +141,22 @@ class CameraFlashCodecTest {
         assertEquals(false, StrobeManager.letsLightThrough(Material.STONE));
         assertEquals(false, StrobeManager.letsLightThrough(Material.OAK_LEAVES));
     }
+
+    @Test
+    void everyNonAirBlockExceptGlassOccludesEveryLightSize() {
+        for (Material material : Material.values()) {
+            boolean glass = material.name().equals("GLASS")
+                || material.name().endsWith("_GLASS")
+                || material.name().equals("GLASS_PANE")
+                || material.name().endsWith("_GLASS_PANE");
+            boolean air = material.name().equals("AIR")
+                || material.name().equals("CAVE_AIR")
+                || material.name().equals("VOID_AIR")
+                || material.name().equals("LEGACY_AIR");
+            boolean expected = !air
+                && material != Material.LIGHT
+                && !glass;
+            assertEquals(expected, StrobeManager.blocksLight(material), material.name());
+        }
+    }
 }
