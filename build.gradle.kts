@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "es.mrdino"
-version = "0.9.6"
+version = "0.9.7"
 
 repositories {
     mavenCentral()
