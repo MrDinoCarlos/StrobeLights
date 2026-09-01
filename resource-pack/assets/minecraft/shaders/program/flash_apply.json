@@ -1,6 +1,6 @@
 {
-  "vertex": "minecraft:post/flash_apply",
-  "fragment": "minecraft:post/flash_apply",
+  "vertex": "flash_apply",
+  "fragment": "flash_apply",
   "samplers": [
     { "name": "DiffuseSampler" },
     { "name": "LightsSampler" }

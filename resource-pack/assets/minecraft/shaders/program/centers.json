@@ -1,6 +1,6 @@
 {
-    "vertex": "minecraft:post/centers",
-    "fragment": "minecraft:post/centers",
+    "vertex": "centers",
+    "fragment": "centers",
     "samplers": [
         { "name": "DiffuseSampler" }
     ],

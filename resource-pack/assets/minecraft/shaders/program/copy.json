@@ -1,6 +1,6 @@
 {
-    "vertex": "minecraft:post/blit",
-    "fragment": "minecraft:post/blit",
+    "vertex": "blit",
+    "fragment": "blit",
     "samplers": [
         { "name": "DiffuseSampler" }
     ],

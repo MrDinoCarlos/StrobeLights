@@ -1,0 +1,33 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/paper"
+  },
+  "overrides": [
+    { "predicate": { "custom_model_data": 6800 }, "model": "strobelights:item/gui/strobe" },
+    { "predicate": { "custom_model_data": 6801 }, "model": "strobelights:item/gui/create" },
+    { "predicate": { "custom_model_data": 6802 }, "model": "strobelights:item/gui/power_on" },
+    { "predicate": { "custom_model_data": 6803 }, "model": "strobelights:item/gui/power_off" },
+    { "predicate": { "custom_model_data": 6804 }, "model": "strobelights:item/gui/discovery" },
+    { "predicate": { "custom_model_data": 6805 }, "model": "strobelights:item/gui/teleport" },
+    { "predicate": { "custom_model_data": 6806 }, "model": "strobelights:item/gui/pulse" },
+    { "predicate": { "custom_model_data": 6807 }, "model": "strobelights:item/gui/color" },
+    { "predicate": { "custom_model_data": 6808 }, "model": "strobelights:item/gui/timing" },
+    { "predicate": { "custom_model_data": 6809 }, "model": "strobelights:item/gui/static" },
+    { "predicate": { "custom_model_data": 6810 }, "model": "strobelights:item/gui/brightness" },
+    { "predicate": { "custom_model_data": 6811 }, "model": "strobelights:item/gui/camera_flash" },
+    { "predicate": { "custom_model_data": 6812 }, "model": "strobelights:item/gui/rename" },
+    { "predicate": { "custom_model_data": 6813 }, "model": "strobelights:item/gui/move" },
+    { "predicate": { "custom_model_data": 6814 }, "model": "strobelights:item/gui/delete" },
+    { "predicate": { "custom_model_data": 6815 }, "model": "strobelights:item/gui/resource_pack" },
+    { "predicate": { "custom_model_data": 6816 }, "model": "strobelights:item/gui/flash_power" },
+    { "predicate": { "custom_model_data": 6817 }, "model": "strobelights:item/gui/back" },
+    { "predicate": { "custom_model_data": 6818 }, "model": "strobelights:item/gui/close" },
+    { "predicate": { "custom_model_data": 6819 }, "model": "strobelights:item/gui/previous" },
+    { "predicate": { "custom_model_data": 6820 }, "model": "strobelights:item/gui/next" },
+    { "predicate": { "custom_model_data": 6821 }, "model": "strobelights:item/gui/color_swatch" },
+    { "predicate": { "custom_model_data": 6822 }, "model": "strobelights:item/gui/no_strobes" },
+    { "predicate": { "custom_model_data": 6823 }, "model": "strobelights:item/gui/groups" },
+    { "predicate": { "custom_model_data": 6824 }, "model": "strobelights:item/gui/expansion" }
+  ]
+}

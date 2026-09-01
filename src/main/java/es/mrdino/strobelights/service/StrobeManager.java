@@ -36,7 +36,7 @@ import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.components.CustomModelDataComponent;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.RayTraceResult;
@@ -46,7 +46,7 @@ import org.bukkit.util.Vector;
 /**
  * Owns invisible Light Painter markers and their strobe timing.
  *
- * <p>The marker does not draw a fixture or projection. The 1.21.4 resource-pack
+ * <p>The marker does not draw a fixture or projection. The 1.20.1 resource-pack
  * shader reconstructs its 3D position from the depth buffer and applies RGB
  * illumination to every visible world pixel around that point.</p>
  */
@@ -506,7 +506,7 @@ public final class StrobeManager {
             true
         );
         world.spawnParticle(
-            Particle.EXPLOSION,
+            Particle.EXPLOSION_NORMAL,
             location,
             1,
             0.0,
@@ -930,7 +930,6 @@ public final class StrobeManager {
             display.setShadowStrength(0.0f);
             display.setInterpolationDelay(0);
             display.setInterpolationDuration(0);
-            display.setTeleportDuration(0);
             applyFixedRenderCarrier(display, carrier);
             initializer.accept(display);
         });
@@ -1183,12 +1182,13 @@ public final class StrobeManager {
     }
 
     private static ItemStack technicalMarker(int rgb) {
-        ItemStack stack = new ItemStack(Material.LIME_STAINED_GLASS);
-        ItemMeta meta = stack.getItemMeta();
-        CustomModelDataComponent component = meta.getCustomModelDataComponent();
-        component.setFloats(List.of(LIGHT_PAINTER_MODEL_DATA));
-        component.setColors(List.of(Color.fromRGB(rgb)));
-        meta.setCustomModelDataComponent(component);
+        // PotionMeta#setColor is available on 1.20.1 and feeds the legacy
+        // item tint used by the custom model. This preserves the 24-bit marker
+        // payload even though the data component API was introduced later.
+        ItemStack stack = new ItemStack(Material.POTION);
+        PotionMeta meta = (PotionMeta) stack.getItemMeta();
+        meta.setCustomModelData((int) LIGHT_PAINTER_MODEL_DATA);
+        meta.setColor(Color.fromRGB(rgb));
         stack.setItemMeta(meta);
         return stack;
     }
@@ -1196,9 +1196,7 @@ public final class StrobeManager {
     private static ItemStack guiIcon(float customModelData) {
         ItemStack stack = new ItemStack(Material.PAPER);
         ItemMeta meta = stack.getItemMeta();
-        CustomModelDataComponent component = meta.getCustomModelDataComponent();
-        component.setFloats(List.of(customModelData));
-        meta.setCustomModelDataComponent(component);
+        meta.setCustomModelData((int) customModelData);
         stack.setItemMeta(meta);
         return stack;
     }

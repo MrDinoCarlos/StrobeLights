@@ -1,6 +1,6 @@
 {
-    "vertex": "minecraft:post/light",
-    "fragment": "minecraft:post/light",
+    "vertex": "light",
+    "fragment": "light",
     "samplers": [
         { "name": "DiffuseDepthSampler" },
         { "name": "LightsSampler" }
@@ -9,7 +9,7 @@
         { "name": "ProjMat",            "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
         { "name": "DiffuseDepthSize",   "type": "float",     "count": 2,  "values": [ 1.0, 1.0 ] },
         { "name": "LightsSize",         "type": "float",     "count": 2,  "values": [ 1.0, 1.0 ] },
-        { "name": "Range",              "type": "float",     "count": 1,  "values": [ 1.0 ] },
-        { "name": "FOV",                "type": "float",     "count": 1,  "values": [ 1.0 ] }
+        { "name": "Range",              "type": "float",     "count": 1,  "values": [ 128.0 ] },
+        { "name": "FOV",                "type": "float",     "count": 1,  "values": [ 70.0 ] }
     ]
 }

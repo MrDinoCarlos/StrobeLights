@@ -24,7 +24,6 @@ import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
@@ -44,7 +43,6 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 
 public final class StrobeGui implements Listener {
 
@@ -1188,9 +1186,7 @@ public final class StrobeGui implements Listener {
     ) {
         ItemStack stack = item(Material.PAPER, displayName, lore, glowing);
         ItemMeta meta = stack.getItemMeta();
-        CustomModelDataComponent component = meta.getCustomModelDataComponent();
-        component.setFloats(List.of(icon.customModelData));
-        meta.setCustomModelDataComponent(component);
+        meta.setCustomModelData((int) icon.customModelData);
         stack.setItemMeta(meta);
         return stack;
     }
@@ -1203,9 +1199,9 @@ public final class StrobeGui implements Listener {
     ) {
         ItemStack stack = item(GuiIcon.COLOR_SWATCH, displayName, lore, glowing);
         ItemMeta meta = stack.getItemMeta();
-        CustomModelDataComponent component = meta.getCustomModelDataComponent();
-        component.setColors(List.of(Color.fromRGB(rgb & 0xFFFFFF)));
-        meta.setCustomModelDataComponent(component);
+        // Paper 1.20.1 has integer CustomModelData but no per-item tint
+        // component. Keep the GUI icon functional; newer branches tint it
+        // with the exact RGB value.
         stack.setItemMeta(meta);
         return stack;
     }
@@ -1224,7 +1220,7 @@ public final class StrobeGui implements Listener {
             .toList());
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         if (glowing) {
-            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+            meta.addEnchant(Enchantment.DURABILITY, 1, true);
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         }
         stack.setItemMeta(meta);

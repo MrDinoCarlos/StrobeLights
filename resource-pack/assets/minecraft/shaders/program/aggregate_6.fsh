@@ -1,6 +1,6 @@
 #version 150
 
-#moj_import <minecraft:utils.glsl>
+#moj_import <utils.glsl>
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D ItemEntityDepthSampler;

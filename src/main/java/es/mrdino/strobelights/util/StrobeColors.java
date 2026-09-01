@@ -67,7 +67,7 @@ public final class StrobeColors {
         int red = rgb >> 16 & 0xFF;
         int green = rgb >> 8 & 0xFF;
         int blue = rgb & 0xFF;
-        GlassColor best = GLASS_COLORS.getFirst();
+        GlassColor best = GLASS_COLORS.get(0);
         long bestDistance = Long.MAX_VALUE;
         for (GlassColor candidate : GLASS_COLORS) {
             int candidateRed = candidate.rgb >> 16 & 0xFF;

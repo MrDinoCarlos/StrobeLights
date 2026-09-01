@@ -1,23 +1,126 @@
 {
-    "vertex": "minecraft:post/transparency",
-    "fragment": "minecraft:post/transparency",
-    "samplers": [
-        { "name": "DiffuseSampler" },
-        { "name": "DiffuseDepthSampler" },
-        { "name": "TranslucentSampler" },
-        { "name": "TranslucentDepthSampler" },
-        { "name": "ItemEntitySampler" },
-        { "name": "ItemEntityDepthSampler" },
-        { "name": "ParticlesSampler" },
-        { "name": "ParticlesDepthSampler" },
-        { "name": "CloudsSampler" },
-        { "name": "CloudsDepthSampler" },
-        { "name": "WeatherSampler" },
-        { "name": "WeatherDepthSampler" }
-    ],
-    "uniforms": [
-        { "name": "ProjMat",    "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
-        { "name": "OutSize",    "type": "float",     "count": 2,  "values": [ 1.0, 1.0 ] },
-        { "name": "Test",       "type": "float",     "count": 1,  "values": [ 1.0 ] }
-    ]
+  "targets": [
+    "swap1",
+    "swap2",
+    "swap3",
+    "lightmap1",
+    "lightmap2",
+    "lights",
+    "final"
+  ],
+  "passes": [
+    {
+      "name": "filter",
+      "intarget": "itemEntity",
+      "outtarget": "swap1",
+      "auxtargets": [
+        { "name": "DiffuseDepthSampler", "id": "itemEntity:depth" }
+      ]
+    },
+    {
+      "name": "centers",
+      "intarget": "swap1",
+      "outtarget": "swap3"
+    },
+    {
+      "name": "aggregate_1",
+      "intarget": "swap3",
+      "outtarget": "swap1"
+    },
+    {
+      "name": "aggregate_2",
+      "intarget": "swap1",
+      "outtarget": "swap2"
+    },
+    {
+      "name": "aggregate_3",
+      "intarget": "swap2",
+      "outtarget": "swap1"
+    },
+    {
+      "name": "aggregate_4",
+      "intarget": "swap1",
+      "outtarget": "swap2"
+    },
+    {
+      "name": "aggregate_5",
+      "intarget": "swap2",
+      "outtarget": "swap1"
+    },
+    {
+      "name": "aggregate_6",
+      "intarget": "swap1",
+      "outtarget": "lights",
+      "auxtargets": [
+        { "name": "ItemEntityDepthSampler", "id": "itemEntity:depth" },
+        { "name": "ColoredCentersSampler", "id": "swap3" }
+      ]
+    },
+    {
+      "name": "light",
+      "intarget": "minecraft:main",
+      "outtarget": "lightmap1",
+      "auxtargets": [
+        { "name": "DiffuseDepthSampler", "id": "minecraft:main:depth" },
+        { "name": "LightsSampler", "id": "lights" }
+      ]
+    },
+    {
+      "name": "light_t",
+      "intarget": "translucent",
+      "outtarget": "lightmap2",
+      "auxtargets": [
+        { "name": "DiffuseDepthSampler", "id": "translucent:depth" },
+        { "name": "LightsSampler", "id": "lights" },
+        { "name": "CompareDepthSampler", "id": "minecraft:main:depth" }
+      ]
+    },
+    {
+      "name": "light_apply",
+      "intarget": "minecraft:main",
+      "outtarget": "swap1",
+      "auxtargets": [
+        { "name": "LightMapSampler", "id": "lightmap1" }
+      ]
+    },
+    {
+      "name": "light_apply_t",
+      "intarget": "translucent",
+      "outtarget": "swap2",
+      "auxtargets": [
+        { "name": "LightMapSampler", "id": "lightmap2" }
+      ]
+    },
+    {
+      "name": "transparency",
+      "intarget": "swap1",
+      "outtarget": "swap3",
+      "auxtargets": [
+        { "name": "DiffuseDepthSampler", "id": "minecraft:main:depth" },
+        { "name": "TranslucentSampler", "id": "swap2" },
+        { "name": "TranslucentDepthSampler", "id": "translucent:depth" },
+        { "name": "ItemEntitySampler", "id": "itemEntity" },
+        { "name": "ItemEntityDepthSampler", "id": "itemEntity:depth" },
+        { "name": "ParticlesSampler", "id": "particles" },
+        { "name": "ParticlesDepthSampler", "id": "particles:depth" },
+        { "name": "CloudsSampler", "id": "clouds" },
+        { "name": "CloudsDepthSampler", "id": "clouds:depth" },
+        { "name": "WeatherSampler", "id": "weather" },
+        { "name": "WeatherDepthSampler", "id": "weather:depth" }
+      ]
+    },
+    {
+      "name": "flash_apply",
+      "intarget": "swap3",
+      "outtarget": "swap1",
+      "auxtargets": [
+        { "name": "LightsSampler", "id": "lights" }
+      ]
+    },
+    {
+      "name": "blit",
+      "intarget": "swap1",
+      "outtarget": "minecraft:main"
+    }
+  ]
 }

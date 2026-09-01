@@ -1,4 +1,4 @@
-# StrobeLights — Paper 1.21.4
+# StrobeLights — Paper 1.20.1
 
 StrobeLights provides configurable 3D RGB strobe lighting based on
 [Light Painter](https://github.com/bradleyq/light_painter), revision `2364940`,
@@ -8,7 +8,7 @@ detonation cue.
 
 ## Requirements and rendering modes
 
-- Paper 1.21.4 and Java 21.
+- Paper 1.20.1 and Java 17.
 - Players must accept the resource pack sent by the server (3D shaders and GUI icons).
 - **Vanilla or OptiFine with Fabulous graphics:** full screen-space 3D RGB lighting.
 - **OptiFine:** external shaderpacks must remain disabled so Minecraft can run the
@@ -78,7 +78,7 @@ names are reused case-insensitively and are stored with each strobe.
 ## EasyArmorStands integration
 
 [EasyArmorStands](https://github.com/56738/EasyArmorStands) is an optional soft
-dependency. For Paper 1.21.4 use its v2 line. While a player holds the tool from
+dependency. For Paper 1.20.1 use its v2 line. While a player holds the tool from
 `/eas give`, StrobeLights automatically enables discovery for that player. The
 temporary 3-axis handle can then be selected and moved with EasyArmorStands;
 the exact invisible light position follows it. Removing the tool hides the
@@ -182,7 +182,7 @@ Permission: `strobelights.admin` (operators by default).
 The ZIP is embedded in the plugin JAR and is also exported to:
 
 ```text
-plugins/StrobeLights/resource-pack/StrobeLights-ResourcePack-1.21.4.zip
+plugins/StrobeLights/resource-pack/StrobeLights-ResourcePack-1.20.1.zip
 ```
 
 Replace `serverip.com` with the public server address and expose the chosen HTTP
@@ -302,7 +302,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.9.6+mc.1.21.4.jar`.
+For this build: `StrobeLights-v.0.9.6+mc.1.20.1.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

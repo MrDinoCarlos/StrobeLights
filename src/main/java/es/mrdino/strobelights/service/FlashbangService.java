@@ -29,7 +29,6 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -63,9 +62,7 @@ public final class FlashbangService implements Listener {
     public ItemStack createItem(Player viewer, int amount) {
         ItemStack stack = new ItemStack(Material.SNOWBALL, Math.max(1, Math.min(16, amount)));
         ItemMeta meta = stack.getItemMeta();
-        CustomModelDataComponent modelData = meta.getCustomModelDataComponent();
-        modelData.setFloats(List.of(CUSTOM_MODEL_DATA));
-        meta.setCustomModelDataComponent(modelData);
+        meta.setCustomModelData((int) CUSTOM_MODEL_DATA);
         meta.displayName(Component.text(
             plugin.messages().text(viewer, "item.flashbang.name"),
             NamedTextColor.GOLD

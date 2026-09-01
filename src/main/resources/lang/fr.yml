@@ -305,7 +305,7 @@ command:
   not-found: "Le strobe '{name}' n'existe pas. Utilisez /strobe list."
   reloaded: "Configuration, langues et strobes rechargés ({count})."
   help:
-    title: "Commandes pour Paper 1.21.4"
+    title: "Commandes pour Paper 1.20.1"
     gui: "ouvre l'interface complète"
     create: "place sur le bloc visé ou à votre position actuelle"
     refresh: "ticks par phase"

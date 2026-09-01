@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/potion"
+  },
+  "overrides": [
+    {
+      "predicate": { "custom_model_data": 6700 },
+      "model": "minecraft:item/lp_custom"
+    }
+  ]
+}

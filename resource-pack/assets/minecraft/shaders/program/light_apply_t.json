@@ -1,6 +1,6 @@
 {
-    "vertex": "minecraft:post/light_apply",
-    "fragment": "minecraft:post/light_apply_t",
+    "vertex": "light_apply",
+    "fragment": "light_apply_t",
     "samplers": [
         { "name": "DiffuseSampler" },
         { "name": "LightMapSampler" }

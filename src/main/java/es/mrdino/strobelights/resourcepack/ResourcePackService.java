@@ -36,19 +36,18 @@ import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 /** Loads, hosts and sends the Light Painter shader and GUI icon resource pack. */
 public final class ResourcePackService implements Listener {
 
-    private static final UUID PACK_ID = UUID.fromString("e9a7e606-b52f-4a18-b4dc-cb1919210411");
     private static final String PACK_REVISION = "0.9.6";
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
     private static final String EMBEDDED_PACK =
-        "embedded/StrobeLights-ResourcePack-1.21.4.zip";
+        "embedded/StrobeLights-ResourcePack-1.20.1.zip";
 
     private final StrobeLightsPlugin plugin;
     private final Set<UUID> loadedPlayers = ConcurrentHashMap.newKeySet();
     private final Set<UUID> compatibilityNotifiedPlayers = ConcurrentHashMap.newKeySet();
     private EmbeddedPackServer httpServer;
     private byte[] sha1;
-    private UUID packId;
+    private String sha1Hash;
     private String publicUrl;
     private boolean required;
     private long sendDelayTicks;
@@ -70,7 +69,7 @@ public final class ResourcePackService implements Listener {
 
         byte[] packBytes = readEmbeddedPack();
         sha1 = sha1(packBytes);
-        packId = PACK_ID;
+        sha1Hash = hexDigest(sha1);
         exportPack(packBytes);
         required = plugin.getConfig().getBoolean("resource-pack.required", true);
         sendDelayTicks = Math.max(
@@ -163,7 +162,8 @@ public final class ResourcePackService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPackStatus(PlayerResourcePackStatusEvent event) {
-        if (!active || !event.getID().equals(packId)) {
+        if (!active || (event.getHash() != null
+            && !event.getHash().equalsIgnoreCase(sha1Hash))) {
             return;
         }
         Player player = event.getPlayer();
@@ -177,7 +177,7 @@ public final class ResourcePackService implements Listener {
                 ));
                 sendCompatibilityNoticeLater(player);
             }
-            case DECLINED, FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD, DISCARDED -> {
+            case DECLINED, FAILED_DOWNLOAD -> {
                 loadedPlayers.remove(player.getUniqueId());
                 plugin.manager().setMarkersVisible(player, false);
                 plugin.getLogger().warning(
@@ -203,7 +203,7 @@ public final class ResourcePackService implements Listener {
                 plugin.messages().text(player, "resource-pack.prompt", "revision", PACK_REVISION),
                 NamedTextColor.AQUA
             );
-            player.setResourcePack(packId, publicUrl, sha1, prompt, required);
+            player.setResourcePack(publicUrl, sha1, prompt, required);
         }, sendDelayTicks);
     }
 
@@ -343,7 +343,7 @@ public final class ResourcePackService implements Listener {
         try {
             Path directory = plugin.getDataFolder().toPath().resolve("resource-pack");
             Files.createDirectories(directory);
-            Files.write(directory.resolve("StrobeLights-ResourcePack-1.21.4.zip"), bytes);
+            Files.write(directory.resolve("StrobeLights-ResourcePack-1.20.1.zip"), bytes);
         } catch (IOException exception) {
             plugin.getLogger().warning("Could not export a copy of the resource pack: "
                 + exception.getMessage());
@@ -372,7 +372,7 @@ public final class ResourcePackService implements Listener {
                 .sorted(Comparator.comparing(InetAddress::getHostAddress))
                 .toList();
             if (!addresses.isEmpty()) {
-                return addresses.getFirst().getHostAddress();
+                return addresses.get(0).getHostAddress();
             }
         } catch (IOException exception) {
             plugin.getLogger().warning("Could not detect the LAN IP: " + exception.getMessage());
@@ -413,6 +413,14 @@ public final class ResourcePackService implements Listener {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-1 is unavailable", exception);
         }
+    }
+
+    private static String hexDigest(byte[] digest) {
+        StringBuilder result = new StringBuilder(digest.length * 2);
+        for (byte value : digest) {
+            result.append(String.format(Locale.ROOT, "%02x", value & 0xFF));
+        }
+        return result.toString();
     }
 
     private static String urlHost(String host) {

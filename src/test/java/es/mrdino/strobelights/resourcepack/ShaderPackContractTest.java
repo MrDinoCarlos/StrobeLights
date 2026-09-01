@@ -17,14 +17,14 @@ class ShaderPackContractTest {
     private static final Path PACK = Path.of("resource-pack");
 
     @Test
-    void targetsMinecraft1214AndContainsTheLightPipeline() throws IOException {
-        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 46");
+    void targetsMinecraft1201AndContainsTheLightPipeline() throws IOException {
+        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 15");
         assertContains(
-            PACK.resolve("assets/minecraft/post_effect/transparency.json"),
-            "minecraft:post/light"
+            PACK.resolve("assets/minecraft/shaders/post/transparency.json"),
+            "\"name\": \"light\""
         );
         assertContains(
-            PACK.resolve("assets/minecraft/shaders/post/light.fsh"),
+            PACK.resolve("assets/minecraft/shaders/program/light.fsh"),
             "lightDist < lightRadius"
         );
     }
@@ -33,12 +33,12 @@ class ShaderPackContractTest {
     void keepsTheTechnicalMarkerMicroscopicButNonDegenerateForOptiFine()
         throws IOException {
         assertContains(
-            PACK.resolve("assets/minecraft/items/lime_stained_glass.json"),
-            "\"threshold\": 6700"
+            PACK.resolve("assets/minecraft/models/item/potion.json"),
+            "\"custom_model_data\": 6700"
         );
         assertContains(
-            PACK.resolve("assets/minecraft/items/lime_stained_glass.json"),
-            "minecraft:custom_model_data"
+            PACK.resolve("assets/minecraft/models/item/potion.json"),
+            "minecraft:item/lp_custom"
         );
         assertContains(
             PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
@@ -143,9 +143,9 @@ class ShaderPackContractTest {
         Path core = PACK.resolve(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
         );
-        Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
-        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
-        Path pipeline = PACK.resolve("assets/minecraft/post_effect/transparency.json");
+        Path filter = PACK.resolve("assets/minecraft/shaders/program/filter.fsh");
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
+        Path pipeline = PACK.resolve("assets/minecraft/shaders/post/transparency.json");
 
         assertNotContains(utils, "DEPTHCODEPRECISION");
         assertNotContains(utils, "decodeLightPositionDepth");
@@ -166,7 +166,7 @@ class ShaderPackContractTest {
         );
         assertContains(
             pipeline,
-            "\"sampler_name\": \"Diffuse\",\n                    \"target\": \"minecraft:item_entity\""
+            "\"name\": \"filter\""
         );
         assertNotContains(pipeline, "markerdata");
     }
@@ -200,22 +200,22 @@ class ShaderPackContractTest {
 
     @Test
     void containsThePlayerOnlyRgbCameraFlashPass() throws IOException {
-        Path flashShader = PACK.resolve("assets/minecraft/shaders/post/flash_apply.fsh");
+        Path flashShader = PACK.resolve("assets/minecraft/shaders/program/flash_apply.fsh");
         assertContains(flashShader, "isCameraFlash");
         assertContains(flashShader, "flashColor");
         assertContains(flashShader, "mix(outColor.rgb, flashColor");
         assertContains(
-            PACK.resolve("assets/minecraft/post_effect/transparency.json"),
-            "minecraft:post/flash_apply"
+            PACK.resolve("assets/minecraft/shaders/post/transparency.json"),
+            "\"name\": \"flash_apply\""
         );
         assertNotContains(flashShader, "int packed =");
         assertNotContains(flashShader, "int packed)");
         assertNotContains(
-            PACK.resolve("assets/minecraft/shaders/post/light.fsh"),
+            PACK.resolve("assets/minecraft/shaders/program/light.fsh"),
             "int packed ="
         );
         assertNotContains(
-            PACK.resolve("assets/minecraft/shaders/post/light_t.fsh"),
+            PACK.resolve("assets/minecraft/shaders/program/light_t.fsh"),
             "int packed ="
         );
     }
@@ -225,7 +225,7 @@ class ShaderPackContractTest {
         Path core = PACK.resolve(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
-        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
         assertContains(core, "2.0 / max(abs(ProjMat[1][1]), 0.0001)");
         assertContains(core, "encodeProjectionK(projectionK)");
@@ -236,7 +236,7 @@ class ShaderPackContractTest {
         assertContains(utils, "if (code == 5) return 0.400");
         assertContains(utils, "if (code == 13) return 2.000");
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
-            Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
+            Path shader = PACK.resolve("assets/minecraft/shaders/program").resolve(shaderName);
             assertContains(shader, "isOffscreenLight");
             assertContains(shader, "reconstructOffscreenLight");
             assertContains(shader, "int mode = (encodedValue >> 20) & 7");
@@ -257,7 +257,7 @@ class ShaderPackContractTest {
     @Test
     void keepsAdjacentLightsAsIndependentCenters()
         throws IOException {
-        Path centers = PACK.resolve("assets/minecraft/shaders/post/centers.fsh");
+        Path centers = PACK.resolve("assets/minecraft/shaders/program/centers.fsh");
         assertContains(centers, "bool sameEncodedMarker");
         assertContains(centers, "vec3(1.5 / 255.0)");
         assertContains(centers, "sameEncodedMarker(outColor.rgb, c1)");
@@ -273,9 +273,9 @@ class ShaderPackContractTest {
         Path coreFragment = PACK.resolve(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
         );
-        Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
-        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
-        Path pipeline = PACK.resolve("assets/minecraft/post_effect/transparency.json");
+        Path filter = PACK.resolve("assets/minecraft/shaders/program/filter.fsh");
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
+        Path pipeline = PACK.resolve("assets/minecraft/shaders/post/transparency.json");
 
         assertContains(coreVertex, "bool isSourceLight(int encodedValue)");
         assertContains(coreVertex, "lightExpansionCode = (encodedValue >> 16) & 15");
@@ -288,9 +288,9 @@ class ShaderPackContractTest {
         assertNotContains(aggregate, "MarkerDataSampler");
         assertContains(aggregate, "expansionCode = (encodedValue >> 12) & 15");
         assertNotContains(pipeline, "markerdata");
-        assertContains(pipeline, "\"height\": 5");
+        assertContains(pipeline, "\"lights\"");
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
-            Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
+            Path shader = PACK.resolve("assets/minecraft/shaders/program").resolve(shaderName);
             assertContains(shader, "return (encodedValue >> 23) == 0");
             assertContains(shader, "float((encodedValue >> 8) & 15)");
             assertContains(shader, "float((encodedValue >> 4) & 15)");
@@ -302,20 +302,20 @@ class ShaderPackContractTest {
     @Test
     void appliesLightWithoutSceneColorBlurOrDriverDependentShadowSamplers()
         throws IOException {
-        Path pipeline = PACK.resolve("assets/minecraft/post_effect/transparency.json");
+        Path pipeline = PACK.resolve("assets/minecraft/shaders/post/transparency.json");
         assertNotContains(pipeline, "minecraft:post/blur_custom");
         assertNotContains(pipeline, "\"sampler_name\": \"Blur\"");
         assertFalse(Files.exists(PACK.resolve(
-            "assets/minecraft/shaders/post/blur_custom.fsh"
+            "assets/minecraft/shaders/program/blur_custom.fsh"
         )));
         assertFalse(Files.exists(PACK.resolve(
-            "assets/minecraft/shaders/post/blur_custom.json"
+            "assets/minecraft/shaders/program/blur_custom.json"
         )));
         assertFalse(Files.exists(PACK.resolve(
-            "assets/minecraft/shaders/post/blur_custom.vsh"
+            "assets/minecraft/shaders/program/blur_custom.vsh"
         )));
         for (String shaderName : new String[] {"light_apply.fsh", "light_apply_t.fsh"}) {
-            Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
+            Path shader = PACK.resolve("assets/minecraft/shaders/program").resolve(shaderName);
             assertNotContains(shader, "BlurSampler");
             assertNotContains(shader, "blurColor");
             assertContains(shader, "vec3 illumination = Intensity * lightColor");
@@ -324,11 +324,11 @@ class ShaderPackContractTest {
 
     @Test
     void containsGuiOnlyCustomPaperIcons() throws IOException {
-        Path definition = PACK.resolve("assets/minecraft/items/paper.json");
-        assertContains(definition, "\"threshold\": 6800");
-        assertContains(definition, "\"threshold\": 6815");
-        assertContains(definition, "\"threshold\": 6822.5");
-        assertContains(definition, "\"model\": \"minecraft:item/paper\"");
+        Path definition = PACK.resolve("assets/minecraft/models/item/paper.json");
+        assertContains(definition, "\"custom_model_data\": 6800");
+        assertContains(definition, "\"custom_model_data\": 6815");
+        assertContains(definition, "\"custom_model_data\": 6822");
+        assertContains(definition, "\"parent\": \"minecraft:item/generated\"");
         assertTrue(Files.isRegularFile(PACK.resolve(
             "assets/strobelights/textures/item/gui/strobe.png"
         )));
@@ -363,9 +363,9 @@ class ShaderPackContractTest {
         assertEquals(32, groupsIcon.getHeight());
         assertEquals(32, expansionIcon.getWidth());
         assertEquals(32, expansionIcon.getHeight());
-        assertContains(definition, "\"threshold\": 6823");
+        assertContains(definition, "\"custom_model_data\": 6823");
         assertContains(definition, "strobelights:item/gui/groups");
-        assertContains(definition, "\"threshold\": 6824");
+        assertContains(definition, "\"custom_model_data\": 6824");
         assertContains(definition, "strobelights:item/gui/expansion");
         Path gui = Path.of("src/main/java/es/mrdino/strobelights/ui/StrobeGui.java");
         assertContains(gui, "title(tr(player, \"gui.delete.confirm\"), NamedTextColor.RED)");
@@ -391,7 +391,7 @@ class ShaderPackContractTest {
         assertContains(core, "float axisScale = 0.0625");
         assertContains(core, "float depthScale = 0.25");
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
-            Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
+            Path shader = PACK.resolve("assets/minecraft/shaders/program").resolve(shaderName);
             assertNotContains(shader, "lightBlocked");
             assertNotContains(shader, "rayIndex < 24");
             assertNotContains(shader, "depthGap > depthBias");
@@ -405,7 +405,7 @@ class ShaderPackContractTest {
             "#define LIGHTR 18.0"
         );
         assertContains(
-            PACK.resolve("assets/minecraft/shaders/post/light_apply.fsh"),
+            PACK.resolve("assets/minecraft/shaders/program/light_apply.fsh"),
             "vec3 colorized"
         );
     }
@@ -433,10 +433,9 @@ class ShaderPackContractTest {
 
     @Test
     void containsAnIsolatedFlashbangModelAndVorbisSound() throws IOException {
-        Path definition = PACK.resolve("assets/minecraft/items/snowball.json");
-        assertContains(definition, "\"threshold\": 6900");
-        assertContains(definition, "\"threshold\": 6900.5");
-        assertContains(definition, "\"model\": \"minecraft:item/snowball\"");
+        Path definition = PACK.resolve("assets/minecraft/models/item/snowball.json");
+        assertContains(definition, "\"custom_model_data\": 6900");
+        assertContains(definition, "\"parent\": \"minecraft:item/generated\"");
         assertTrue(Files.isRegularFile(PACK.resolve(
             "assets/strobelights/models/item/flashbang.json"
         )));
@@ -474,13 +473,17 @@ class ShaderPackContractTest {
     }
 
     private static void assertContains(Path file, String expected) throws IOException {
-        assertTrue(Files.readString(file).contains(expected), () -> file + " no contiene " + expected);
+        assertTrue(read(file).contains(expected), () -> file + " no contiene " + expected);
     }
 
     private static void assertNotContains(Path file, String forbidden) throws IOException {
         assertFalse(
-            Files.readString(file).contains(forbidden),
+            read(file).contains(forbidden),
             () -> file + " contiene la palabra GLSL reservada " + forbidden
         );
+    }
+
+    private static String read(Path file) throws IOException {
+        return Files.readString(file).replace("\r\n", "\n");
     }
 }

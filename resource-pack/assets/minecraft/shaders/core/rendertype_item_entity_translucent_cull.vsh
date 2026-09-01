@@ -1,8 +1,8 @@
 #version 150
 
-#moj_import <minecraft:light.glsl>
-#moj_import <minecraft:fog.glsl>
-#moj_import <minecraft:utils.glsl>
+#moj_import <light.glsl>
+#moj_import <fog.glsl>
+#moj_import <utils.glsl>
 
 in vec3 Position;
 in vec4 Color;
@@ -16,6 +16,7 @@ uniform sampler2D Sampler2;
 
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
+uniform mat3 IViewRotMat;
 uniform int FogShape;
 uniform float FogStart;
 uniform float FogEnd;
@@ -153,7 +154,7 @@ vec3 packOffscreenColor(
 }
 
 void main() {
-    vertexDistance = fog_distance(Position, FogShape);
+    vertexDistance = fog_distance(ModelViewMat, IViewRotMat * Position, FogShape);
     vertexColor = minecraft_mix_light(Light0_Direction, Light1_Direction, Normal, Color) * texelFetch(Sampler2, UV2 / 16, 0);
     texCoord0 = UV0;
     texCoord1 = UV1;
