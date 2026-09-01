@@ -1,4 +1,4 @@
-#version 150
+#version 330
 
 #moj_import <minecraft:utils.glsl>
 
@@ -15,7 +15,7 @@ uniform sampler2D WeatherDepthSampler;
 uniform sampler2D CloudsSampler;
 uniform sampler2D CloudsDepthSampler;
 
-uniform float Test;
+const float Test = 0.0;
 
 in vec2 texCoord;
 in vec2 oneTexel;

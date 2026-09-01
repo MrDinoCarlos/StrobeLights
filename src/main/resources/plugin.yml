@@ -1,10 +1,10 @@
 name: StrobeLights
 version: '${version}'
 main: es.mrdino.strobelights.StrobeLightsPlugin
-api-version: '1.21.4'
+api-version: '26.1'
 authors: [MrDino]
 website: https://mrdino.es/wiki/category/strobelights/
-description: 3D RGB strobe lights using the Light Painter shader for Paper 1.21.4.
+description: 3D RGB strobe lights using the Light Painter shader for Paper 26.1.2.
 softdepend: [EasyArmorStands]
 commands:
   strobe:

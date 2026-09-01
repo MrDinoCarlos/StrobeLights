@@ -17,8 +17,8 @@ class ShaderPackContractTest {
     private static final Path PACK = Path.of("resource-pack");
 
     @Test
-    void targetsMinecraft1214AndContainsTheLightPipeline() throws IOException {
-        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 46");
+    void targetsMinecraft2612AndContainsTheLightPipeline() throws IOException {
+        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 84");
         assertContains(
             PACK.resolve("assets/minecraft/post_effect/transparency.json"),
             "minecraft:post/light"
@@ -66,19 +66,19 @@ class ShaderPackContractTest {
         );
         assertNotContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/item.vsh"
             ),
             "ModelViewMat * vec4(0.0, 0.0, 0.0, 1.0)"
         );
         assertContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/item.vsh"
             ),
             "ModelViewMat * vec4(Position, 1.0)"
         );
         assertContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/item.vsh"
             ),
             "#define HALFMARKER tmp.z / 64.0"
         );
@@ -98,7 +98,7 @@ class ShaderPackContractTest {
         throws IOException {
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/item.vsh"
         );
         assertContains(utils, "#define LIGHTALPHATOLERANCE (2.0 / 255.0)");
         assertContains(
@@ -130,7 +130,7 @@ class ShaderPackContractTest {
         assertNotContains(core, "!hand && !gui");
         assertNotContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+                "assets/minecraft/shaders/core/item.fsh"
             ),
             "bool hand = isHand(FogStart, FogEnd)"
         );
@@ -141,7 +141,7 @@ class ShaderPackContractTest {
         throws IOException {
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+                "assets/minecraft/shaders/core/item.fsh"
         );
         Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
         Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
@@ -164,10 +164,9 @@ class ShaderPackContractTest {
             aggregate,
             "texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH"
         );
-        assertContains(
-            pipeline,
-            "\"sampler_name\": \"Diffuse\",\n                    \"target\": \"minecraft:item_entity\""
-        );
+        assertContains(pipeline, "\"vertex_shader\": \"minecraft:post/filter\"");
+        assertContains(pipeline, "\"target\": \"minecraft:item_entity\"");
+        assertNotContains(pipeline, "\"program\":");
         assertNotContains(pipeline, "markerdata");
     }
 
@@ -223,7 +222,7 @@ class ShaderPackContractTest {
     @Test
     void reconstructsNearAndBehindLightsFromPrivateMarkers() throws IOException {
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/item.vsh"
         );
         Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
@@ -268,10 +267,10 @@ class ShaderPackContractTest {
     void carriesPerStrobeExpansionWithoutReducingRgbOrZoomMetadata()
         throws IOException {
         Path coreVertex = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/item.vsh"
         );
         Path coreFragment = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+                "assets/minecraft/shaders/core/item.fsh"
         );
         Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
         Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
@@ -385,7 +384,7 @@ class ShaderPackContractTest {
     @Test
     void anchorsSourcesClientSideWithoutProjectingScreenSpaceShadows() throws IOException {
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/item.vsh"
         );
         assertContains(core, "offscreenProxy");
         assertContains(core, "float axisScale = 0.0625");
@@ -474,13 +473,17 @@ class ShaderPackContractTest {
     }
 
     private static void assertContains(Path file, String expected) throws IOException {
-        assertTrue(Files.readString(file).contains(expected), () -> file + " no contiene " + expected);
+        assertTrue(read(file).contains(expected), () -> file + " no contiene " + expected);
     }
 
     private static void assertNotContains(Path file, String forbidden) throws IOException {
         assertFalse(
-            Files.readString(file).contains(forbidden),
+            read(file).contains(forbidden),
             () -> file + " contiene la palabra GLSL reservada " + forbidden
         );
+    }
+
+    private static String read(Path file) throws IOException {
+        return Files.readString(file).replace("\r\n", "\n");
     }
 }

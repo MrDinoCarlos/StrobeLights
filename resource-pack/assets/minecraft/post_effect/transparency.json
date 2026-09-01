@@ -3,359 +3,140 @@
         "swap1": {},
         "swap2": {},
         "swap3": {},
-        "passthrough": {},
         "lightmap1": {},
         "lightmap2": {},
-        "lights": {"width": 1024, "height": 5, "bilinear": false }
+        "lights": {"width": 1024, "height": 5, "bilinear": false}
     },
     "passes": [
         {
-            "program": "minecraft:post/filter",
+            "vertex_shader": "minecraft:post/filter",
+            "fragment_shader": "minecraft:post/filter",
             "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "minecraft:item_entity"
-                },
-                {
-                    "sampler_name": "DiffuseDepth",
-                    "target": "minecraft:item_entity",
-                    "use_depth_buffer": true
-                }
-            ],
-            "output": "swap1",
-            "uniforms": [
-                {
-                    "name":"Range",
-                    "values": [ 128.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/centers",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "swap1"
-                }
-            ],
-            "output": "swap3"
-        },
-        {
-            "program": "minecraft:post/aggregate_1",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "swap3"
-                }
-            ],
-            "output": "swap1",
-            "uniforms": [
-                {
-                    "name":"Step",
-                    "values": [ 8.0 ]
-                },
-                {
-                    "name":"Test",
-                    "values": [ 0.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/aggregate_2",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "swap1"
-                }
-            ],
-            "output": "swap2",
-            "uniforms": [
-                {
-                    "name":"Step",
-                    "values": [ 8.0 ]
-                },
-                {
-                    "name":"Test",
-                    "values": [ 0.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/aggregate_3",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "swap2"
-                }
-            ],
-            "output": "swap1",
-            "uniforms": [
-                {
-                    "name":"Step",
-                    "values": [ 8.0 ]
-                },
-                {
-                    "name":"Test",
-                    "values": [ 0.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/aggregate_4",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "swap1"
-                }
-            ],
-            "output": "swap2",
-            "uniforms": [
-                {
-                    "name":"Step",
-                    "values": [ 8.0 ]
-                },
-                {
-                    "name":"Test",
-                    "values": [ 0.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/aggregate_5",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "swap2"
-                }
-            ],
-            "output": "swap1",
-            "uniforms": [
-                {
-                    "name":"Step",
-                    "values": [ 8.0 ]
-                },
-                {
-                    "name":"Test",
-                    "values": [ 0.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/aggregate_6",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "swap1"
-                },
-                {
-                    "sampler_name": "ItemEntityDepth",
-                    "target": "minecraft:item_entity",
-                    "use_depth_buffer": true
-                },
-                {
-                    "sampler_name": "ColoredCenters",
-                    "target": "swap3"
-                }
-            ],
-            "output": "lights",
-            "uniforms": [
-                {
-                    "name":"Step",
-                    "values": [ 8.0 ]
-                },
-                {
-                    "name":"FOV",
-                    "values": [ 70.0 ]
-                },
-                {
-                    "name":"Test",
-                    "values": [ 0.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/light",
-            "inputs": [
-                {
-                    "sampler_name": "DiffuseDepth",
-                    "target": "minecraft:main",
-                    "use_depth_buffer": true
-                },
-                {
-                    "sampler_name": "Lights",
-                    "target": "lights"
-                }
-            ],
-            "output": "lightmap1",
-            "uniforms": [
-                {
-                    "name":"FOV",
-                    "values": [ 70.0 ]
-                },
-                {
-                    "name":"Range",
-                    "values": [ 128.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/light_t",
-            "inputs": [
-                {
-                    "sampler_name": "DiffuseDepth",
-                    "target": "minecraft:translucent",
-                    "use_depth_buffer": true
-                },
-                {
-                    "sampler_name": "Lights",
-                    "target": "lights"
-                },
-                {
-                    "sampler_name": "CompareDepth",
-                    "target": "minecraft:main",
-                    "use_depth_buffer": true
-                }
-            ],
-            "output": "lightmap2",
-            "uniforms": [
-                {
-                    "name":"FOV",
-                    "values": [ 70.0 ]
-                },
-                {
-                    "name":"Range",
-                    "values": [ 128.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/light_apply",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "minecraft:main"
-                },
-                {
-                    "sampler_name": "LightMap",
-                    "target": "lightmap1"
-                }
-            ],
-            "output": "swap1",
-            "uniforms": [
-                {
-                    "name":"Intensity",
-                    "values": [ 1.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/light_apply_t",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "minecraft:translucent"
-                },
-                {
-                    "sampler_name": "LightMap",
-                    "target": "lightmap2"
-                }
-            ],
-            "output": "swap2",
-            "uniforms": [
-                {
-                    "name":"Intensity",
-                    "values": [ 1.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/transparency",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "swap1"
-                },
-                {
-                    "sampler_name": "DiffuseDepth",
-                    "target": "minecraft:main",
-                    "use_depth_buffer": true
-                },
-                {
-                    "sampler_name": "Translucent",
-                    "target": "swap2"
-                },
-                {
-                    "sampler_name": "TranslucentDepth",
-                    "target": "minecraft:translucent",
-                    "use_depth_buffer": true
-                },
-                {
-                    "sampler_name": "ItemEntity",
-                    "target": "minecraft:item_entity"
-                },
-                {
-                    "sampler_name": "ItemEntityDepth",
-                    "target": "minecraft:item_entity",
-                    "use_depth_buffer": true
-                },
-                {
-                    "sampler_name": "Particles",
-                    "target": "minecraft:particles"
-                },
-                {
-                    "sampler_name": "ParticlesDepth",
-                    "target": "minecraft:particles",
-                    "use_depth_buffer": true
-                },
-                {
-                    "sampler_name": "Clouds",
-                    "target": "minecraft:clouds"
-                },
-                {
-                    "sampler_name": "CloudsDepth",
-                    "target": "minecraft:clouds",
-                    "use_depth_buffer": true
-                },
-                {
-                    "sampler_name": "Weather",
-                    "target": "minecraft:weather"
-                },
-                {
-                    "sampler_name": "WeatherDepth",
-                    "target": "minecraft:weather",
-                    "use_depth_buffer": true
-                }
-            ],
-            "output": "swap3",
-            "uniforms": [
-                {
-                    "name":"Test",
-                    "values": [ 0.0 ]
-                }
-            ]
-        },
-        {
-            "program": "minecraft:post/flash_apply",
-            "inputs": [
-                {
-                    "sampler_name": "Diffuse",
-                    "target": "swap3"
-                },
-                {
-                    "sampler_name": "Lights",
-                    "target": "lights"
-                }
+                {"sampler_name": "Diffuse", "target": "minecraft:item_entity"},
+                {"sampler_name": "DiffuseDepth", "target": "minecraft:item_entity", "use_depth_buffer": true}
             ],
             "output": "swap1"
         },
         {
-            "program": "minecraft:post/blit",
+            "vertex_shader": "minecraft:post/centers",
+            "fragment_shader": "minecraft:post/centers",
+            "inputs": [{"sampler_name": "Diffuse", "target": "swap1"}],
+            "output": "swap3"
+        },
+        {
+            "vertex_shader": "minecraft:post/aggregate",
+            "fragment_shader": "minecraft:post/aggregate_1",
+            "inputs": [{"sampler_name": "Diffuse", "target": "swap3"}],
+            "output": "swap1"
+        },
+        {
+            "vertex_shader": "minecraft:post/aggregate",
+            "fragment_shader": "minecraft:post/aggregate_2",
+            "inputs": [{"sampler_name": "Diffuse", "target": "swap1"}],
+            "output": "swap2"
+        },
+        {
+            "vertex_shader": "minecraft:post/aggregate",
+            "fragment_shader": "minecraft:post/aggregate_3",
+            "inputs": [{"sampler_name": "Diffuse", "target": "swap2"}],
+            "output": "swap1"
+        },
+        {
+            "vertex_shader": "minecraft:post/aggregate",
+            "fragment_shader": "minecraft:post/aggregate_4",
+            "inputs": [{"sampler_name": "Diffuse", "target": "swap1"}],
+            "output": "swap2"
+        },
+        {
+            "vertex_shader": "minecraft:post/aggregate",
+            "fragment_shader": "minecraft:post/aggregate_5",
+            "inputs": [{"sampler_name": "Diffuse", "target": "swap2"}],
+            "output": "swap1"
+        },
+        {
+            "vertex_shader": "minecraft:post/aggregate_6",
+            "fragment_shader": "minecraft:post/aggregate_6",
             "inputs": [
-                {
-                    "sampler_name": "In",
-                    "target": "swap1"
-                }
+                {"sampler_name": "Diffuse", "target": "swap1"},
+                {"sampler_name": "ItemEntityDepth", "target": "minecraft:item_entity", "use_depth_buffer": true},
+                {"sampler_name": "ColoredCenters", "target": "swap3"}
             ],
+            "output": "lights"
+        },
+        {
+            "vertex_shader": "minecraft:post/light",
+            "fragment_shader": "minecraft:post/light",
+            "inputs": [
+                {"sampler_name": "DiffuseDepth", "target": "minecraft:main", "use_depth_buffer": true},
+                {"sampler_name": "Lights", "target": "lights"}
+            ],
+            "output": "lightmap1"
+        },
+        {
+            "vertex_shader": "minecraft:post/light",
+            "fragment_shader": "minecraft:post/light_t",
+            "inputs": [
+                {"sampler_name": "DiffuseDepth", "target": "minecraft:translucent", "use_depth_buffer": true},
+                {"sampler_name": "Lights", "target": "lights"},
+                {"sampler_name": "CompareDepth", "target": "minecraft:main", "use_depth_buffer": true}
+            ],
+            "output": "lightmap2"
+        },
+        {
+            "vertex_shader": "minecraft:post/light_apply",
+            "fragment_shader": "minecraft:post/light_apply",
+            "inputs": [
+                {"sampler_name": "Diffuse", "target": "minecraft:main"},
+                {"sampler_name": "LightMap", "target": "lightmap1"}
+            ],
+            "output": "swap1"
+        },
+        {
+            "vertex_shader": "minecraft:post/light_apply",
+            "fragment_shader": "minecraft:post/light_apply_t",
+            "inputs": [
+                {"sampler_name": "Diffuse", "target": "minecraft:translucent"},
+                {"sampler_name": "LightMap", "target": "lightmap2"}
+            ],
+            "output": "swap2"
+        },
+        {
+            "vertex_shader": "minecraft:post/transparency",
+            "fragment_shader": "minecraft:post/transparency",
+            "inputs": [
+                {"sampler_name": "Diffuse", "target": "swap1"},
+                {"sampler_name": "DiffuseDepth", "target": "minecraft:main", "use_depth_buffer": true},
+                {"sampler_name": "Translucent", "target": "swap2"},
+                {"sampler_name": "TranslucentDepth", "target": "minecraft:translucent", "use_depth_buffer": true},
+                {"sampler_name": "ItemEntity", "target": "minecraft:item_entity"},
+                {"sampler_name": "ItemEntityDepth", "target": "minecraft:item_entity", "use_depth_buffer": true},
+                {"sampler_name": "Particles", "target": "minecraft:particles"},
+                {"sampler_name": "ParticlesDepth", "target": "minecraft:particles", "use_depth_buffer": true},
+                {"sampler_name": "Clouds", "target": "minecraft:clouds"},
+                {"sampler_name": "CloudsDepth", "target": "minecraft:clouds", "use_depth_buffer": true},
+                {"sampler_name": "Weather", "target": "minecraft:weather"},
+                {"sampler_name": "WeatherDepth", "target": "minecraft:weather", "use_depth_buffer": true}
+            ],
+            "output": "swap3"
+        },
+        {
+            "vertex_shader": "minecraft:post/flash_apply",
+            "fragment_shader": "minecraft:post/flash_apply",
+            "inputs": [
+                {"sampler_name": "Diffuse", "target": "swap3"},
+                {"sampler_name": "Lights", "target": "lights"}
+            ],
+            "output": "swap1"
+        },
+        {
+            "vertex_shader": "minecraft:core/screenquad",
+            "fragment_shader": "minecraft:post/blit",
+            "inputs": [{"sampler_name": "In", "target": "swap1"}],
+            "uniforms": {
+                "BlitConfig": [
+                    {"name": "ColorModulate", "type": "vec4", "value": [1.0, 1.0, 1.0, 1.0]}
+                ]
+            },
             "output": "minecraft:main"
         }
     ]
