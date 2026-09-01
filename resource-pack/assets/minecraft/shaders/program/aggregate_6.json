@@ -7,7 +7,7 @@
         { "name": "ColoredCentersSampler" }
     ],
     "uniforms": [
-        { "name": "DiffuseSize",    "type": "float",     "count": 2,  "values": [ 1.0, 1.0 ] },
+        { "name": "InSize",         "type": "float",     "count": 2,  "values": [ 1.0, 1.0 ] },
         { "name": "Step",           "type": "float",     "count": 1,  "values": [ 8.0 ] },
         { "name": "FOV",            "type": "float",     "count": 1,  "values": [ 70.0 ] },
         { "name": "Test",           "type": "float",     "count": 1,  "values": [ 0.0 ] }

@@ -4,7 +4,7 @@ in vec4 Position;
 
 uniform sampler2D LightsSampler;
 uniform mat4 ProjMat;
-uniform vec2 LightsSize;
+uniform vec2 AuxSize0;
 
 out vec2 texCoord;
 flat out vec2 oneTexelLights;
@@ -19,7 +19,7 @@ int decodeInt(vec4 encoded) {
 void main() {
     vec4 outPos = ProjMat * vec4(Position.xy, 0.0, 1.0);
     texCoord = outPos.xy * 0.5 + 0.5;
-    oneTexelLights = 1.0 / LightsSize;
+    oneTexelLights = 1.0 / AuxSize0;
 
     vec4 encodedCount = texture(
         LightsSampler,

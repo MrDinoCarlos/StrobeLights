@@ -1,7 +1,7 @@
 #version 150
 
 uniform sampler2D DiffuseSampler;
-uniform vec2 DiffuseSize;
+uniform vec2 InSize;
 uniform float Step;
 uniform float Test;
 
@@ -12,8 +12,8 @@ out vec4 outColor;
 
 void main() {
     outColor = texture(DiffuseSampler, texCoord);
-    float width = ceil(DiffuseSize.x / Step);
-    float height = ceil(DiffuseSize.y / Step);
+    float width = ceil(InSize.x / Step);
+    float height = ceil(InSize.y / Step);
     vec2 samplepos = gl_FragCoord.xy - 0.5;
     samplepos = vec2((samplepos.x - 2.0 * width) * Step + width, samplepos.y);
     if (samplepos.x >= width && samplepos.x < 2.0 * width && samplepos.y < height) {

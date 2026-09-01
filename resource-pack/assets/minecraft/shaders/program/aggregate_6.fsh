@@ -35,7 +35,7 @@ float decodeProjectionK(int code) {
 uniform sampler2D DiffuseSampler;
 uniform sampler2D ItemEntityDepthSampler;
 uniform sampler2D ColoredCentersSampler;
-uniform vec2 DiffuseSize;
+uniform vec2 InSize;
 uniform float Step;
 uniform float Test;
 
@@ -73,9 +73,9 @@ bool isOffscreenLight(int encodedValue) {
 }
 
 void main() {
-    float width = ceil(DiffuseSize.x / Step);
+    float width = ceil(InSize.x / Step);
     float width2 = ceil(width / Step);
-    float height = ceil(DiffuseSize.y / (Step));
+    float height = ceil(InSize.y / (Step));
     float height2 = ceil(height / (Step));
     vec2 pos = gl_FragCoord.xy - 0.5;
     float targetNum = pos.x + 1.0;
@@ -86,7 +86,7 @@ void main() {
     int px = 0;
     int py = 0;
     for (int iter = 0; iter < int(width2); iter += 1) {
-        float l0count = texture(DiffuseSampler, (vec2(samplepos.x + float(iter), 0.0) + 0.5) / DiffuseSize).r * 255.0;
+        float l0count = texture(DiffuseSampler, (vec2(samplepos.x + float(iter), 0.0) + 0.5) / InSize).r * 255.0;
         if (tmpCounter + l0count >= targetNum) {
             status = 1.0;
             px = iter;
@@ -101,7 +101,7 @@ void main() {
     if (status == 1.0) {
         samplepos = vec2(2.0 * width + width2 + float(px), 0.0);
         for (int iter = 0; iter < int(height2); iter += 1) {
-            float l1count = texture(DiffuseSampler, (vec2(samplepos.x, float(iter)) + 0.5) / DiffuseSize).r * 255.0;
+            float l1count = texture(DiffuseSampler, (vec2(samplepos.x, float(iter)) + 0.5) / InSize).r * 255.0;
             if (tmpCounter + l1count >= targetNum) {
                 status = 2.0;
                 py = iter;
@@ -116,7 +116,7 @@ void main() {
         py *= int(Step);
         samplepos = vec2(2.0 * width + float(px), float(py));
         for (int iter = 0; iter < int(Step); iter += 1) {
-            float l2count = texture(DiffuseSampler, (vec2(samplepos.x, samplepos.y + float(iter)) + 0.5) / DiffuseSize).r * 255.0;
+            float l2count = texture(DiffuseSampler, (vec2(samplepos.x, samplepos.y + float(iter)) + 0.5) / InSize).r * 255.0;
             if (tmpCounter + l2count >= targetNum) {
                 status = 3.0;
                 py += iter;
@@ -131,7 +131,7 @@ void main() {
         px *= int(Step);
         samplepos = vec2(width + float(px), float(py));
         for (int iter = 0; iter < int(Step); iter += 1) {
-            float l3count = texture(DiffuseSampler, (vec2(samplepos.x + float(iter), samplepos.y) + 0.5) / DiffuseSize).r * 255.0;
+            float l3count = texture(DiffuseSampler, (vec2(samplepos.x + float(iter), samplepos.y) + 0.5) / InSize).r * 255.0;
             if (px + iter < int(width) && tmpCounter + l3count >= targetNum) {
                 status = 4.0;
                 px += iter;
@@ -146,7 +146,7 @@ void main() {
         py *= int(Step);
         samplepos = vec2(float(px), float(py));
         for (int iter = 0; iter < int(Step); iter += 1) {
-            float l4count = texture(DiffuseSampler, (vec2(samplepos.x, samplepos.y + float(iter)) + 0.5) / DiffuseSize).r * 255.0;
+            float l4count = texture(DiffuseSampler, (vec2(samplepos.x, samplepos.y + float(iter)) + 0.5) / InSize).r * 255.0;
             if (tmpCounter + l4count >= targetNum) {
                 status = 5.0;
                 py += iter;
@@ -162,7 +162,7 @@ void main() {
         px *= int(Step);
         samplepos = vec2(float(px), float(py));
         for (int iter = 0; iter < int(Step); iter += 1) {
-            sampleColor = texture(ColoredCentersSampler, (vec2(samplepos.x + float(iter), samplepos.y) + 0.5) / DiffuseSize);
+            sampleColor = texture(ColoredCentersSampler, (vec2(samplepos.x + float(iter), samplepos.y) + 0.5) / InSize);
             float isLight = sampleColor.a;
             if (tmpCounter + isLight == targetNum) {
                 px += iter;

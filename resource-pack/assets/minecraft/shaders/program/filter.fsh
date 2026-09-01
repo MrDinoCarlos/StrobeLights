@@ -14,7 +14,7 @@ float LinearizeDepth(float depth) {
 uniform sampler2D DiffuseSampler;
 uniform sampler2D DiffuseDepthSampler;
 uniform float Range;
-uniform vec2 DiffuseSize;
+uniform vec2 InSize;
 
 in vec2 texCoord;
 
@@ -37,7 +37,7 @@ void main() {
     if (depth < LIGHTDEPTH) {
         depth = LinearizeDepth(depth / LIGHTDEPTH);
         if (depth < Range) {
-            vec2 oneTexel = 1.0 / DiffuseSize;
+            vec2 oneTexel = 1.0 / InSize;
             vec4 candidate = texture(DiffuseSampler, texCoord);
             vec4 guardBefore = texture(
                 DiffuseSampler,

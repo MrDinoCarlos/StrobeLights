@@ -218,7 +218,8 @@ class ShaderPackContractTest {
         assertContains(filter, "ivec4(61, 186, 2, 255)");
         assertContains(filter, "candidate.a >= 254.5 / 255.0");
         assertContains(filter, "outColor = vec4(candidate.rgb, 1.0)");
-        assertContains(filterDefinition, "\"DiffuseSize\"");
+        assertContains(filterDefinition, "\"InSize\"");
+        assertNotContains(filterDefinition, "\"DiffuseSize\"");
         assertNotContains(filter, "payloadIndex");
         assertNotContains(filter, "cellBytes.a - 2");
         assertContains(aggregate, "texture(ItemEntityDepthSampler, samplepos).r");
@@ -234,6 +235,63 @@ class ShaderPackContractTest {
             "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
         )));
         assertNotContains(pipeline, "carriers");
+    }
+
+    @Test
+    void usesMinecraft1201PostPassSizeUniforms() throws IOException {
+        Path programs = PACK.resolve("assets/minecraft/shaders/program");
+        for (String shaderName : new String[] {
+            "filter.fsh",
+            "centers.vsh",
+            "aggregate.vsh",
+            "aggregate_1.fsh",
+            "aggregate_2.fsh",
+            "aggregate_3.fsh",
+            "aggregate_4.fsh",
+            "aggregate_5.fsh",
+            "aggregate_6.vsh",
+            "aggregate_6.fsh"
+        }) {
+            assertContains(programs.resolve(shaderName), "uniform vec2 InSize");
+        }
+        for (String definitionName : new String[] {
+            "filter.json",
+            "centers.json",
+            "aggregate_1.json",
+            "aggregate_2.json",
+            "aggregate_3.json",
+            "aggregate_4.json",
+            "aggregate_5.json",
+            "aggregate_6.json"
+        }) {
+            assertContains(programs.resolve(definitionName), "\"name\": \"InSize\"");
+        }
+
+        Path lightVertex = programs.resolve("light.vsh");
+        assertContains(lightVertex, "uniform vec2 InSize");
+        assertContains(lightVertex, "uniform vec2 AuxSize1");
+        assertContains(lightVertex, "oneTexelAux1 = 1.0 / AuxSize1");
+        for (String definitionName : new String[] {"light.json", "light_t.json"}) {
+            Path definition = programs.resolve(definitionName);
+            assertContains(definition, "\"name\": \"InSize\"");
+            assertContains(definition, "\"name\": \"AuxSize1\"");
+        }
+
+        Path flashVertex = programs.resolve("flash_apply.vsh");
+        assertContains(flashVertex, "uniform vec2 AuxSize0");
+        assertContains(flashVertex, "oneTexelLights = 1.0 / AuxSize0");
+        assertContains(
+            programs.resolve("flash_apply.json"),
+            "\"name\": \"AuxSize0\""
+        );
+
+        try (var shaders = Files.walk(programs)) {
+            for (Path shader : shaders.filter(Files::isRegularFile).toList()) {
+                assertNotContains(shader, "DiffuseSize");
+                assertNotContains(shader, "DiffuseDepthSize");
+                assertNotContains(shader, "LightsSize");
+            }
+        }
     }
 
     @Test
