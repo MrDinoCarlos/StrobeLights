@@ -42,10 +42,11 @@ tasks.test {
 }
 
 val generatedLegacyCarrierPack = layout.buildDirectory.dir(
-    "generated/legacy-carrier-pack"
+    "generated/legacy-carrier-pack-opaque"
 )
 
 val generateLegacyCarrierPack = tasks.register("generateLegacyCarrierPack") {
+    inputs.property("carrierEncodingVersion", 2)
     outputs.dir(generatedLegacyCarrierPack)
 
     doLast {
@@ -62,28 +63,42 @@ val generateLegacyCarrierPack = tasks.register("generateLegacyCarrierPack") {
         val overrides = mutableListOf<String>()
         for (highByte in 0..255) {
             val suffix = highByte.toString(16).padStart(2, '0')
-            val texture = BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)
-            val sourcePixel = (24 shl 24) or (highByte shl 16) or
+            val sourceTexture = BufferedImage(
+                16,
+                16,
+                BufferedImage.TYPE_INT_ARGB
+            )
+            val flashTexture = BufferedImage(
+                16,
+                16,
+                BufferedImage.TYPE_INT_ARGB
+            )
+            val sourcePixel = (255 shl 24) or (highByte shl 16) or
                 (32 shl 8) or 224
-            val flashPixel = (24 shl 24) or (highByte shl 16) or
+            val flashPixel = (255 shl 24) or (highByte shl 16) or
                 (224 shl 8) or 32
             for (y in 0 until 16) {
                 for (x in 0 until 16) {
-                    val pixel = if (x < 8) sourcePixel else flashPixel
-                    texture.setRGB(x, y, pixel)
+                    sourceTexture.setRGB(x, y, sourcePixel)
+                    flashTexture.setRGB(x, y, flashPixel)
                 }
             }
             check(ImageIO.write(
-                texture,
+                sourceTexture,
                 "png",
-                textureDirectory.resolve("$suffix.png")
+                textureDirectory.resolve("source_$suffix.png")
+            ))
+            check(ImageIO.write(
+                flashTexture,
+                "png",
+                textureDirectory.resolve("flash_$suffix.png")
             ))
 
             itemModelDirectory.resolve("source_$suffix.json").writeText(
                 """
                 {
                   "parent": "minecraft:item/lp_payload_source_base",
-                  "textures": { "0": "minecraft:misc/lp_payload/$suffix" }
+                  "textures": { "0": "minecraft:misc/lp_payload/source_$suffix" }
                 }
                 """.trimIndent() + "\n"
             )
@@ -91,7 +106,7 @@ val generateLegacyCarrierPack = tasks.register("generateLegacyCarrierPack") {
                 """
                 {
                   "parent": "minecraft:item/lp_payload_flash_base",
-                  "textures": { "0": "minecraft:misc/lp_payload/$suffix" }
+                  "textures": { "0": "minecraft:misc/lp_payload/flash_$suffix" }
                 }
                 """.trimIndent() + "\n"
             )

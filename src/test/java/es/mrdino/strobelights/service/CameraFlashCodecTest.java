@@ -61,6 +61,19 @@ class CameraFlashCodecTest {
     }
 
     @Test
+    void transportsSaturatedRedWithoutFallingBackToWhite() {
+        int packed = StrobeManager.packSourceLightColor(0xFF0000, 15, 3);
+        StrobeManager.MarkerCarrier carrier = StrobeManager.markerCarrier(packed);
+
+        assertEquals(0xA3F005, packed);
+        assertEquals(0x3F00, carrier.transportValue());
+        assertEquals(6_763, carrier.customModelData());
+        assertEquals(0, carrier.blockLight());
+        assertEquals(0, carrier.skyLight());
+        assertEquals(false, carrier.cameraFlash());
+    }
+
+    @Test
     void transportsCameraFlashThroughModelAndLightmapWithoutLeatherTint() {
         int packed = StrobeManager.packCameraFlashColor(0x2A80F4, 0.75);
         StrobeManager.MarkerCarrier carrier = StrobeManager.markerCarrier(packed);

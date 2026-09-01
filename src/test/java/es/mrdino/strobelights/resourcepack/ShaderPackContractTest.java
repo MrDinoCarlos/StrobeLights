@@ -16,7 +16,7 @@ class ShaderPackContractTest {
 
     private static final Path PACK = Path.of("resource-pack");
     private static final Path GENERATED_PACK = Path.of(
-        "build/generated/legacy-carrier-pack"
+        "build/generated/legacy-carrier-pack-opaque"
     );
 
     @Test
@@ -97,10 +97,11 @@ class ShaderPackContractTest {
         Path flashModel = PACK.resolve(
             "assets/minecraft/models/item/lp_payload_flash_base.json"
         );
-        assertContains(sourceModel, "\"from\": [7.5, 8, 7.5]");
-        assertContains(sourceModel, "\"scale\": [0.002, 0.002, 0.002]");
-        assertContains(sourceModel, "\"uv\": [4, 8, 4, 8]");
-        assertContains(flashModel, "\"uv\": [12, 8, 12, 8]");
+        assertContains(sourceModel, "\"from\": [4, 8, 4]");
+        assertContains(sourceModel, "\"to\": [12, 8, 12]");
+        assertContains(sourceModel, "\"scale\": [0, 0, 0]");
+        assertContains(sourceModel, "\"uv\": [0, 0, 16, 16]");
+        assertContains(flashModel, "\"uv\": [0, 0, 16, 16]");
 
         Path payloadModels = GENERATED_PACK.resolve(
             "assets/minecraft/models/item/lp_payload"
@@ -108,14 +109,26 @@ class ShaderPackContractTest {
         try (var files = Files.list(payloadModels)) {
             assertEquals(512L, files.filter(Files::isRegularFile).count());
         }
-        var texture = ImageIO.read(GENERATED_PACK.resolve(
-            "assets/minecraft/textures/misc/lp_payload/7f.png"
+        Path payloadTextures = GENERATED_PACK.resolve(
+            "assets/minecraft/textures/misc/lp_payload"
+        );
+        try (var files = Files.list(payloadTextures)) {
+            assertEquals(512L, files.filter(Files::isRegularFile).count());
+        }
+        var sourceTexture = ImageIO.read(payloadTextures.resolve(
+            "source_7f.png"
         ).toFile());
-        assertEquals(24, texture.getRGB(0, 0) >>> 24);
-        assertEquals(16, texture.getWidth());
-        assertEquals(16, texture.getHeight());
-        assertEquals(0x7F20E0, texture.getRGB(0, 8) & 0xFFFFFF);
-        assertEquals(0x7FE020, texture.getRGB(15, 8) & 0xFFFFFF);
+        var flashTexture = ImageIO.read(payloadTextures.resolve(
+            "flash_7f.png"
+        ).toFile());
+        assertEquals(255, sourceTexture.getRGB(0, 0) >>> 24);
+        assertEquals(255, flashTexture.getRGB(0, 0) >>> 24);
+        assertEquals(16, sourceTexture.getWidth());
+        assertEquals(16, sourceTexture.getHeight());
+        assertEquals(0x7F20E0, sourceTexture.getRGB(0, 0) & 0xFFFFFF);
+        assertEquals(0x7F20E0, sourceTexture.getRGB(15, 15) & 0xFFFFFF);
+        assertEquals(0x7FE020, flashTexture.getRGB(0, 0) & 0xFFFFFF);
+        assertEquals(0x7FE020, flashTexture.getRGB(15, 15) & 0xFFFFFF);
 
         assertFalse(Files.exists(PACK.resolve(
             "assets/minecraft/models/item/leather_horse_armor.json"
@@ -124,18 +137,17 @@ class ShaderPackContractTest {
             PACK.resolve("assets/minecraft/models/item/potion.json"),
             "\"custom_model_data\": 6700"
         );
-        assertNotContains(manager, "display.setBillboard(Display.Billboard.FIXED)");
+        assertContains(manager, "display.setBillboard(Display.Billboard.FIXED)");
     }
 
     @Test
-    void decodesPayloadFromTextureAndLightmapDespiteOptiFinePremultiplication()
+    void decodesOpaqueMipZeroPayloadFromTextureAndLightmap()
         throws IOException {
-        Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
         Path core = PACK.resolve(
             "assets/minecraft/shaders/core/"
                 + "rendertype_item_entity_translucent_cull.vsh"
         );
-        assertContains(utils, "#define LIGHTALPHATOLERANCE (2.0 / 255.0)");
+        assertContains(core, "textureLod(Sampler0, UV0, 0.0)");
         assertContains(core, "decodeTechnicalPayload(tmpcol, UV2)");
         assertContains(core, "carrierTexel.r / max(reference");
         assertContains(core, "lightCoordinates.x / 16");
@@ -144,8 +156,9 @@ class ShaderPackContractTest {
         assertContains(core, "flashTexture");
         assertContains(
             core,
-            "abs(tmpcol.a - LIGHTALPHA) <= LIGHTALPHATOLERANCE"
+            "tmpcol.a >= 254.5 / 255.0"
         );
+        assertNotContains(core, "abs(tmpcol.a - LIGHTALPHA)");
         assertContains(core, "markerTexturePeak >= tmpcol.a * 0.5");
         assertContains(core, "markerTexturePeak > markerTextureBase * 2.0");
         assertContains(core, "&& encodedTechnicalCarrier");

@@ -12,8 +12,6 @@
 #define LIGHT_BOOST 1.45
 
 #define ALPHACUTOFF (21.5 / 255.0)
-#define LIGHTALPHA (24.0 / 255.0)
-#define LIGHTALPHATOLERANCE (2.0 / 255.0)
 #define LIGHTDEPTH 0.025
 
 float decodeExpansionScale(int code) {

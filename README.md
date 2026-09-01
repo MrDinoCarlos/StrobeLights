@@ -278,13 +278,15 @@ The HTTP port must be open over TCP and differ from the Minecraft port.
 - The OptiFine carrier contract is protected by automated tests. The technical
   item is translucent `LIME_STAINED_GLASS`, matching Light Painter's proven
   1.20.1 `rendertype_item_entity_translucent_cull` route. A generated payload
-  atlas carries the high byte and the display lightmap coordinates carry the
-  low byte; the shader rebuilds the full RGB/size or camera-flash packet. The
-  atlas uses channel ratios so OptiFine premultiplication cannot change the
-  decoded value. Nine low-alpha pixels carry that packet and compressed source
-  depth inside `itemEntity`; the transparency composite removes them from the
-  visible scene. Fast/Fancy never opens that target, discards the low-alpha
-  technical model and continues to show only the vanilla white fallback.
+  texture carries the high byte and the display lightmap coordinates carry the
+  low byte; the shader rebuilds the full RGB/size or camera-flash packet. Source
+  and flash use independent, opaque, uniform textures sampled explicitly at mip
+  zero, preventing atlas filtering and OptiFine alpha handling from corrupting
+  the input. The invisible zero-scale model follows Light Painter's fixed
+  `ItemDisplay` contract. After recognition, nine low-alpha pixels carry the
+  packet and compressed source depth inside `itemEntity`; the transparency
+  composite removes them from the visible scene. Fast/Fancy never opens that
+  target and continues to show only the vanilla white fallback.
 - After the pack loads, clients whose reported brand explicitly identifies
   OptiFine can receive a short translated reminder of those settings.
   Standalone OptiFine normally reports itself as vanilla, so it receives the

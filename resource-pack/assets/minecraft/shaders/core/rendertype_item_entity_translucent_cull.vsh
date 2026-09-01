@@ -37,8 +37,9 @@ flat out float marker;
 flat out vec4 markerPayload;
 out float scale;
 
-// The quad only supplies a 3x3 micro-carrier. Each cell is nearly transparent
-// and the Fabulous pass rebuilds the exact payload from those faint bits.
+// The invisible item model only anchors a 3x3 micro-carrier. The core fragment
+// shader writes its faint technical bits after this vertex shader recognizes
+// the opaque, uniform source texture.
 #define HALFMARKER tmp.z / 64.0
 
 float opz(vec4 pos, float factor, float bias) {
@@ -204,19 +205,21 @@ void main() {
     normal = ProjMat * ModelViewMat * vec4(Normal, 0.0);
     markerPayload = vec4(0.0);
 
-    vec4 tmpcol = texture(Sampler0, UV0);
+    // Vertex texture sampling has no screen-space derivatives. Force mip zero
+    // so atlas minification cannot blend the source/flash signature or payload.
+    vec4 tmpcol = textureLod(Sampler0, UV0, 0.0);
     vec4 tmp = ModelViewMat * vec4(Position, 1.0);
     bool gui = isGUI(ProjMat);
 
     int encodedValue = decodeTechnicalPayload(tmpcol, UV2);
     bool encodedTechnicalCarrier = isCameraFlash(encodedValue)
         || isSourceLight(encodedValue);
-    // OptiFine can quantize the atlas alpha by one or two 8-bit steps while
-    // rebuilding the item model. The payload signature is therefore checked
-    // independently instead of treating every low-alpha item as a light.
-    bool markerAlpha = abs(tmpcol.a - LIGHTALPHA) <= LIGHTALPHATOLERANCE;
-    // Blue-dominant texels carry source lights and green-dominant texels carry
-    // camera flashes. Their channel ratio survives OptiFine premultiplication.
+    // Keep the atlas source opaque, like Light Painter's proven 1.20.1 carrier.
+    // The core fragment shader, not the item texture, creates the low-alpha
+    // technical pixels consumed by the Fabulous transparency pipeline.
+    bool markerAlpha = tmpcol.a >= 254.5 / 255.0;
+    // Blue-dominant textures carry source lights and green-dominant textures
+    // carry camera flashes. Each generated texture is uniform and independent.
     float markerTexturePeak = max(tmpcol.g, tmpcol.b);
     float markerTextureBase = min(tmpcol.g, tmpcol.b);
     bool markerTextureCarrier = markerTexturePeak >= tmpcol.a * 0.5

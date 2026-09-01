@@ -928,10 +928,9 @@ public final class StrobeManager {
             display.setInvulnerable(true);
             display.setSilent(true);
             display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.HEAD);
-            // The technical model is a single microscopic face. Keep its
-            // world anchor fixed, but face the carrier toward the camera so
-            // OptiFine cannot cull it when the player looks across its edge.
-            display.setBillboard(Display.Billboard.CENTER);
+            // Match Light Painter's proven 1.20.1 ItemDisplay contract. The
+            // baked model is invisible and the shader builds the screen quad.
+            display.setBillboard(Display.Billboard.FIXED);
             display.setBrightness(new Display.Brightness(15, 15));
             display.setShadowRadius(0.0f);
             display.setShadowStrength(0.0f);
@@ -1734,8 +1733,8 @@ public final class StrobeManager {
             display.setInvulnerable(true);
             display.setSilent(true);
             display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.HEAD);
-            // Camera flashes use the same one-face technical carrier.
-            display.setBillboard(Display.Billboard.CENTER);
+            // Camera flashes use the same fixed technical carrier as lights.
+            display.setBillboard(Display.Billboard.FIXED);
             display.setBrightness(new Display.Brightness(15, 15));
             display.setShadowRadius(0.0f);
             display.setShadowStrength(0.0f);
