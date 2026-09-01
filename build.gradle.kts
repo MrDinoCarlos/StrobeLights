@@ -5,23 +5,27 @@ plugins {
 group = "es.mrdino"
 version = "0.9.6"
 
+val minecraftVersion = "1.21.11"
+val paperApiVersion = "1.21.11-R0.1-SNAPSHOT"
+val javaVersion = 21
+
 repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:$paperApiVersion")
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    testImplementation("io.papermc.paper:paper-api:$paperApiVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(javaVersion)
     }
 }
 
@@ -36,7 +40,7 @@ tasks.test {
 
 val shaderPackZip = tasks.register<Zip>("shaderPackZip") {
     from("resource-pack")
-    archiveFileName = "StrobeLights-ResourcePack-1.21.4.zip"
+    archiveFileName = "StrobeLights-ResourcePack-$minecraftVersion.zip"
     destinationDirectory = layout.buildDirectory.dir("generated-resource-pack")
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
@@ -62,12 +66,12 @@ val exportResourcePack = tasks.register<Copy>("exportResourcePack") {
 }
 
 tasks.jar {
-    archiveFileName = "StrobeLights-v.${project.version}+mc.1.21.4.jar"
+    archiveFileName = "StrobeLights-v.${project.version}+mc.$minecraftVersion.jar"
     manifest {
         attributes(
             "Implementation-Title" to "StrobeLights",
             "Implementation-Version" to project.version,
-            "Built-For-Minecraft" to "1.21.4"
+            "Built-For-Minecraft" to minecraftVersion
         )
     }
 }

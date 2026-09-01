@@ -17,8 +17,8 @@ class ShaderPackContractTest {
     private static final Path PACK = Path.of("resource-pack");
 
     @Test
-    void targetsMinecraft1214AndContainsTheLightPipeline() throws IOException {
-        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 46");
+    void targetsMinecraft12111AndContainsTheLightPipeline() throws IOException {
+        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 75");
         assertContains(
             PACK.resolve("assets/minecraft/post_effect/transparency.json"),
             "minecraft:post/light"
