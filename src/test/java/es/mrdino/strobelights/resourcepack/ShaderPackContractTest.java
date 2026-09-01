@@ -308,8 +308,8 @@ class ShaderPackContractTest {
         assertContains(manager, "display.setDisplayHeight(carrier.displayHeight())");
         assertContains(manager, "new Vector3f(0.0f, carrier.translationY(), 0.0f)");
         assertContains(manager, "sourceY,\n            0.0f,\n            0.0f,\n            0.0f");
-        assertContains(manager, "applyTechnicalMarker(state.marker, 0)");
-        assertNotContains(manager, "state.marker.setItemStack(new ItemStack(Material.AIR))");
+        assertContains(manager, "state.marker.setItemStack(new ItemStack(Material.AIR))");
+        assertContains(manager, "state.marker.setBrightness(new Display.Brightness(0, 0))");
         assertNotContains(manager, "displayAnchor(");
         assertNotContains(manager, "setDisplaySourceOffset(");
         assertNotContains(manager, "spawnOffscreenProxy(");

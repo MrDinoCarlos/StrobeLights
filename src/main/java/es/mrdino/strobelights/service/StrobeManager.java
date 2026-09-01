@@ -1100,10 +1100,13 @@ public final class StrobeManager {
             return;
         }
         if (!state.lit || strobe.lightLevel() <= 0) {
-            // Keep the technical model present with zero RGB. Replacing it
-            // with AIR every phase made the client rebuild the render entry
-            // and caused visible hitches at the on/off boundary.
-            applyTechnicalMarker(state.marker, 0);
+            // Minecraft 1.20.1 caches the baked model of an ItemDisplay and
+            // can keep drawing the previous custom-model-data override when
+            // the same base item is replaced by the zero-RGB carrier. AIR
+            // explicitly invalidates that client render state, so both
+            // vanilla and OptiFine observe every off phase.
+            state.marker.setItemStack(new ItemStack(Material.AIR));
+            state.marker.setBrightness(new Display.Brightness(0, 0));
             return;
         }
         applyTechnicalMarker(
