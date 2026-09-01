@@ -473,13 +473,34 @@ class ShaderPackContractTest {
         assertContains(config, "scene-view-range: 128.0");
     }
 
+    @Test
+    void makesOpaqueBlockOcclusionMandatoryForEveryRgbEffect() throws IOException {
+        Path manager = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
+        );
+        Path config = Path.of("src/main/resources/config.yml");
+        assertContains(manager, "sourceBlockedForPlayer(player, source)");
+        assertContains(manager, "sourceBlockedForPlayer(player, scene.location)");
+        assertContains(manager, "if (blockedByGeometry(eye, direction, distance))");
+        assertContains(manager, "blocksLight(world.getBlockAt(blockX, blockY, blockZ).getType())");
+        assertNotContains(manager, "requireLineOfSight");
+        assertNotContains(config, "require-line-of-sight");
+    }
+
     private static void assertContains(Path file, String expected) throws IOException {
-        assertTrue(Files.readString(file).contains(expected), () -> file + " no contiene " + expected);
+        String contents = Files.readString(file).replace("\r\n", "\n");
+        String normalizedExpected = expected.replace("\r\n", "\n");
+        assertTrue(
+            contents.contains(normalizedExpected),
+            () -> file + " no contiene " + expected
+        );
     }
 
     private static void assertNotContains(Path file, String forbidden) throws IOException {
+        String contents = Files.readString(file).replace("\r\n", "\n");
+        String normalizedForbidden = forbidden.replace("\r\n", "\n");
         assertFalse(
-            Files.readString(file).contains(forbidden),
+            contents.contains(normalizedForbidden),
             () -> file + " contiene la palabra GLSL reservada " + forbidden
         );
     }
