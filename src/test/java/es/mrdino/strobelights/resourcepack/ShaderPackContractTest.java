@@ -27,6 +27,18 @@ class ShaderPackContractTest {
             PACK.resolve("assets/minecraft/shaders/program/light.fsh"),
             "lightDist < lightRadius"
         );
+        assertContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.json"
+            ),
+            "\"vertex\": \"rendertype_item_entity_translucent_cull\""
+        );
+        assertNotContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.json"
+            ),
+            "minecraft:core/rendertype_item_entity_translucent_cull"
+        );
     }
 
     @Test
