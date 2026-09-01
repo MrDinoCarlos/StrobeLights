@@ -27,6 +27,19 @@ class ShaderPackContractTest {
             PACK.resolve("assets/minecraft/shaders/program/light.fsh"),
             "lightDist < lightRadius"
         );
+        Path legacyPipeline = PACK.resolve(
+            "assets/minecraft/shaders/post/transparency.json"
+        );
+        for (String target : new String[] {
+            "\"water\"",
+            "\"translucent\"",
+            "\"itemEntity\"",
+            "\"particles\"",
+            "\"clouds\"",
+            "\"weather\""
+        }) {
+            assertContains(legacyPipeline, target);
+        }
         assertContains(
             PACK.resolve(
                 "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.json"
@@ -471,6 +484,8 @@ class ShaderPackContractTest {
             "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
         );
         Path config = Path.of("src/main/resources/config.yml");
+        assertContains(manager, "Particle.FLASH");
+        assertContains(manager, "0.0,\n            null,\n            true");
         assertContains(flashbangService, "scheduleFlightTimeout(projectile)");
         assertContains(flashbangService, "throwable-flashbang.maximum-flight-ticks");
         assertContains(flashbangService, "ProjectileLaunchEvent event");

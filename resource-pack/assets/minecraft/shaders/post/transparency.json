@@ -1,5 +1,11 @@
 {
   "targets": [
+    "water",
+    "translucent",
+    "itemEntity",
+    "particles",
+    "clouds",
+    "weather",
     "swap1",
     "swap2",
     "swap3",

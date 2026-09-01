@@ -502,7 +502,7 @@ public final class StrobeManager {
             0.0,
             0.0,
             0.0,
-            Color.WHITE,
+            null,
             true
         );
         world.spawnParticle(
