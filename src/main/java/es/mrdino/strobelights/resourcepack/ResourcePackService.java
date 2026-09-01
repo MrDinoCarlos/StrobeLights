@@ -41,7 +41,7 @@ public final class ResourcePackService implements Listener {
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
     private static final String EMBEDDED_PACK =
-        "embedded/StrobeLights-ResourcePack-26.1.2.zip";
+        "embedded/StrobeLights-ResourcePack-26.2.zip";
 
     private final StrobeLightsPlugin plugin;
     private final Set<UUID> loadedPlayers = ConcurrentHashMap.newKeySet();
@@ -343,7 +343,7 @@ public final class ResourcePackService implements Listener {
         try {
             Path directory = plugin.getDataFolder().toPath().resolve("resource-pack");
             Files.createDirectories(directory);
-            Files.write(directory.resolve("StrobeLights-ResourcePack-26.1.2.zip"), bytes);
+            Files.write(directory.resolve("StrobeLights-ResourcePack-26.2.zip"), bytes);
         } catch (IOException exception) {
             plugin.getLogger().warning("Could not export a copy of the resource pack: "
                 + exception.getMessage());

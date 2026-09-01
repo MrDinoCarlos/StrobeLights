@@ -38,7 +38,7 @@ int try_insert( sampler2D cSampler, sampler2D dSampler, vec2 coord, int ie ) {
 
     float depth = texture( dSampler, coord ).r;
     if (ie > 0) {
-        if (depth < LIGHTDEPTH) {
+        if (isMarkerDepth(depth)) {
             if (Test > 0.0) {
                 color.rgb = vec3(0.0, 1.0, 0.0);
                 depth = 0.0;
@@ -53,7 +53,7 @@ int try_insert( sampler2D cSampler, sampler2D dSampler, vec2 coord, int ie ) {
 
     int jj = active_layers++;
     int ii = jj - 1;
-    while ( jj > 0 && depth > depth_layers[index_layers[ii]] ) {
+    while ( jj > 0 && depth < depth_layers[index_layers[ii]] ) {
         int indexTemp = index_layers[ii];
         index_layers[ii] = index_layers[jj];
         index_layers[jj] = indexTemp;

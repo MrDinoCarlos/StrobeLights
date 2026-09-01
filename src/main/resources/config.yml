@@ -1,6 +1,6 @@
 # ==============================================================================
 #                              STROBELIGHTS
-#                  Invisible 3D RGB lighting for Paper 26.1.2
+#                  Invisible 3D RGB lighting for Paper 26.2
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
@@ -66,7 +66,7 @@ discovery:
   minimum-light-level: 10
 
 easy-armor-stands:
-  # Soft integration with EasyArmorStands v2 on Paper 26.1.2.
+  # Soft integration with EasyArmorStands v2 on Paper 26.2.
   # Holding the /eas give tool automatically enables discovery. Moving a
   # StrobeLights handle moves the exact invisible light point.
   enabled: true

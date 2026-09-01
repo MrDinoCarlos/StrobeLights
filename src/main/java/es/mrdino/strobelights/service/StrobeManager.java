@@ -46,7 +46,7 @@ import org.bukkit.util.Vector;
 /**
  * Owns invisible Light Painter markers and their strobe timing.
  *
- * <p>The marker does not draw a fixture or projection. The 26.1.2 resource-pack
+ * <p>The marker does not draw a fixture or projection. The 26.2 resource-pack
  * shader reconstructs its 3D position from the depth buffer and applies RGB
  * illumination to every visible world pixel around that point.</p>
  */

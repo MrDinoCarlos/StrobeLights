@@ -109,7 +109,7 @@ void main() {
     float oDepth = texture(DiffuseDepthSampler, texCoord).r;
     float compDepth = texture(CompareDepthSampler, texCoord).r;
     float depth = LinearizeDepth(oDepth);
-    if (oDepth < compDepth && depth < Range + LIGHTR) {
+    if (oDepth > compDepth && depth < Range + LIGHTR) {
         vec4 aggColor = vec4(0.0, 0.0, 0.0, 1.0);
 
         vec2 pixCoord = texCoord;

@@ -151,9 +151,9 @@ void main() {
 
         samplepos = vec2(px, py);
         samplepos = (samplepos + 0.5) * inOneTexel;
-        float lightDepth = LinearizeDepth(
-            texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH
-        );
+        float lightDepth = LinearizeDepth(decodeMarkerDepth(
+            texture(ItemEntityDepthSampler, samplepos).r
+        ));
         samplepos = (samplepos - vec2(0.5)) * vec2(inAspectRatio, 1.0);
         int encodedValue = markerValue(sampleColor.rgb);
         float markerConversionK = conversionK;

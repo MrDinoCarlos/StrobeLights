@@ -17,8 +17,8 @@ class ShaderPackContractTest {
     private static final Path PACK = Path.of("resource-pack");
 
     @Test
-    void targetsMinecraft2612AndContainsTheLightPipeline() throws IOException {
-        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 84");
+    void targetsMinecraft262AndContainsTheLightPipeline() throws IOException {
+        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 88");
         assertContains(
             PACK.resolve("assets/minecraft/post_effect/transparency.json"),
             "minecraft:post/light"
@@ -152,18 +152,20 @@ class ShaderPackContractTest {
         assertContains(core, "inverse(uvPerPixel) * (texCoord2 - vec2(0.5))");
         assertContains(core, "fragColor = vec4(vec3(0.4), 5.0 / 255.0)");
         assertContains(core, "fragColor = vec4(bitColor * 0.5, 2.0 / 255.0)");
-        assertContains(core, "gl_FragDepth = centerDepth * LIGHTDEPTH");
+        assertContains(core, "gl_FragDepth = 1.0 - (1.0 - centerDepth) * LIGHTDEPTH");
         assertNotContains(core, "fragColor = vec4(vertexColor.rgb, 1.0)");
         assertNotContains(core, "DEPTHCODESIGNATURE");
         assertContains(filter, "uniform sampler2D DiffuseSampler");
-        assertContains(filter, "depth / LIGHTDEPTH");
+        assertContains(filter, "decodeMarkerDepth(depth)");
         assertContains(filter, "int encodedValue = 0");
         assertContains(filter, "encodedValue |= triplet << (payloadIndex * 3)");
         assertContains(filter, "if (validCarrier)");
         assertContains(
             aggregate,
-            "texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH"
+            "decodeMarkerDepth("
         );
+        assertContains(utils, "return depth >= 1.0 - LIGHTDEPTH;");
+        assertContains(pipeline, "\"vertex_shader\": \"minecraft:post/filter\"");
         assertContains(pipeline, "\"vertex_shader\": \"minecraft:post/filter\"");
         assertContains(pipeline, "\"target\": \"minecraft:item_entity\"");
         assertNotContains(pipeline, "\"program\":");

@@ -312,7 +312,7 @@ command:
   not-found: "Strobe '{name}' does not exist. Use /strobe list."
   reloaded: "Configuration, languages and strobes reloaded ({count})."
   help:
-    title: "Commands for Paper 26.1.2"
+    title: "Commands for Paper 26.2"
     gui: "open the complete GUI"
     create: "place on a target block or at your current position"
     refresh: "ticks per phase"

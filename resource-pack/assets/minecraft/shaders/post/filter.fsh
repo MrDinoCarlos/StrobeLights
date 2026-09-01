@@ -14,8 +14,8 @@ void main() {
     outColor = vec4(0.0);
     float depth = texture(DiffuseDepthSampler, texCoord).r;
 
-    if (depth < LIGHTDEPTH) {
-        depth = LinearizeDepth(depth / LIGHTDEPTH);
+    if (isMarkerDepth(depth)) {
+        depth = LinearizeDepth(decodeMarkerDepth(depth));
         if (depth < Range) {
             ivec4 anchorBytes = ivec4(floor(
                 texture(DiffuseSampler, texCoord) * 255.0 + 0.5

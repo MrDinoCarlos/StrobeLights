@@ -5,8 +5,8 @@ plugins {
 group = "es.mrdino"
 version = "0.9.6"
 
-val minecraftVersion = "26.1.2"
-val paperApiVersion = "26.1.2.build.74-stable"
+val minecraftVersion = "26.2"
+val paperApiVersion = "26.2.build.121-stable"
 val javaVersion = 25
 
 repositories {

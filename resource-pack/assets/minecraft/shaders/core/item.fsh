@@ -10,6 +10,8 @@ uniform sampler2D Sampler0;
 in float sphericalVertexDistance;
 in float cylindricalVertexDistance;
 in vec4 vertexColor;
+in vec4 lightMapColor;
+in vec4 overlayColor;
 in vec2 texCoord0;
 in vec2 texCoord2;
 in vec4 glpos;
@@ -36,6 +38,8 @@ void main() {
         }
 #endif
         color *= vertexColor * ColorModulator;
+        color.rgb = mix(overlayColor.rgb, color.rgb, overlayColor.a);
+        color *= lightMapColor;
         fragColor = apply_fog(
             color,
             sphericalVertexDistance,
@@ -47,8 +51,8 @@ void main() {
             FogColor
         );
         fragColor.a = fragColor.a < 0.1 ? 0.1 : fragColor.a;
-        if (!gui && gl_FragCoord.z <= LIGHTDEPTH) {
-            gl_FragDepth = LIGHTDEPTH + 10e-7;
+        if (!gui && gl_FragCoord.z >= 1.0 - LIGHTDEPTH) {
+            gl_FragDepth = 1.0 - LIGHTDEPTH - 10e-7;
         } else {
             gl_FragDepth = gl_FragCoord.z;
         }
@@ -83,6 +87,6 @@ void main() {
             );
             fragColor = vec4(bitColor * 0.5, 2.0 / 255.0);
         }
-        gl_FragDepth = centerDepth * LIGHTDEPTH;
+        gl_FragDepth = 1.0 - (1.0 - centerDepth) * LIGHTDEPTH;
     }
 }

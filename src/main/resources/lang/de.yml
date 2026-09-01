@@ -305,7 +305,7 @@ command:
   not-found: "Strobe '{name}' existiert nicht. Verwende /strobe list."
   reloaded: "Konfiguration, Sprachen und Strobes neu geladen ({count})."
   help:
-    title: "Befehle für Paper 26.1.2"
+    title: "Befehle für Paper 26.2"
     gui: "öffnet die vollständige GUI"
     create: "platziert am Zielblock oder an deiner aktuellen Position"
     refresh: "Ticks pro Phase"
