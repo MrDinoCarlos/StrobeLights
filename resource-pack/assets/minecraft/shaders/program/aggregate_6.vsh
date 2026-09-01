@@ -4,10 +4,8 @@ in vec4 Position;
 
 uniform mat4 ProjMat;
 uniform vec2 DiffuseSize;
-uniform vec2 OutSize;
 uniform float FOV;
 
-out vec2 texCoord;
 flat out vec2 inOneTexel;
 flat out float inAspectRatio;
 flat out float conversionK;
@@ -24,7 +22,6 @@ void main(){
 
     inAspectRatio = DiffuseSize.x / DiffuseSize.y;
     inOneTexel = 1.0 / DiffuseSize;
-    texCoord = Position.xy / OutSize;
     conversionK = tan(FOV / 360.0 * 3.14159265358979) * 2.0;
 
     gl_Position = vec4(x, y, 0.2, 1.0);

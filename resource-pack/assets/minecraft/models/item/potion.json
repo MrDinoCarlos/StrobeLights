@@ -5,10 +5,6 @@
   },
   "overrides": [
     {
-      "predicate": { "custom_model_data": 6700 },
-      "model": "minecraft:item/lp_custom"
-    },
-    {
       "predicate": { "custom_model_data": 6821 },
       "model": "strobelights:item/gui/color_swatch"
     }

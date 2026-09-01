@@ -164,9 +164,12 @@ void main() {
     vec4 tmp = ModelViewMat * vec4(Position, 1.0);
     bool gui = isGUI(ProjMat);
 
+    int encodedValue = markerValue(Color.rgb);
+    bool encodedTechnicalCarrier = isCameraFlash(encodedValue)
+        || isSourceLight(encodedValue);
     // OptiFine can quantize the atlas alpha by one or two 8-bit steps while
-    // rebuilding the item model. Exact float equality then loses the carrier
-    // before the Fabulous aggregation passes even though the pack is enabled.
+    // rebuilding the item model. The payload signature is therefore checked
+    // independently instead of treating every low-alpha item as a light.
     bool markerAlpha = abs(tmpcol.a - LIGHTALPHA) <= LIGHTALPHATOLERANCE;
     // The dedicated carrier texture is neutral white. Compare its chroma and
     // brightness relative to alpha so OptiFine premultiplication is accepted,
@@ -180,14 +183,18 @@ void main() {
     // OFF mode supplies NO_FOG with equal start/end values for world entities,
     // which made every ItemDisplay look like a hand item and removed all
     // StrobeLights markers before the Fabulous post chain.
-    marker = float(!gui && markerAlpha && markerTextureCarrier);
+    marker = float(
+        !gui
+        && encodedTechnicalCarrier
+        && markerAlpha
+        && markerTextureCarrier
+    );
 
     if (marker > 0.0) {
         // Do not multiply the payload by the atlas RGB. OptiFine may
         // premultiply that texel, but the custom tint still owns the marker.
         vertexColor = vec4(Color.rgb, 1.0);
 
-        int encodedValue = markerValue(vertexColor.rgb);
         if (!isCameraFlash(encodedValue)) {
             int lightExpansionCode = 3;
             if (isSourceLight(encodedValue)) {

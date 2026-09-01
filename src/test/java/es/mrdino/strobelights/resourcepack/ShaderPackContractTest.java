@@ -71,13 +71,25 @@ class ShaderPackContractTest {
     @Test
     void keepsTheTechnicalMarkerMicroscopicButNonDegenerateForOptiFine()
         throws IOException {
+        Path technicalItem = PACK.resolve(
+            "assets/minecraft/models/item/leather_horse_armor.json"
+        );
         assertContains(
-            PACK.resolve("assets/minecraft/models/item/potion.json"),
+            technicalItem,
             "\"custom_model_data\": 6700"
         );
         assertContains(
-            PACK.resolve("assets/minecraft/models/item/potion.json"),
+            technicalItem,
             "minecraft:item/lp_custom"
+        );
+        Path manager = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
+        );
+        assertContains(manager, "Material.LEATHER_HORSE_ARMOR");
+        assertContains(manager, "LeatherArmorMeta meta");
+        assertNotContains(
+            PACK.resolve("assets/minecraft/models/item/potion.json"),
+            "\"custom_model_data\": 6700"
         );
         assertContains(
             PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
@@ -159,10 +171,11 @@ class ShaderPackContractTest {
             "markerTextureBase >= markerTexturePeak * 0.75"
         );
         assertNotContains(core, "tmpcol.a == LIGHTALPHA");
-        assertContains(
-            core,
-            "marker = float(!gui && markerAlpha && markerTextureCarrier)"
-        );
+        assertContains(core, "bool encodedTechnicalCarrier = isCameraFlash(encodedValue)");
+        assertContains(core, "|| isSourceLight(encodedValue)");
+        assertContains(core, "&& encodedTechnicalCarrier");
+        assertContains(core, "&& markerAlpha");
+        assertContains(core, "&& markerTextureCarrier");
         assertContains(core, "vertexColor = vec4(Color.rgb, 1.0)");
         assertNotContains(core, "min(min(tmpcol.r, tmpcol.g), tmpcol.b) > 0.99");
         assertNotContains(core, "bool hand = isHand(FogStart, FogEnd)");
@@ -184,6 +197,9 @@ class ShaderPackContractTest {
         );
         Path filter = PACK.resolve("assets/minecraft/shaders/program/filter.fsh");
         Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
+        Path aggregateDefinition = PACK.resolve(
+            "assets/minecraft/shaders/program/aggregate_6.json"
+        );
         Path pipeline = PACK.resolve("assets/minecraft/shaders/post/transparency.json");
 
         assertNotContains(utils, "DEPTHCODEPRECISION");
@@ -203,6 +219,7 @@ class ShaderPackContractTest {
             aggregate,
             "texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH"
         );
+        assertNotContains(aggregateDefinition, "\"OutSize\"");
         assertContains(
             pipeline,
             "\"name\": \"filter\""

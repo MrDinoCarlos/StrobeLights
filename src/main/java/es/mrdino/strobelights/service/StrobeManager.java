@@ -36,7 +36,7 @@ import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.RayTraceResult;
@@ -1198,11 +1198,11 @@ public final class StrobeManager {
     }
 
     private static ItemStack technicalMarker(int rgb) {
-        // PotionMeta#setColor is available on 1.20.1 and feeds the legacy
-        // item tint used by the custom model. This preserves the 24-bit marker
-        // payload even though the data component API was introduced later.
-        ItemStack stack = new ItemStack(Material.POTION);
-        PotionMeta meta = (PotionMeta) stack.getItemMeta();
+        // Keep the binary carrier away from OptiFine's potion Custom Colors
+        // path. Leather dye is a direct legacy item tint in 1.20.1 and keeps
+        // all 24 payload bits intact for both RGB lights and camera flashes.
+        ItemStack stack = new ItemStack(Material.LEATHER_HORSE_ARMOR);
+        LeatherArmorMeta meta = (LeatherArmorMeta) stack.getItemMeta();
         meta.setCustomModelData((int) LIGHT_PAINTER_MODEL_DATA);
         meta.setColor(Color.fromRGB(rgb));
         stack.setItemMeta(meta);

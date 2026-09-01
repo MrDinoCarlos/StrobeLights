@@ -39,7 +39,6 @@ uniform vec2 DiffuseSize;
 uniform float Step;
 uniform float Test;
 
-in vec2 texCoord;
 flat in vec2 inOneTexel;
 flat in float inAspectRatio;
 flat in float conversionK;
@@ -74,7 +73,6 @@ bool isOffscreenLight(int encodedValue) {
 }
 
 void main() {
-    outColor = texture(DiffuseSampler, texCoord);
     float width = ceil(DiffuseSize.x / Step);
     float width2 = ceil(width / Step);
     float height = ceil(DiffuseSize.y / (Step));
