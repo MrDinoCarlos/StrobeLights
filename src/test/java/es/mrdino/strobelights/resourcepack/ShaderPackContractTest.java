@@ -17,8 +17,8 @@ class ShaderPackContractTest {
     private static final Path PACK = Path.of("resource-pack");
 
     @Test
-    void targetsMinecraft1214AndContainsTheLightPipeline() throws IOException {
-        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 46");
+    void targetsMinecraft12110AndContainsTheLightPipeline() throws IOException {
+        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 69");
         assertContains(
             PACK.resolve("assets/minecraft/post_effect/transparency.json"),
             "minecraft:post/light"
@@ -474,13 +474,17 @@ class ShaderPackContractTest {
     }
 
     private static void assertContains(Path file, String expected) throws IOException {
-        assertTrue(Files.readString(file).contains(expected), () -> file + " no contiene " + expected);
+        assertTrue(read(file).contains(expected), () -> file + " no contiene " + expected);
     }
 
     private static void assertNotContains(Path file, String forbidden) throws IOException {
         assertFalse(
-            Files.readString(file).contains(forbidden),
+            read(file).contains(forbidden),
             () -> file + " contiene la palabra GLSL reservada " + forbidden
         );
+    }
+
+    private static String read(Path file) throws IOException {
+        return Files.readString(file).replace("\r\n", "\n");
     }
 }
