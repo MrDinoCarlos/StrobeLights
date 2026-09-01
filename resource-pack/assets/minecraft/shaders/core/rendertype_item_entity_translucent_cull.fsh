@@ -24,8 +24,12 @@ in float scale;
 
 out vec4 fragColor;
 
+int markerValue(vec3 color) {
+    ivec3 bytes = ivec3(floor(color * 255.0 + 0.5));
+    return (bytes.r << 16) | (bytes.g << 8) | bytes.b;
+}
+
 void main() {
-    bool hand = isHand(FogStart, FogEnd);
     bool gui = isGUI(ProjMat);
 
     
@@ -45,13 +49,39 @@ void main() {
             gl_FragDepth = gl_FragCoord.z;
         }
     } else {
-        float onePixelToUV = 0.55 / (gl_FragCoord.y * 2.0 / (glpos.y / glpos.w + 1.0) * scale);
-        if (!(abs(texCoord2.x - 0.5) <= onePixelToUV && abs(texCoord2.y - 0.5) <= onePixelToUV)) {
+        vec2 uvDx = dFdx(texCoord2);
+        vec2 uvDy = dFdy(texCoord2);
+        mat2 uvPerPixel = mat2(uvDx, uvDy);
+        if (abs(determinant(uvPerPixel)) < 0.000000000001) {
             discard;
         }
-        fragColor = linear_fog(vertexColor, vertexDistance, FogStart, FogEnd, FogColor);
-        fragColor.a = 1.0;
 
-        gl_FragDepth = gl_FragCoord.z * LIGHTDEPTH;
+        vec2 pixelOffset = inverse(uvPerPixel) * (texCoord2 - vec2(0.5));
+        ivec2 cell = ivec2(floor(pixelOffset + vec2(0.5)));
+        if (abs(cell.x) > 1 || abs(cell.y) > 1) {
+            discard;
+        }
+
+        float centerDepth = gl_FragCoord.z
+            - pixelOffset.x * dFdx(gl_FragCoord.z)
+            - pixelOffset.y * dFdy(gl_FragCoord.z);
+        int cellIndex = (cell.y + 1) * 3 + cell.x + 1;
+        int encodedValue = markerValue(vertexColor.rgb);
+        if (cellIndex == 4) {
+            // The anchor changes a normal scene pixel by roughly one percent.
+            fragColor = vec4(vec3(0.4), 5.0 / 255.0);
+        } else {
+            int payloadIndex = cellIndex < 4 ? cellIndex : cellIndex - 1;
+            int triplet = (encodedValue >> (payloadIndex * 3)) & 7;
+            vec3 bitColor = vec3(
+                float(triplet & 1),
+                float((triplet >> 1) & 1),
+                float((triplet >> 2) & 1)
+            );
+            // Premultiplied RGBA8 stores each channel as exactly zero or one,
+            // while direct Fast/Fancy rendering remains visually negligible.
+            fragColor = vec4(bitColor * 0.5, 2.0 / 255.0);
+        }
+        gl_FragDepth = centerDepth * LIGHTDEPTH;
     }
 }

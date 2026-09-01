@@ -6,7 +6,7 @@
         "passthrough": {},
         "lightmap1": {},
         "lightmap2": {},
-        "lights": {"width": 1024, "height": 4, "bilinear": false }
+        "lights": {"width": 1024, "height": 5, "bilinear": false }
     },
     "passes": [
         {

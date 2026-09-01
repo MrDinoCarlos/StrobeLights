@@ -57,6 +57,9 @@ public final class StrobeManager {
     private static final double MARKER_SURFACE_OFFSET = 0.125;
     private static final int OFFSCREEN_LIGHT_SIGNATURE = 0b110;
     private static final int FLASH_SIGNATURE = 0xD;
+    private static final int SOURCE_LIGHT_SIGNATURE = 0xA;
+    private static final int SOURCE_LIGHT_TRAILER = 0x5;
+    private static final int DEFAULT_PROJECTION_CODE = 11;
     private static final double CAMERA_FLASH_MARKER_DISTANCE = 0.75;
     private static final double CAMERA_FLASH_MARKER_SIDE = 0.22;
 
@@ -172,6 +175,25 @@ public final class StrobeManager {
         return all().stream().map(Strobe::name).toList();
     }
 
+    public List<String> groups() {
+        Map<String, String> canonical = new LinkedHashMap<>();
+        for (Strobe strobe : all()) {
+            if (strobe.hasGroup()) {
+                canonical.putIfAbsent(Strobe.key(strobe.group()), strobe.group());
+            }
+        }
+        return canonical.values().stream()
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .toList();
+    }
+
+    public Collection<Strobe> inGroup(String group) {
+        String key = Strobe.key(group);
+        return all().stream()
+            .filter(strobe -> strobe.hasGroup() && Strobe.key(strobe.group()).equals(key))
+            .toList();
+    }
+
     public boolean validName(String name) {
         return name != null
             && name.length() <= maximumNameLength()
@@ -181,6 +203,27 @@ public final class StrobeManager {
             && !name.equalsIgnoreCase("alle")
             && !name.equalsIgnoreCase("tutti")
             && name.matches("[A-Za-z0-9_-]+");
+    }
+
+    public int maximumGroupNameLength() {
+        return Math.max(1, plugin.getConfig().getInt(
+            "limits.maximum-group-name-length",
+            32
+        ));
+    }
+
+    public boolean validGroupName(String group) {
+        if (group == null
+            || group.isBlank()
+            || group.length() > maximumGroupNameLength()
+            || !group.matches("[A-Za-z0-9_-]+")) {
+            return false;
+        }
+        String key = Strobe.key(group);
+        return !List.of(
+            "all", "todos", "tous", "alle", "tutti",
+            "none", "ninguno", "aucun", "keine", "nessuno"
+        ).contains(key);
     }
 
     public boolean locationAvailable(Location location, Strobe ignored) {
@@ -287,6 +330,25 @@ public final class StrobeManager {
         save();
     }
 
+    public void setExpansion(Strobe strobe, double expansion) {
+        strobe.setExpansion(expansion);
+        refreshMarkerItem(strobe);
+        save();
+    }
+
+    public void setGroup(Strobe strobe, String group) {
+        if (group == null || group.isBlank()) {
+            strobe.setGroup(Strobe.DEFAULT_GROUP);
+        } else {
+            String canonical = groups().stream()
+                .filter(existing -> existing.equalsIgnoreCase(group))
+                .findFirst()
+                .orElse(group);
+            strobe.setGroup(canonical);
+        }
+        save();
+    }
+
     public void setBlindness(Strobe strobe, BlindnessLevel blindness) {
         strobe.setBlindness(blindness);
         save();
@@ -327,6 +389,48 @@ public final class StrobeManager {
         }
         save();
         return changed;
+    }
+
+    public int setGroupEnabled(String group, boolean enabled) {
+        int changed = 0;
+        for (Strobe strobe : inGroup(group)) {
+            if (enabled && !strobe.placed()) {
+                continue;
+            }
+            if (strobe.enabled() != enabled) {
+                strobe.setEnabled(enabled);
+                changed++;
+            }
+            RuntimeState state = runtime.computeIfAbsent(
+                strobe.key(),
+                ignored -> new RuntimeState()
+            );
+            state.pulseTicks = 0;
+            state.ticksUntilToggle = 0;
+            if (!enabled) {
+                applyLitState(strobe, state, false);
+            }
+        }
+        save();
+        return changed;
+    }
+
+    public boolean toggleGroup(String group) {
+        boolean enable = inGroup(group).stream()
+            .anyMatch(strobe -> strobe.placed() && !strobe.enabled());
+        setGroupEnabled(group, enable);
+        return enable;
+    }
+
+    public int pulseGroup(String group) {
+        int count = 0;
+        for (Strobe strobe : inGroup(group)) {
+            if (strobe.placed()) {
+                pulse(strobe);
+                count++;
+            }
+        }
+        return count;
     }
 
     public void pulse(Strobe strobe) {
@@ -661,7 +765,6 @@ public final class StrobeManager {
             state.removeDiscoveryLight(playerId);
             state.editorVisible.remove(playerId);
             state.sourceHidden.remove(playerId);
-            state.sourceBlocked.remove(playerId);
         }
     }
 
@@ -671,7 +774,6 @@ public final class StrobeManager {
                 continue;
             }
             state.sourceHidden.remove(player.getUniqueId());
-            state.sourceBlocked.remove(player.getUniqueId());
             if (visible) {
                 player.showEntity(plugin, state.marker);
             } else {
@@ -999,27 +1101,20 @@ public final class StrobeManager {
             state.marker.setItemStack(technicalMarker(0));
             return;
         }
-        state.marker.setItemStack(lightPainterMarker(strobe.rgb(), strobe.lightLevel()));
+        state.marker.setItemStack(lightPainterMarker(
+            strobe.rgb(),
+            strobe.lightLevel(),
+            strobe.expansionCode()
+        ));
     }
 
     private void applyVanillaFallback(Strobe strobe, RuntimeState state) {
         boolean enabled = plugin.getConfig().getBoolean("vanilla-fallback.enabled", true);
-        int stabilizationThreshold = Math.max(0, Math.min(
-            100,
-            plugin.getConfig().getInt(
-                "vanilla-fallback.stabilize-at-or-below-refresh-ticks",
-                10
-            )
-        ));
-        boolean stableFastFallback = needsStableVanillaFallback(
-            strobe.mode(),
-            strobe.enabled(),
-            strobe.refreshTicks(),
-            stabilizationThreshold
+        boolean shouldLight = shouldLightVanillaFallback(
+            enabled,
+            state.lit,
+            strobe.lightLevel()
         );
-        boolean shouldLight = enabled
-            && (state.lit || stableFastFallback)
-            && strobe.lightLevel() > 0;
         if (!shouldLight) {
             state.clearVanillaLight();
             return;
@@ -1042,16 +1137,12 @@ public final class StrobeManager {
         target.setBlockData(light, false);
     }
 
-    static boolean needsStableVanillaFallback(
-        StrobeMode mode,
-        boolean enabled,
-        int refreshTicks,
-        int thresholdTicks
+    static boolean shouldLightVanillaFallback(
+        boolean fallbackEnabled,
+        boolean lit,
+        int lightLevel
     ) {
-        return enabled
-            && mode == StrobeMode.STROBE
-            && thresholdTicks > 0
-            && refreshTicks <= thresholdTicks;
+        return fallbackEnabled && lit && lightLevel > 0;
     }
 
     private static Block vanillaLightTarget(Strobe strobe) {
@@ -1070,18 +1161,25 @@ public final class StrobeManager {
         return nearestAirBlock(preferred);
     }
 
-    private static ItemStack lightPainterMarker(int rgb, int lightLevel) {
-        double intensity = Math.max(0, Math.min(15, lightLevel)) / 15.0;
-        int red = (int) Math.round((rgb >> 16 & 0xFF) * intensity);
-        int green = (int) Math.round((rgb >> 8 & 0xFF) * intensity);
-        int blue = (int) Math.round((rgb & 0xFF) * intensity);
-        int encoded = red << 16 | green << 8 | blue;
-        if (isPackedCameraFlash(encoded) || isPackedOffscreenLight(encoded)) {
-            blue ^= 1;
-            encoded = red << 16 | green << 8 | blue;
-        }
+    private static ItemStack lightPainterMarker(
+        int rgb,
+        int lightLevel,
+        int expansionCode
+    ) {
+        return technicalMarker(packSourceLightColor(rgb, lightLevel, expansionCode));
+    }
 
-        return technicalMarker(encoded);
+    static int packSourceLightColor(int rgb, int lightLevel, int expansionCode) {
+        double intensity = Math.max(0, Math.min(15, lightLevel)) / 15.0;
+        int red4 = (int) Math.round((rgb >> 16 & 0xFF) * intensity * 15.0 / 255.0);
+        int green4 = (int) Math.round((rgb >> 8 & 0xFF) * intensity * 15.0 / 255.0);
+        int blue4 = (int) Math.round((rgb & 0xFF) * intensity * 15.0 / 255.0);
+        return SOURCE_LIGHT_SIGNATURE << 20
+            | (Math.max(0, Math.min(15, expansionCode)) << 16)
+            | red4 << 12
+            | green4 << 8
+            | blue4 << 4
+            | SOURCE_LIGHT_TRAILER;
     }
 
     private static ItemStack technicalMarker(int rgb) {
@@ -1107,54 +1205,36 @@ public final class StrobeManager {
 
     private void updateFixedSourceViewers(Strobe strobe, RuntimeState state) {
         if (strobe.lightLevel() <= 0) {
-            state.sourceBlocked.clear();
             restoreSourceMarkers(state);
             return;
         }
         Location source = fixedSourceLocation(strobe);
         if (source == null) {
-            state.sourceBlocked.clear();
             restoreSourceMarkers(state);
             return;
         }
-        // Never create a proxy at the camera or player. Visibility is adjusted
-        // per player, but every rendered marker remains at its fixed source.
-        Set<UUID> retainedBlocked = new HashSet<>();
+        // The fixed source must reach the shader even when the player cannot
+        // see the origin itself. Per-pixel depth rays decide which visible
+        // surfaces the light can actually reach; only discovery replaces this
+        // shared marker with its private steady preview.
         for (Player player : source.getWorld().getPlayers()) {
             if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
                 continue;
             }
-            UUID playerId = player.getUniqueId();
-            Location eye = player.getEyeLocation();
-            Vector toLight = source.toVector().subtract(eye.toVector());
-            double distance = toLight.length();
-            boolean blocked = distance > 0.75 && blockedByGeometry(
-                eye,
-                toLight.clone().multiply(1.0 / distance),
-                distance
-            );
-            if (blocked) {
-                state.sourceBlocked.add(playerId);
-                retainedBlocked.add(playerId);
-                hideSourceMarker(player, state);
-                continue;
-            }
-            state.sourceBlocked.remove(playerId);
             if (discoveryApplies(player, source)) {
                 hideSourceMarker(player, state);
                 continue;
             }
             showSourceMarker(player, state);
         }
-        state.sourceBlocked.retainAll(retainedBlocked);
     }
 
     private void updateSourceVisibility(RuntimeState state) {
         if (!state.valid()) {
             return;
         }
-        // Blocked/discovery players keep the shared source hidden to avoid a
-        // duplicate or forbidden light. The shader itself stays shadow-free.
+        // Discovery players keep the shared source hidden to avoid rendering a
+        // duplicate underneath their private steady preview.
         restoreUnproxiedSourceMarkers(state);
     }
 
@@ -1237,7 +1317,8 @@ public final class StrobeManager {
         ));
         light.setItemStack(lightPainterMarker(
             strobe.rgb(),
-            Math.max(minimumLevel, strobe.lightLevel())
+            Math.max(minimumLevel, strobe.lightLevel()),
+            strobe.expansionCode()
         ));
         hideSourceMarker(player, state);
     }
@@ -1316,8 +1397,7 @@ public final class StrobeManager {
 
     private void restoreUnproxiedSourceMarkers(RuntimeState state) {
         for (UUID playerId : new HashSet<>(state.sourceHidden)) {
-            if (state.sourceBlocked.contains(playerId)
-                || state.discoveryLights.containsKey(playerId)) {
+            if (state.discoveryLights.containsKey(playerId)) {
                 continue;
             }
             Player player = plugin.getServer().getPlayer(playerId);
@@ -1369,10 +1449,6 @@ public final class StrobeManager {
                 scene.hideSource(plugin, player);
                 continue;
             }
-            if (sourceBlockedForPlayer(player, scene.location)) {
-                scene.hideSource(plugin, player);
-                continue;
-            }
             eligibleViewers.add(playerId);
             scene.showSource(plugin, player);
         }
@@ -1381,7 +1457,11 @@ public final class StrobeManager {
 
     private ItemDisplay spawnSceneFlashSource(UUID id, Location location) {
         return spawnFixedLightDisplay(location, display -> {
-            display.setItemStack(lightPainterMarker(0xFFFFFF, 15));
+            display.setItemStack(lightPainterMarker(
+                0xFFFFFF,
+                15,
+                (int) Math.round(Strobe.DEFAULT_EXPANSION / Strobe.EXPANSION_STEP) - 1
+            ));
             display.getPersistentDataContainer().set(
                 sceneFlashEntityKey,
                 PersistentDataType.STRING,
@@ -1640,13 +1720,13 @@ public final class StrobeManager {
     }
 
     static int packOffscreenLightColor(int rgb, int lightLevel, int mode) {
-        int red4 = (int) Math.round((rgb >> 16 & 0xFF) * 15.0 / 255.0);
-        int green4 = (int) Math.round((rgb >> 8 & 0xFF) * 15.0 / 255.0);
-        int blue4 = (int) Math.round((rgb & 0xFF) * 15.0 / 255.0);
-        int intensity4 = Math.max(0, Math.min(15, lightLevel));
+        double intensity = Math.max(0, Math.min(15, lightLevel)) / 15.0;
+        int red4 = (int) Math.round((rgb >> 16 & 0xFF) * intensity * 15.0 / 255.0);
+        int green4 = (int) Math.round((rgb >> 8 & 0xFF) * intensity * 15.0 / 255.0);
+        int blue4 = (int) Math.round((rgb & 0xFF) * intensity * 15.0 / 255.0);
         return OFFSCREEN_LIGHT_SIGNATURE << 21
             | (mode & 7) << 18
-            | intensity4 << 14
+            | DEFAULT_PROJECTION_CODE << 14
             | red4 << 10
             | green4 << 6
             | blue4 << 2
@@ -1676,17 +1756,84 @@ public final class StrobeManager {
     }
 
     private boolean blockedByGeometry(Location eye, Vector direction, double distance) {
-        RayTraceResult hit = eye.getWorld().rayTraceBlocks(
-            eye,
-            direction,
-            // Stop just before the technical point to avoid counting its own
-            // supporting face, while still catching a full block immediately
-            // behind it. The previous 0.65 margin skipped that last block.
-            Math.max(0.0, distance - 0.05),
-            FluidCollisionMode.NEVER,
-            true
-        );
-        return hit != null && hit.getHitBlock() != null;
+        World world = eye.getWorld();
+        Vector rayDirection = direction.clone().normalize();
+        Location rayStart = eye.clone();
+        double remaining = Math.max(0.0, distance - 0.05);
+
+        while (remaining > 1.0e-6) {
+            RayTraceResult hit = world.rayTraceBlocks(
+                rayStart,
+                rayDirection,
+                remaining,
+                FluidCollisionMode.NEVER,
+                true
+            );
+            if (hit == null || hit.getHitBlock() == null) {
+                return false;
+            }
+            Block block = hit.getHitBlock();
+            if (!letsLightThrough(block.getType())) {
+                return true;
+            }
+
+            Vector hitPosition = hit.getHitPosition();
+            double distanceToHit = Math.max(
+                0.0,
+                hitPosition.clone().subtract(rayStart.toVector()).dot(rayDirection)
+            );
+            double distanceToExit = distanceToExitBlock(
+                hitPosition,
+                rayDirection,
+                block
+            );
+            double advance = Math.max(0.01, distanceToExit + 0.01);
+            remaining -= distanceToHit + advance;
+            rayStart = hitPosition.toLocation(world).add(
+                rayDirection.clone().multiply(advance)
+            );
+        }
+        return false;
+    }
+
+    static boolean letsLightThrough(Material material) {
+        String name = material.name();
+        return name.equals("GLASS")
+            || name.endsWith("_GLASS")
+            || name.equals("GLASS_PANE")
+            || name.endsWith("_GLASS_PANE");
+    }
+
+    private static double distanceToExitBlock(
+        Vector position,
+        Vector direction,
+        Block block
+    ) {
+        double exit = Double.POSITIVE_INFINITY;
+        exit = nearestPositive(exit, axisExitDistance(
+            position.getX(), direction.getX(), block.getX()
+        ));
+        exit = nearestPositive(exit, axisExitDistance(
+            position.getY(), direction.getY(), block.getY()
+        ));
+        exit = nearestPositive(exit, axisExitDistance(
+            position.getZ(), direction.getZ(), block.getZ()
+        ));
+        return Double.isFinite(exit) ? Math.max(0.0, exit) : 0.0;
+    }
+
+    private static double axisExitDistance(double position, double direction, int blockAxis) {
+        if (direction > 1.0e-9) {
+            return (blockAxis + 1.0 - position) / direction;
+        }
+        if (direction < -1.0e-9) {
+            return (blockAxis - position) / direction;
+        }
+        return Double.POSITIVE_INFINITY;
+    }
+
+    private static double nearestPositive(double current, double candidate) {
+        return candidate >= 0.0 && candidate < current ? candidate : current;
     }
 
     private void removeOrphanedDisplays() {
@@ -1754,7 +1901,6 @@ public final class StrobeManager {
         private Location editorAnchor;
         private final Map<UUID, ItemDisplay> discoveryLights = new LinkedHashMap<>();
         private final Set<UUID> sourceHidden = new HashSet<>();
-        private final Set<UUID> sourceBlocked = new HashSet<>();
         private final Set<UUID> editorVisible = new HashSet<>();
         private Block vanillaLight;
         private Material originalAir = Material.AIR;
@@ -1771,7 +1917,6 @@ public final class StrobeManager {
             clearVanillaLight();
             clearDiscoveryLights();
             sourceHidden.clear();
-            sourceBlocked.clear();
             editorVisible.clear();
             if (marker != null) {
                 marker.remove();

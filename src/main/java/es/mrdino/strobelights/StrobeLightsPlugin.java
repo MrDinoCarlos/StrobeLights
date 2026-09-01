@@ -51,6 +51,9 @@ public final class StrobeLightsPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (flashbangs != null) {
+            flashbangs.shutdown();
+        }
         if (gui != null) {
             gui.closeAll();
         }

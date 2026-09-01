@@ -22,7 +22,8 @@ class LanguageContractTest {
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{[a-z-]+}");
     private static final Pattern SOURCE_KEY = Pattern.compile(
         "\"((?:(?:gui|item|level|message|state|position|command)\\.[a-z0-9.-]+"
-            + "|resource-pack\\.(?:loaded|prompt|unconfigured\\.[a-z0-9.-]+)))\""
+            + "|resource-pack\\.(?:loaded|prompt|compatibility\\.[a-z0-9.-]+"
+            + "|unconfigured\\.[a-z0-9.-]+)))\""
     );
 
     @Test

@@ -7,6 +7,7 @@ import es.mrdino.strobelights.model.StrobeMode;
 import es.mrdino.strobelights.util.StrobeColors;
 import es.mrdino.strobelights.util.StrobeTiming;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -57,10 +58,25 @@ public final class StrobeGui implements Listener {
     private static final int LIST_PREVIOUS_SLOT = 21;
     private static final int LIST_CREATE_SLOT = 22;
     private static final int LIST_NEXT_SLOT = 23;
+    private static final int LIST_GROUPS_SLOT = 24;
     private static final int LIST_PACK_SLOT = 25;
     private static final int LIST_CLOSE_SLOT = 26;
     private static final int EDITOR_SIZE = 27;
+    private static final int EDITOR_PROFILE_SLOT = 4;
+    private static final int EDITOR_POWER_SLOT = 9;
+    private static final int EDITOR_PULSE_SLOT = 10;
+    private static final int EDITOR_COLOR_SLOT = 11;
+    private static final int EDITOR_INTENSITY_SLOT = 12;
+    private static final int EDITOR_EXPANSION_SLOT = 13;
+    private static final int EDITOR_REFRESH_SLOT = 14;
+    private static final int EDITOR_SCREEN_FLASH_SLOT = 15;
+    private static final int EDITOR_FLASH_POWER_SLOT = 16;
     private static final int EDITOR_BACK_SLOT = 18;
+    private static final int EDITOR_MOVE_SLOT = 19;
+    private static final int EDITOR_TELEPORT_SLOT = 20;
+    private static final int EDITOR_GROUP_SLOT = 21;
+    private static final int EDITOR_RENAME_SLOT = 22;
+    private static final int EDITOR_DELETE_SLOT = 24;
     private static final int EDITOR_CLOSE_SLOT = 26;
     private static final int PALETTE_SIZE = 45;
     private static final int PALETTE_BACK_SLOT = 36;
@@ -68,6 +84,12 @@ public final class StrobeGui implements Listener {
     private static final int DELETE_SIZE = 27;
     private static final int DELETE_BACK_SLOT = 18;
     private static final int DELETE_CLOSE_SLOT = 26;
+    private static final int GROUP_SIZE = 27;
+    private static final int GROUP_PAGE_SIZE = 18;
+    private static final int GROUP_BACK_SLOT = 18;
+    private static final int GROUP_PREVIOUS_SLOT = 21;
+    private static final int GROUP_NEXT_SLOT = 23;
+    private static final int GROUP_CLOSE_SLOT = 26;
     private static final int[] PALETTE_SLOTS = {
         9, 10, 11, 12, 13, 14, 15, 16,
         18, 19, 20, 21, 22, 23, 24, 25
@@ -203,6 +225,15 @@ public final class StrobeGui implements Listener {
                 false
             ));
         }
+        inventory.setItem(LIST_GROUPS_SLOT, item(
+            GuiIcon.GROUPS,
+            title(tr(player, "gui.list.groups.title"), NamedTextColor.LIGHT_PURPLE),
+            lore(
+                tr(player, "gui.list.groups.count", "count", plugin.manager().groups().size()),
+                tr(player, "gui.list.groups.lore")
+            ),
+            false
+        ));
         boolean packLoaded = plugin.resourcePack() != null
             && plugin.resourcePack().isLoaded(player);
         inventory.setItem(LIST_PACK_SLOT, item(
@@ -249,6 +280,17 @@ public final class StrobeGui implements Listener {
         player.sendMessage(PREFIX + ChatColor.GRAY + tr(player, "message.cancel-help"));
     }
 
+    private void openGroupName(Player player, Strobe strobe, int returnPage) {
+        pendingNames.put(
+            player.getUniqueId(),
+            new NameRequest(NameMode.GROUP, strobe.name(), returnPage)
+        );
+        player.closeInventory();
+        player.sendMessage(PREFIX + ChatColor.LIGHT_PURPLE
+            + tr(player, "message.group-prompt", "name", strobe.name()));
+        player.sendMessage(PREFIX + ChatColor.GRAY + tr(player, "message.cancel-help"));
+    }
+
     private void openEditor(Player player, Strobe strobe, int returnPage) {
         GuiHolder holder = new GuiHolder(Screen.EDITOR, strobe.name(), returnPage, List.of());
         Inventory inventory = Bukkit.createInventory(
@@ -261,14 +303,26 @@ public final class StrobeGui implements Listener {
         );
         holder.inventory = inventory;
 
-        inventory.setItem(4, strobeItem(player, strobe));
+        inventory.setItem(EDITOR_PROFILE_SLOT, strobeItem(player, strobe));
         inventory.setItem(EDITOR_BACK_SLOT, item(
             GuiIcon.BACK,
             title(tr(player, "gui.editor.back"), NamedTextColor.AQUA),
             List.of(),
             false
         ));
-        inventory.setItem(9, item(
+        inventory.setItem(EDITOR_EXPANSION_SLOT, item(
+            GuiIcon.EXPANSION,
+            title(tr(player, "gui.editor.expansion.title"), NamedTextColor.AQUA),
+            lore(
+                tr(player, "gui.editor.expansion.value", "scale",
+                    formatExpansion(strobe.expansion())),
+                tr(player, "gui.common.left-plus-one"),
+                tr(player, "gui.common.right-minus-one"),
+                tr(player, "gui.editor.expansion.shift")
+            ),
+            strobe.expansion() == Strobe.DEFAULT_EXPANSION
+        ));
+        inventory.setItem(EDITOR_POWER_SLOT, item(
             strobe.enabled() ? GuiIcon.POWER_OFF : GuiIcon.POWER_ON,
             title(tr(player, strobe.enabled() ? "gui.editor.turn-off" : "gui.editor.turn-on"),
                 strobe.enabled() ? NamedTextColor.RED : NamedTextColor.GREEN),
@@ -276,7 +330,7 @@ public final class StrobeGui implements Listener {
                 tr(player, strobe.enabled() ? "state.enabled" : "state.disabled"))),
             strobe.enabled()
         ));
-        inventory.setItem(10, item(
+        inventory.setItem(EDITOR_PULSE_SLOT, item(
             GuiIcon.PULSE,
             title(tr(player, "gui.editor.pulse.title"), NamedTextColor.LIGHT_PURPLE),
             lore(
@@ -285,7 +339,7 @@ public final class StrobeGui implements Listener {
             ),
             true
         ));
-        inventory.setItem(11, item(
+        inventory.setItem(EDITOR_COLOR_SLOT, item(
             GuiIcon.COLOR,
             title(tr(player, "gui.editor.color.title"), TextColor.color(strobe.rgb())),
             lore(
@@ -294,7 +348,7 @@ public final class StrobeGui implements Listener {
             ),
             true
         ));
-        inventory.setItem(12, item(
+        inventory.setItem(EDITOR_REFRESH_SLOT, item(
             strobe.mode() == StrobeMode.STATIC ? GuiIcon.STATIC : GuiIcon.TIMING,
             title(tr(player, "gui.editor.refresh.title"), NamedTextColor.GOLD),
             lore(
@@ -310,7 +364,7 @@ public final class StrobeGui implements Listener {
             ),
             strobe.mode() == StrobeMode.STATIC
         ));
-        inventory.setItem(13, item(
+        inventory.setItem(EDITOR_INTENSITY_SLOT, item(
             GuiIcon.BRIGHTNESS,
             title(tr(player, "gui.editor.intensity.title"), NamedTextColor.YELLOW),
             lore(
@@ -321,7 +375,7 @@ public final class StrobeGui implements Listener {
             ),
             strobe.lightLevel() == 15
         ));
-        inventory.setItem(14, item(
+        inventory.setItem(EDITOR_SCREEN_FLASH_SLOT, item(
             GuiIcon.CAMERA_FLASH,
             title(tr(player, "gui.editor.screen-flash.title"), NamedTextColor.DARK_PURPLE),
             lore(
@@ -334,7 +388,7 @@ public final class StrobeGui implements Listener {
             ),
             strobe.blindness().enabled()
         ));
-        inventory.setItem(15, item(
+        inventory.setItem(EDITOR_FLASH_POWER_SLOT, item(
             GuiIcon.FLASH_POWER,
             title(tr(player, "gui.editor.flash-power.title"), NamedTextColor.LIGHT_PURPLE),
             lore(
@@ -346,13 +400,13 @@ public final class StrobeGui implements Listener {
             ),
             strobe.flashPower() >= 100
         ));
-        inventory.setItem(16, item(
+        inventory.setItem(EDITOR_RENAME_SLOT, item(
             GuiIcon.RENAME,
             title(tr(player, "gui.editor.rename.title"), NamedTextColor.YELLOW),
             lore(tr(player, "gui.editor.rename.lore")),
             false
         ));
-        inventory.setItem(20, item(
+        inventory.setItem(EDITOR_MOVE_SLOT, item(
             GuiIcon.MOVE,
             title(tr(player, strobe.placed() ? "gui.editor.placement.move" : "gui.editor.placement.place"),
                 strobe.placed() ? NamedTextColor.AQUA : NamedTextColor.YELLOW),
@@ -368,7 +422,18 @@ public final class StrobeGui implements Listener {
             ),
             !strobe.placed()
         ));
-        inventory.setItem(22, item(
+        inventory.setItem(EDITOR_GROUP_SLOT, item(
+            GuiIcon.GROUPS,
+            title(tr(player, "gui.editor.group.title"), NamedTextColor.LIGHT_PURPLE),
+            lore(
+                tr(player, "gui.editor.group.value", "group",
+                    strobe.hasGroup() ? strobe.group() : tr(player, "gui.common.none")),
+                tr(player, "gui.editor.group.assign"),
+                tr(player, "gui.editor.group.clear")
+            ),
+            strobe.hasGroup()
+        ));
+        inventory.setItem(EDITOR_TELEPORT_SLOT, item(
             GuiIcon.TELEPORT,
             title(tr(player, "gui.editor.teleport.title"), NamedTextColor.AQUA),
             lore(
@@ -378,7 +443,7 @@ public final class StrobeGui implements Listener {
             ),
             false
         ));
-        inventory.setItem(24, item(
+        inventory.setItem(EDITOR_DELETE_SLOT, item(
             GuiIcon.DELETE,
             title(tr(player, "gui.editor.delete.title"), NamedTextColor.RED),
             lore(tr(player, "gui.editor.delete.lore")),
@@ -462,10 +527,10 @@ public final class StrobeGui implements Listener {
         );
         holder.inventory = inventory;
         inventory.setItem(11, item(
-            Material.LIME_CONCRETE,
-            title(tr(player, "gui.delete.confirm"), NamedTextColor.GREEN),
+            GuiIcon.DELETE,
+            title(tr(player, "gui.delete.confirm"), NamedTextColor.RED),
             lore(tr(player, "gui.delete.confirm-lore")),
-            false
+            true
         ));
         inventory.setItem(13, strobeItem(player, strobe));
         inventory.setItem(DELETE_BACK_SLOT, item(
@@ -475,6 +540,81 @@ public final class StrobeGui implements Listener {
             false
         ));
         inventory.setItem(DELETE_CLOSE_SLOT, item(
+            GuiIcon.CLOSE,
+            title(tr(player, "gui.common.close"), NamedTextColor.RED),
+            List.of(),
+            false
+        ));
+        player.openInventory(inventory);
+    }
+
+    private void openGroups(Player player, int requestedPage) {
+        List<String> groups = plugin.manager().groups();
+        int maximumPage = Math.max(0, (groups.size() - 1) / GROUP_PAGE_SIZE);
+        int page = Math.max(0, Math.min(maximumPage, requestedPage));
+        GuiHolder holder = new GuiHolder(Screen.GROUPS, null, page, groups);
+        Inventory inventory = Bukkit.createInventory(
+            holder,
+            GROUP_SIZE,
+            Component.text(
+                tr(player, "gui.groups.title", "page", page + 1,
+                    "pages", maximumPage + 1),
+                NamedTextColor.DARK_PURPLE
+            )
+        );
+        holder.inventory = inventory;
+
+        int start = page * GROUP_PAGE_SIZE;
+        int end = Math.min(groups.size(), start + GROUP_PAGE_SIZE);
+        for (int index = start; index < end; index++) {
+            String group = groups.get(index);
+            Collection<Strobe> members = plugin.manager().inGroup(group);
+            long enabled = members.stream().filter(Strobe::enabled).count();
+            inventory.setItem(index - start, item(
+                GuiIcon.GROUPS,
+                title(group, NamedTextColor.LIGHT_PURPLE),
+                lore(
+                    tr(player, "gui.groups.members", "count", members.size()),
+                    tr(player, "gui.groups.enabled", "enabled", enabled,
+                        "count", members.size()),
+                    tr(player, "gui.groups.left-start"),
+                    tr(player, "gui.groups.right-stop"),
+                    tr(player, "gui.groups.shift-pulse")
+                ),
+                enabled > 0
+            ));
+        }
+        if (groups.isEmpty()) {
+            inventory.setItem(LIST_EMPTY_SLOT, item(
+                GuiIcon.NO_STROBES,
+                title(tr(player, "gui.groups.empty.title"), NamedTextColor.GRAY),
+                lore(tr(player, "gui.groups.empty.lore")),
+                false
+            ));
+        }
+        inventory.setItem(GROUP_BACK_SLOT, item(
+            GuiIcon.BACK,
+            title(tr(player, "gui.common.back"), NamedTextColor.AQUA),
+            List.of(),
+            false
+        ));
+        if (page > 0) {
+            inventory.setItem(GROUP_PREVIOUS_SLOT, item(
+                GuiIcon.PREVIOUS,
+                title(tr(player, "gui.common.previous-page"), NamedTextColor.AQUA),
+                List.of(),
+                false
+            ));
+        }
+        if (page < maximumPage) {
+            inventory.setItem(GROUP_NEXT_SLOT, item(
+                GuiIcon.NEXT,
+                title(tr(player, "gui.common.next-page"), NamedTextColor.AQUA),
+                List.of(),
+                false
+            ));
+        }
+        inventory.setItem(GROUP_CLOSE_SLOT, item(
             GuiIcon.CLOSE,
             title(tr(player, "gui.common.close"), NamedTextColor.RED),
             List.of(),
@@ -501,6 +641,7 @@ public final class StrobeGui implements Listener {
             case EDITOR -> handleEditorClick(player, holder, event);
             case PALETTE -> handlePaletteClick(player, holder, event);
             case DELETE_CONFIRM -> handleDeleteClick(player, holder, event.getRawSlot());
+            case GROUPS -> handleGroupClick(player, holder, event);
         }
     }
 
@@ -644,6 +785,7 @@ public final class StrobeGui implements Listener {
             case LIST_PREVIOUS_SLOT -> openList(player, holder.page - 1);
             case LIST_CREATE_SLOT -> openCreateName(player, holder.page);
             case LIST_NEXT_SLOT -> openList(player, holder.page + 1);
+            case LIST_GROUPS_SLOT -> openGroups(player, 0);
             case LIST_PACK_SLOT -> {
                 if (plugin.resourcePack() != null) {
                     plugin.resourcePack().resend(player);
@@ -663,7 +805,7 @@ public final class StrobeGui implements Listener {
         }
         if (isCancelWord(name)) {
             player.sendMessage(PREFIX + ChatColor.YELLOW + tr(player, "message.name-cancelled"));
-            if (request.mode == NameMode.RENAME) {
+            if (request.mode == NameMode.RENAME || request.mode == NameMode.GROUP) {
                 plugin.manager().find(request.strobeName)
                     .ifPresentOrElse(
                         strobe -> openEditor(player, strobe, request.returnPage),
@@ -672,6 +814,36 @@ public final class StrobeGui implements Listener {
             } else {
                 openList(player, request.returnPage);
             }
+            return;
+        }
+        if (request.mode == NameMode.GROUP) {
+            Optional<Strobe> optional = plugin.manager().find(request.strobeName);
+            if (optional.isEmpty()) {
+                player.sendMessage(PREFIX + ChatColor.RED + tr(player, "message.strobe-gone"));
+                openList(player, request.returnPage);
+                return;
+            }
+            if (!plugin.manager().validGroupName(name)) {
+                player.sendMessage(PREFIX + ChatColor.RED + tr(
+                    player,
+                    "message.invalid-group",
+                    "maximum",
+                    plugin.manager().maximumGroupNameLength()
+                ));
+                pendingNames.put(player.getUniqueId(), request);
+                return;
+            }
+            Strobe strobe = optional.get();
+            plugin.manager().setGroup(strobe, name);
+            player.sendMessage(PREFIX + ChatColor.LIGHT_PURPLE + tr(
+                player,
+                "message.group-saved",
+                "name",
+                strobe.name(),
+                "group",
+                strobe.group()
+            ));
+            openEditor(player, strobe, request.returnPage);
             return;
         }
         if (!plugin.manager().validName(name)) {
@@ -730,7 +902,7 @@ public final class StrobeGui implements Listener {
         Strobe strobe = optional.get();
         switch (event.getRawSlot()) {
             case EDITOR_BACK_SLOT -> openList(player, holder.page);
-            case 9 -> {
+            case EDITOR_POWER_SLOT -> {
                 if (!strobe.placed()) {
                     player.sendMessage(PREFIX + ChatColor.YELLOW
                         + tr(player, "message.place-first"));
@@ -739,7 +911,7 @@ public final class StrobeGui implements Listener {
                 plugin.manager().setEnabled(strobe, !strobe.enabled());
                 openEditor(player, strobe, holder.page);
             }
-            case 10 -> {
+            case EDITOR_PULSE_SLOT -> {
                 if (!strobe.placed()) {
                     player.sendMessage(PREFIX + ChatColor.YELLOW
                         + tr(player, "message.place-first"));
@@ -754,8 +926,8 @@ public final class StrobeGui implements Listener {
                         + tr(player, "message.flash-preview-unavailable"));
                 }
             }
-            case 11 -> openPalette(player, strobe, holder.page);
-            case 12 -> {
+            case EDITOR_COLOR_SLOT -> openPalette(player, strobe, holder.page);
+            case EDITOR_REFRESH_SLOT -> {
                 int maximum = plugin.manager().maximumRefreshTicks();
                 if (strobe.mode() == StrobeMode.STATIC) {
                     if (!event.isRightClick()) {
@@ -778,7 +950,7 @@ public final class StrobeGui implements Listener {
                 }
                 openEditor(player, strobe, holder.page);
             }
-            case 13 -> {
+            case EDITOR_INTENSITY_SLOT -> {
                 int amount = event.isShiftClick() ? 5 : 1;
                 int value = event.isRightClick()
                     ? strobe.lightLevel() - amount
@@ -786,14 +958,14 @@ public final class StrobeGui implements Listener {
                 plugin.manager().setLightLevel(strobe, Math.max(0, Math.min(15, value)));
                 openEditor(player, strobe, holder.page);
             }
-            case 14 -> {
+            case EDITOR_SCREEN_FLASH_SLOT -> {
                 BlindnessLevel[] levels = BlindnessLevel.values();
                 int direction = event.isRightClick() ? -1 : 1;
                 int index = Math.floorMod(strobe.blindness().ordinal() + direction, levels.length);
                 plugin.manager().setBlindness(strobe, levels[index]);
                 openEditor(player, strobe, holder.page);
             }
-            case 15 -> {
+            case EDITOR_FLASH_POWER_SLOT -> {
                 int amount = event.isShiftClick() ? 25 : 5;
                 int value = event.isRightClick()
                     ? strobe.flashPower() - amount
@@ -801,8 +973,22 @@ public final class StrobeGui implements Listener {
                 plugin.manager().setFlashPower(strobe, Math.max(0, Math.min(200, value)));
                 openEditor(player, strobe, holder.page);
             }
-            case 16 -> openRename(player, strobe, holder.page);
-            case 20 -> {
+            case EDITOR_RENAME_SLOT -> openRename(player, strobe, holder.page);
+            case EDITOR_EXPANSION_SLOT -> {
+                double amount = event.isShiftClick() ? 1.0 : Strobe.EXPANSION_STEP;
+                double value = event.isRightClick()
+                    ? strobe.expansion() - amount
+                    : strobe.expansion() + amount;
+                plugin.manager().setExpansion(
+                    strobe,
+                    Math.max(Strobe.MINIMUM_EXPANSION, Math.min(
+                        Strobe.MAXIMUM_EXPANSION,
+                        value
+                    ))
+                );
+                openEditor(player, strobe, holder.page);
+            }
+            case EDITOR_MOVE_SLOT -> {
                 pendingPlacements.put(
                     player.getUniqueId(),
                     new PlacementRequest(strobe.name(), holder.page)
@@ -813,7 +999,21 @@ public final class StrobeGui implements Listener {
                 player.sendMessage(PREFIX + ChatColor.GRAY
                     + tr(player, "message.placement-cancel"));
             }
-            case 22 -> {
+            case EDITOR_GROUP_SLOT -> {
+                if (event.isRightClick()) {
+                    plugin.manager().setGroup(strobe, Strobe.DEFAULT_GROUP);
+                    player.sendMessage(PREFIX + ChatColor.YELLOW + tr(
+                        player,
+                        "message.group-cleared",
+                        "name",
+                        strobe.name()
+                    ));
+                    openEditor(player, strobe, holder.page);
+                } else {
+                    openGroupName(player, strobe, holder.page);
+                }
+            }
+            case EDITOR_TELEPORT_SLOT -> {
                 if (!plugin.manager().teleport(player, strobe)) {
                     player.sendMessage(PREFIX + ChatColor.YELLOW
                         + tr(player, "message.place-first"));
@@ -823,7 +1023,7 @@ public final class StrobeGui implements Listener {
                     + tr(player, "message.teleported", "name", strobe.name()));
                 player.closeInventory();
             }
-            case 24 -> openDeleteConfirmation(player, strobe, holder.page);
+            case EDITOR_DELETE_SLOT -> openDeleteConfirmation(player, strobe, holder.page);
             case EDITOR_CLOSE_SLOT -> player.closeInventory();
             default -> {
             }
@@ -891,6 +1091,53 @@ public final class StrobeGui implements Listener {
         }
     }
 
+    private void handleGroupClick(
+        Player player,
+        GuiHolder holder,
+        InventoryClickEvent event
+    ) {
+        int slot = event.getRawSlot();
+        if (slot >= 0 && slot < GROUP_PAGE_SIZE) {
+            int index = holder.page * GROUP_PAGE_SIZE + slot;
+            if (index >= holder.names.size()) {
+                return;
+            }
+            String group = holder.names.get(index);
+            if (event.isShiftClick()) {
+                int count = plugin.manager().pulseGroup(group);
+                player.sendMessage(PREFIX + ChatColor.LIGHT_PURPLE + tr(
+                    player,
+                    "message.group-pulsed",
+                    "group",
+                    group,
+                    "count",
+                    count
+                ));
+            } else {
+                boolean enabled = !event.isRightClick();
+                int changed = plugin.manager().setGroupEnabled(group, enabled);
+                player.sendMessage(PREFIX + ChatColor.GREEN + tr(
+                    player,
+                    enabled ? "message.group-started" : "message.group-stopped",
+                    "group",
+                    group,
+                    "changed",
+                    changed
+                ));
+            }
+            openGroups(player, holder.page);
+            return;
+        }
+        switch (slot) {
+            case GROUP_BACK_SLOT -> openList(player, 0);
+            case GROUP_PREVIOUS_SLOT -> openGroups(player, holder.page - 1);
+            case GROUP_NEXT_SLOT -> openGroups(player, holder.page + 1);
+            case GROUP_CLOSE_SLOT -> player.closeInventory();
+            default -> {
+            }
+        }
+    }
+
     private ItemStack strobeItem(Player player, Strobe strobe) {
         return item(
             GuiIcon.STROBE,
@@ -911,6 +1158,11 @@ public final class StrobeGui implements Listener {
                         "rate", formatHz(strobe.refreshTicks())), NamedTextColor.YELLOW),
                 title(tr(player, "gui.strobe.intensity", "level", strobe.lightLevel()),
                     NamedTextColor.AQUA),
+                title(tr(player, "gui.strobe.expansion", "scale",
+                    formatExpansion(strobe.expansion())), NamedTextColor.AQUA),
+                title(tr(player, "gui.strobe.group", "group",
+                    strobe.hasGroup() ? strobe.group() : tr(player, "gui.common.none")),
+                    NamedTextColor.LIGHT_PURPLE),
                 title(tr(player, "gui.strobe.screen-flash", "level",
                     plugin.messages().blindness(player, strobe.blindness())),
                     NamedTextColor.LIGHT_PURPLE),
@@ -1026,6 +1278,10 @@ public final class StrobeGui implements Listener {
         return String.format(Locale.ROOT, "%.2f", StrobeTiming.flashesPerSecond(ticks));
     }
 
+    private static String formatExpansion(double expansion) {
+        return String.format(Locale.ROOT, "%.2f×", expansion);
+    }
+
     private String position(Player player, Strobe strobe) {
         String coordinates = String.format(
             Locale.ROOT,
@@ -1051,12 +1307,14 @@ public final class StrobeGui implements Listener {
         LIST,
         EDITOR,
         PALETTE,
-        DELETE_CONFIRM
+        DELETE_CONFIRM,
+        GROUPS
     }
 
     private enum NameMode {
         CREATE,
-        RENAME
+        RENAME,
+        GROUP
     }
 
     private enum GuiIcon {
@@ -1082,7 +1340,9 @@ public final class StrobeGui implements Listener {
         PREVIOUS(6_819.0f),
         NEXT(6_820.0f),
         COLOR_SWATCH(6_821.0f),
-        NO_STROBES(6_822.0f);
+        NO_STROBES(6_822.0f),
+        GROUPS(6_823.0f),
+        EXPANSION(6_824.0f);
 
         private final float customModelData;
 

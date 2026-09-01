@@ -2,8 +2,10 @@ package es.mrdino.strobelights.resourcepack;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
+import javax.imageio.ImageIO;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,7 +30,8 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void reservesTheOriginalInvisibleTechnicalPointMarker() throws IOException {
+    void keepsTheTechnicalMarkerMicroscopicButNonDegenerateForOptiFine()
+        throws IOException {
         assertContains(
             PACK.resolve("assets/minecraft/items/lime_stained_glass.json"),
             "\"threshold\": 6700"
@@ -39,11 +42,27 @@ class ShaderPackContractTest {
         );
         assertContains(
             PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
-            "\"from\": [8,8,8]"
+            "\"from\": [7.5,8,7.5]"
         );
         assertContains(
             PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
+            "\"to\": [8.5,8,8.5]"
+        );
+        assertContains(
+            PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
+            "\"scale\":[0.002,0.002,0.002]"
+        );
+        assertNotContains(
+            PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
             "\"scale\":[0.0,0.0,0.0]"
+        );
+        assertContains(
+            PACK.resolve("assets/minecraft/models/item/lp.json"),
+            "\"from\": [7.5,8,7.5]"
+        );
+        assertContains(
+            PACK.resolve("assets/minecraft/models/item/lp.json"),
+            "\"scale\":[0.002,0.002,0.002]"
         );
         assertNotContains(
             PACK.resolve(
@@ -57,6 +76,12 @@ class ShaderPackContractTest {
             ),
             "ModelViewMat * vec4(Position, 1.0)"
         );
+        assertContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            ),
+            "#define HALFMARKER tmp.z / 64.0"
+        );
         assertFalse(Files.exists(PACK.resolve(
             "assets/minecraft/optifine/emissive.properties"
         )));
@@ -66,6 +91,84 @@ class ShaderPackContractTest {
         assertFalse(Files.exists(PACK.resolve(
             "assets/minecraft/optifine/dynamic_lights.properties"
         )));
+    }
+
+    @Test
+    void acceptsOptiFineAlphaQuantizationWithoutUsingFogAsAWorldMarkerGate()
+        throws IOException {
+        Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
+        Path core = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        );
+        assertContains(utils, "#define LIGHTALPHATOLERANCE (2.0 / 255.0)");
+        assertContains(
+            core,
+            "abs(tmpcol.a - LIGHTALPHA) <= LIGHTALPHATOLERANCE"
+        );
+        assertContains(core, "float markerTextureFloor = tmpcol.a * 0.5");
+        assertContains(
+            core,
+            "float markerTexturePeak = max(max(tmpcol.r, tmpcol.g), tmpcol.b)"
+        );
+        assertContains(
+            core,
+            "float markerTextureBase = min(min(tmpcol.r, tmpcol.g), tmpcol.b)"
+        );
+        assertContains(core, "markerTexturePeak >= markerTextureFloor");
+        assertContains(
+            core,
+            "markerTextureBase >= markerTexturePeak * 0.75"
+        );
+        assertNotContains(core, "tmpcol.a == LIGHTALPHA");
+        assertContains(
+            core,
+            "marker = float(!gui && markerAlpha && markerTextureCarrier)"
+        );
+        assertContains(core, "vertexColor = vec4(Color.rgb, 1.0)");
+        assertNotContains(core, "min(min(tmpcol.r, tmpcol.g), tmpcol.b) > 0.99");
+        assertNotContains(core, "bool hand = isHand(FogStart, FogEnd)");
+        assertNotContains(core, "!hand && !gui");
+        assertNotContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+            ),
+            "bool hand = isHand(FogStart, FogEnd)"
+        );
+    }
+
+    @Test
+    void transportsMarkersThroughTheOptiFineCompatibleColorAttachment()
+        throws IOException {
+        Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
+        Path core = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+        );
+        Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
+        Path pipeline = PACK.resolve("assets/minecraft/post_effect/transparency.json");
+
+        assertNotContains(utils, "DEPTHCODEPRECISION");
+        assertNotContains(utils, "decodeLightPositionDepth");
+        assertContains(core, "inverse(uvPerPixel) * (texCoord2 - vec2(0.5))");
+        assertContains(core, "fragColor = vec4(vec3(0.4), 5.0 / 255.0)");
+        assertContains(core, "fragColor = vec4(bitColor * 0.5, 2.0 / 255.0)");
+        assertContains(core, "gl_FragDepth = centerDepth * LIGHTDEPTH");
+        assertNotContains(core, "fragColor = vec4(vertexColor.rgb, 1.0)");
+        assertNotContains(core, "DEPTHCODESIGNATURE");
+        assertContains(filter, "uniform sampler2D DiffuseSampler");
+        assertContains(filter, "depth / LIGHTDEPTH");
+        assertContains(filter, "int encodedValue = 0");
+        assertContains(filter, "encodedValue |= triplet << (payloadIndex * 3)");
+        assertContains(filter, "if (validCarrier)");
+        assertContains(
+            aggregate,
+            "texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH"
+        );
+        assertContains(
+            pipeline,
+            "\"sampler_name\": \"Diffuse\",\n                    \"target\": \"minecraft:item_entity\""
+        );
+        assertNotContains(pipeline, "markerdata");
     }
 
     @Test
@@ -119,17 +222,80 @@ class ShaderPackContractTest {
 
     @Test
     void reconstructsNearAndBehindLightsFromPrivateMarkers() throws IOException {
+        Path core = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        );
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
+        Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
+        assertContains(core, "2.0 / max(abs(ProjMat[1][1]), 0.0001)");
+        assertContains(core, "encodeProjectionK(projectionK)");
+        assertContains(core, "((projectionCode & 15) << 16)");
+        assertContains(aggregate, "markerConversionK = decodeProjectionK(projectionCode)");
+        assertContains(utils, "int encodeProjectionK(float value)");
+        assertContains(utils, "float decodeProjectionK(int code)");
+        assertContains(utils, "if (code == 5) return 0.400");
+        assertContains(utils, "if (code == 13) return 2.000");
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
             Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
             assertContains(shader, "isOffscreenLight");
             assertContains(shader, "reconstructOffscreenLight");
-            assertContains(shader, "int mode = (encodedValue >> 18) & 7");
-            assertContains(shader, "float inverseScale = 4.0");
+            assertContains(shader, "int mode = (encodedValue >> 20) & 7");
+            assertContains(shader, "int projectionCode = (encodedValue >> 16) & 15");
+            assertContains(shader, "float axisInverse = 16.0");
+            assertContains(shader, "float depthInverse = 4.0");
             assertContains(shader, "return proxyCoord");
             assertContains(shader, "if (mode == 4)");
             assertContains(shader, "if (mode == 5)");
+            assertContains(shader, "markerConversionK = decodeProjectionK(projectionCode)");
+            assertContains(shader, "screenCoord * markerConversionK * depth");
+            assertNotContains(shader, "return color * intensity");
             assertContains(shader, "if (lightDist < lightRadius");
             assertNotContains(shader, "edgeFade");
+        }
+    }
+
+    @Test
+    void keepsAdjacentLightsAsIndependentCenters()
+        throws IOException {
+        Path centers = PACK.resolve("assets/minecraft/shaders/post/centers.fsh");
+        assertContains(centers, "bool sameEncodedMarker");
+        assertContains(centers, "vec3(1.5 / 255.0)");
+        assertContains(centers, "sameEncodedMarker(outColor.rgb, c1)");
+        assertContains(centers, "texCoord + vec2(oneTexel.x");
+    }
+
+    @Test
+    void carriesPerStrobeExpansionWithoutReducingRgbOrZoomMetadata()
+        throws IOException {
+        Path coreVertex = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        );
+        Path coreFragment = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+        );
+        Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
+        Path pipeline = PACK.resolve("assets/minecraft/post_effect/transparency.json");
+
+        assertContains(coreVertex, "bool isSourceLight(int encodedValue)");
+        assertContains(coreVertex, "lightExpansionCode = (encodedValue >> 16) & 15");
+        assertContains(coreVertex, "((expansionCode & 15) << 12)");
+        assertContains(coreVertex, "| (color4.r << 8)");
+        assertContains(coreVertex, "| (color4.g << 4)");
+        assertContains(coreVertex, "| color4.b");
+        assertNotContains(coreFragment, "expansionCode");
+        assertNotContains(filter, "expectedExpansionSignature");
+        assertNotContains(aggregate, "MarkerDataSampler");
+        assertContains(aggregate, "expansionCode = (encodedValue >> 12) & 15");
+        assertNotContains(pipeline, "markerdata");
+        assertContains(pipeline, "\"height\": 5");
+        for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
+            Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
+            assertContains(shader, "return (encodedValue >> 23) == 0");
+            assertContains(shader, "float((encodedValue >> 8) & 15)");
+            assertContains(shader, "float((encodedValue >> 4) & 15)");
+            assertContains(shader, "float(encodedValue & 15)");
+            assertContains(shader, "decodeExpansionScale(expansionCode)");
         }
     }
 
@@ -181,6 +347,39 @@ class ShaderPackContractTest {
         assertTrue(Files.isRegularFile(PACK.resolve(
             "assets/strobelights/textures/item/gui/no_strobes.png"
         )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/groups.png"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/expansion.png"
+        )));
+        var groupsIcon = ImageIO.read(PACK.resolve(
+            "assets/strobelights/textures/item/gui/groups.png"
+        ).toFile());
+        var expansionIcon = ImageIO.read(PACK.resolve(
+            "assets/strobelights/textures/item/gui/expansion.png"
+        ).toFile());
+        assertEquals(32, groupsIcon.getWidth());
+        assertEquals(32, groupsIcon.getHeight());
+        assertEquals(32, expansionIcon.getWidth());
+        assertEquals(32, expansionIcon.getHeight());
+        assertContains(definition, "\"threshold\": 6823");
+        assertContains(definition, "strobelights:item/gui/groups");
+        assertContains(definition, "\"threshold\": 6824");
+        assertContains(definition, "strobelights:item/gui/expansion");
+        Path gui = Path.of("src/main/java/es/mrdino/strobelights/ui/StrobeGui.java");
+        assertContains(gui, "title(tr(player, \"gui.delete.confirm\"), NamedTextColor.RED)");
+        assertContains(gui, "GuiIcon.DELETE");
+        assertContains(gui, "GuiIcon.GROUPS");
+        assertContains(gui, "GuiIcon.EXPANSION");
+        assertContains(gui, "EDITOR_INTENSITY_SLOT = 12");
+        assertContains(gui, "EDITOR_EXPANSION_SLOT = 13");
+        assertContains(gui, "EDITOR_REFRESH_SLOT = 14");
+        assertContains(gui, "EDITOR_MOVE_SLOT = 19");
+        assertContains(gui, "EDITOR_TELEPORT_SLOT = 20");
+        assertContains(gui, "EDITOR_GROUP_SLOT = 21");
+        assertContains(gui, "EDITOR_RENAME_SLOT = 22");
+        assertNotContains(gui, "Material.LIME_CONCRETE");
     }
 
     @Test
@@ -189,12 +388,15 @@ class ShaderPackContractTest {
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
         assertContains(core, "offscreenProxy");
-        assertContains(core, "sourceOnScreen");
+        assertContains(core, "float axisScale = 0.0625");
+        assertContains(core, "float depthScale = 0.25");
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
             Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
-            assertNotContains(shader, "rayOccluded");
-            assertNotContains(shader, "stepIndex <= 16");
-            assertNotContains(shader, "sampledDepth");
+            assertNotContains(shader, "lightBlocked");
+            assertNotContains(shader, "rayIndex < 24");
+            assertNotContains(shader, "depthGap > depthBias");
+            assertContains(shader, "float axisInverse = 16.0");
+            assertContains(shader, "float depthInverse = 4.0");
             assertContains(shader, "float lightRadius = mix(");
             assertContains(shader, "float radialFalloff = pow(");
         }
@@ -260,9 +462,14 @@ class ShaderPackContractTest {
         Path config = Path.of("src/main/resources/config.yml");
         assertContains(flashbangService, "scheduleFlightTimeout(projectile)");
         assertContains(flashbangService, "throwable-flashbang.maximum-flight-ticks");
+        assertContains(flashbangService, "ProjectileLaunchEvent event");
+        assertContains(flashbangService, "isFlashbang(projectile.getItem())");
+        assertContains(flashbangService, "addPluginChunkTicket(plugin)");
+        assertContains(flashbangService, "scheduleDetonation(impact, delay)");
+        assertContains(flashbangService, "sceneRetentionTicks()");
         assertContains(manager, "throwable-flashbang.scene-view-range");
         assertNotContains(manager, "throwable-flashbang.scene-light-radius");
-        assertContains(config, "maximum-flight-ticks: 100");
+        assertContains(config, "maximum-flight-ticks: 1200");
         assertContains(config, "scene-view-range: 128.0");
     }
 

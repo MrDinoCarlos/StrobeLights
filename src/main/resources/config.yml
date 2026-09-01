@@ -4,14 +4,15 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.8.13
+# Version:     0.9.6
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
 # License:     See THIRD_PARTY_NOTICES.md and the bundled pack license
 # ==============================================================================
-# Vanilla Fabulous graphics: full 3D RGB lighting and colored camera flash.
-# Fast/Fancy or modified renderers: invisible vanilla white LIGHT fallback.
+# Vanilla or OptiFine with Fabulous: full 3D RGB lighting and camera flash.
+# OptiFine shaderpacks must be OFF; Fast/Fancy or replaced render pipelines use
+# the invisible vanilla white LIGHT fallback.
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
@@ -35,15 +36,21 @@ resource-pack:
     bind-address: '0.0.0.0'
     port: 8250
 
+client-compatibility-notices:
+  # One short chat notice after the pack loads. A client brand containing
+  # OptiFine/OptiFabric gets the specific Fabulous/no-shaderpack reminder. Minecraft
+  # does not report its graphics mode, so every other client receives the
+  # conditional Fabulous/no-shaderpack hint without claiming detection.
+  enabled: false
+  delay-ticks: 20
+
 render:
   # 128 blocks, like Light Painter Universal. The technical display remains at
   # the exact saved source and disables client frustum culling, so it can be
   # rendered from above, below and every side without following the camera.
   display-view-range: 128.0
-  # Solid-block occlusion is mandatory and cannot be disabled: neither normal
-  # lights, discovery previews nor scene flashes cross walls. Frustum culling
-  # is disabled for the invisible source, so the shader receives it from above,
-  # below, every side and behind while the player is within render range.
+  # RGB light stays visible above, below, on every side and outside the frame.
+  # It deliberately does not project screen-space shadows or dark silhouettes.
 
 timing:
   # GUI: normal click changes 1 tick, 20 above 200; Shift changes 100.
@@ -78,11 +85,6 @@ vanilla-fallback:
   # mods do not run vanilla post effects still receive visible white lighting.
   # In vanilla Fabulous it is a base while the resource pack adds RGB color.
   enabled: true
-  # Minecraft's block-light engine may not display an on/off phase this short
-  # before it changes again. Keep only the white fallback stable at or below
-  # this speed so incompatible renderers never remain completely dark.
-  # Set to 0 to force the white fallback to copy every strobe phase.
-  stabilize-at-or-below-refresh-ticks: 10
 
 flashbang:
   # RGB resource-pack post effect. It uses each strobe's color, does not apply
@@ -97,9 +99,10 @@ throwable-flashbang:
   throw-velocity: 1.35
   # Fuse begins when the projectile hits a block or entity. 20 ticks = 1 s.
   detonation-delay-ticks: 20
-  # Failsafe: if no impact event ever arrives, the projectile still detonates
-  # at its last position after this flight time. 100 ticks = 5 seconds.
-  maximum-flight-ticks: 100
+  # Failsafe only: if no impact event ever arrives, the projectile still
+  # detonates at its last position. 1200 ticks = 60 seconds, leaving ample
+  # time for throws from unusual heights to reach the ground normally.
+  maximum-flight-ticks: 1200
   # Unconditional vanilla cue at the physical impact. Unlike blindness, it is
   # not cancelled when every player is outside the effect radius, is looking
   # away or has no resource pack. Volume 8 carries roughly 128 blocks.
@@ -133,3 +136,4 @@ throwable-flashbang:
 limits:
   maximum-strobes: 256
   maximum-name-length: 32
+  maximum-group-name-length: 32

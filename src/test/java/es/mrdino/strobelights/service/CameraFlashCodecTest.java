@@ -1,10 +1,10 @@
 package es.mrdino.strobelights.service;
 
 import es.mrdino.strobelights.model.BlindnessLevel;
-import es.mrdino.strobelights.model.StrobeMode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
 class CameraFlashCodecTest {
@@ -28,17 +28,29 @@ class CameraFlashCodecTest {
     }
 
     @Test
-    void packsPrivateOffscreenLightWithRgbIntensityAndCameraMode() {
+    void packsPrivateOffscreenLightWithPremultipliedRgbAndDefaultProjection() {
         int packed = StrobeManager.packOffscreenLightColor(0x2A80F4, 12, 5);
 
         assertTrue(StrobeManager.isPackedOffscreenLight(packed));
         assertEquals(6, packed >>> 21);
         assertEquals(5, packed >> 18 & 7);
-        assertEquals(12, packed >> 14 & 15);
+        assertEquals(11, packed >> 14 & 15);
         assertEquals(2, packed >> 10 & 15);
-        assertEquals(8, packed >> 6 & 15);
-        assertEquals(14, packed >> 2 & 15);
+        assertEquals(6, packed >> 6 & 15);
+        assertEquals(11, packed >> 2 & 15);
         assertEquals(2, packed & 3);
+    }
+
+    @Test
+    void packsRgbIntensityAndExpansionForTheCoreShader() {
+        int packed = StrobeManager.packSourceLightColor(0x2A80F4, 12, 7);
+
+        assertEquals(10, packed >>> 20);
+        assertEquals(7, packed >> 16 & 15);
+        assertEquals(2, packed >> 12 & 15);
+        assertEquals(6, packed >> 8 & 15);
+        assertEquals(11, packed >> 4 & 15);
+        assertEquals(5, packed & 15);
     }
 
     @Test
@@ -71,19 +83,11 @@ class CameraFlashCodecTest {
     }
 
     @Test
-    void keepsTheWhiteCompatibilityLightStableOnlyForFastEnabledStrobes() {
-        assertTrue(StrobeManager.needsStableVanillaFallback(
-            StrobeMode.STROBE, true, 5, 10
-        ));
-        assertEquals(false, StrobeManager.needsStableVanillaFallback(
-            StrobeMode.STROBE, true, 20, 10
-        ));
-        assertEquals(false, StrobeManager.needsStableVanillaFallback(
-            StrobeMode.STATIC, true, 5, 10
-        ));
-        assertEquals(false, StrobeManager.needsStableVanillaFallback(
-            StrobeMode.STROBE, false, 5, 10
-        ));
+    void whiteCompatibilityLightFollowsEveryStrobePhase() {
+        assertTrue(StrobeManager.shouldLightVanillaFallback(true, true, 15));
+        assertEquals(false, StrobeManager.shouldLightVanillaFallback(true, false, 15));
+        assertEquals(false, StrobeManager.shouldLightVanillaFallback(false, true, 15));
+        assertEquals(false, StrobeManager.shouldLightVanillaFallback(true, true, 0));
     }
 
     @Test
@@ -125,5 +129,16 @@ class CameraFlashCodecTest {
         assertTrue(middle > far);
         assertTrue(far > 0);
         assertEquals(0, StrobeManager.flashbangDurationTicks(0.0, 100));
+    }
+
+    @Test
+    void glassIsTransparentToServerSideLightOcclusion() {
+        assertTrue(StrobeManager.letsLightThrough(Material.GLASS));
+        assertTrue(StrobeManager.letsLightThrough(Material.RED_STAINED_GLASS));
+        assertTrue(StrobeManager.letsLightThrough(Material.GLASS_PANE));
+        assertTrue(StrobeManager.letsLightThrough(Material.BLUE_STAINED_GLASS_PANE));
+        assertTrue(StrobeManager.letsLightThrough(Material.TINTED_GLASS));
+        assertEquals(false, StrobeManager.letsLightThrough(Material.STONE));
+        assertEquals(false, StrobeManager.letsLightThrough(Material.OAK_LEAVES));
     }
 }

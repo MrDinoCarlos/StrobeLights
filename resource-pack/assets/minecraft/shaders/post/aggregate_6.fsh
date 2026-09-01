@@ -34,6 +34,15 @@ vec4 encodeInt(int i) {
     return vec4(float(r) / 255.0, float(g) / 255.0, float(b) / 255.0, a);
 }
 
+int markerValue(vec3 color) {
+    ivec3 bytes = ivec3(floor(color * 255.0 + 0.5));
+    return (bytes.r << 16) | (bytes.g << 8) | bytes.b;
+}
+
+bool isOffscreenLight(int encodedValue) {
+    return (encodedValue >> 23) == 0;
+}
+
 void main() {
     outColor = texture(DiffuseSampler, texCoord);
     float width = ceil(DiffuseSize.x / Step);
@@ -137,9 +146,22 @@ void main() {
 
         samplepos = vec2(px, py);
         samplepos = (samplepos + 0.5) * inOneTexel;
-        float lightDepth = LinearizeDepth(texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH);
+        float lightDepth = LinearizeDepth(
+            texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH
+        );
         samplepos = (samplepos - vec2(0.5)) * vec2(inAspectRatio, 1.0);
-        vec3 lightWorldCoord = vec3(samplepos * conversionK * lightDepth, lightDepth);
+        int encodedValue = markerValue(sampleColor.rgb);
+        float markerConversionK = conversionK;
+        int expansionCode = 3;
+        if (isOffscreenLight(encodedValue)) {
+            int projectionCode = (encodedValue >> 16) & 15;
+            expansionCode = (encodedValue >> 12) & 15;
+            markerConversionK = decodeProjectionK(projectionCode);
+        }
+        vec3 lightWorldCoord = vec3(
+            samplepos * markerConversionK * lightDepth,
+            lightDepth
+        );
 
         if (pos.y == 0.0) {
             outColor = encodeInt(int(lightWorldCoord.x * FIXEDPOINT));
@@ -147,8 +169,10 @@ void main() {
             outColor = encodeInt(int(lightWorldCoord.y * FIXEDPOINT));
         } else if (pos.y == 2.0) {
             outColor = encodeInt(int(lightWorldCoord.z * FIXEDPOINT));
-        } else {
+        } else if (pos.y == 3.0) {
             outColor = sampleColor;
+        } else {
+            outColor = vec4(float(expansionCode) / 15.0, 0.0, 0.0, 1.0);
         }
 
         if (Test > 0.5 && outColor.a == 0.0) {

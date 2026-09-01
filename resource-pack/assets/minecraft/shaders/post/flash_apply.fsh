@@ -43,5 +43,6 @@ void main() {
     }
 
     outColor.rgb = mix(outColor.rgb, flashColor, clamp(strongest, 0.0, 1.0));
+
     outColor.a = 1.0;
 }

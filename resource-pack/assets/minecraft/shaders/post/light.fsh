@@ -43,64 +43,63 @@ bool isCameraFlash(int encodedValue) {
 }
 
 bool isOffscreenLight(int encodedValue) {
-    return (encodedValue >> 21) == 6 && (encodedValue & 3) == 2;
+    return (encodedValue >> 23) == 0;
 }
 
 vec3 offscreenLightColor(int encodedValue) {
-    vec3 color = vec3(
-        float((encodedValue >> 10) & 15),
-        float((encodedValue >> 6) & 15),
-        float((encodedValue >> 2) & 15)
+    return vec3(
+        float((encodedValue >> 8) & 15),
+        float((encodedValue >> 4) & 15),
+        float(encodedValue & 15)
     ) / 15.0;
-    float intensity = float((encodedValue >> 14) & 15) / 15.0;
-    return color * intensity;
 }
 
 vec3 reconstructOffscreenLight(vec3 proxyCoord, int encodedValue) {
-    int mode = (encodedValue >> 18) & 7;
-    float inverseScale = 4.0;
+    int mode = (encodedValue >> 20) & 7;
+    float axisInverse = 16.0;
+    float depthInverse = 4.0;
     if (mode == 0) {
         return proxyCoord;
     }
     if (mode == 1) {
         return vec3(
-            -proxyCoord.x * inverseScale,
-            -proxyCoord.y * inverseScale,
-            -proxyCoord.z
+            -proxyCoord.x * axisInverse,
+            -proxyCoord.y * axisInverse,
+            -proxyCoord.z * depthInverse
         );
     }
     if (mode == 2) {
         return vec3(
-            proxyCoord.z,
-            proxyCoord.y * inverseScale,
-            -proxyCoord.x * inverseScale
+            proxyCoord.z * depthInverse,
+            proxyCoord.y * axisInverse,
+            -proxyCoord.x * axisInverse
         );
     }
     if (mode == 3) {
         return vec3(
-            -proxyCoord.z,
-            proxyCoord.y * inverseScale,
-            proxyCoord.x * inverseScale
+            -proxyCoord.z * depthInverse,
+            proxyCoord.y * axisInverse,
+            proxyCoord.x * axisInverse
         );
     }
     if (mode == 4) {
         return vec3(
-            proxyCoord.x * inverseScale,
-            proxyCoord.z,
-            -proxyCoord.y * inverseScale
+            proxyCoord.x * axisInverse,
+            proxyCoord.z * depthInverse,
+            -proxyCoord.y * axisInverse
         );
     }
     if (mode == 5) {
         return vec3(
-            proxyCoord.x * inverseScale,
-            -proxyCoord.z,
-            proxyCoord.y * inverseScale
+            proxyCoord.x * axisInverse,
+            -proxyCoord.z * depthInverse,
+            proxyCoord.y * axisInverse
         );
     }
     return vec3(
-        proxyCoord.x * inverseScale,
-        proxyCoord.y * inverseScale,
-        proxyCoord.z
+        proxyCoord.x * axisInverse,
+        proxyCoord.y * axisInverse,
+        proxyCoord.z * depthInverse
     );
 }
 
@@ -112,8 +111,6 @@ void main() {
 
         vec2 pixCoord = texCoord;
         vec2 screenCoord = (pixCoord - vec2(0.5)) * vec2(aspectRatio, 1.0);
-        float conversion = conversionK * depth;
-        vec3 worldCoord = vec3(screenCoord * conversion, depth);
 
         for (int i = 0; i < int(count); i += 1) {
             vec4 xvec = texture(LightsSampler, (vec2(float(i), 0.0) + 0.5) * oneTexelAux1);
@@ -121,15 +118,26 @@ void main() {
             vec4 zvec = texture(LightsSampler, (vec2(float(i), 2.0) + 0.5) * oneTexelAux1);
             vec3 lightWorldCoord = vec3(decodeInt(xvec), decodeInt(yvec), decodeInt(zvec)) / FIXEDPOINT;
             vec3 lightColor = texture(LightsSampler, (vec2(float(i), 3.0) + 0.5) * oneTexelAux1).rgb;
+            int expansionCode = int(floor(texture(
+                LightsSampler,
+                (vec2(float(i), 4.0) + 0.5) * oneTexelAux1
+            ).r * 15.0 + 0.5));
             int encodedValue = markerValue(lightColor);
             if (isCameraFlash(encodedValue)) {
                 continue;
             }
             bool offscreenLight = isOffscreenLight(encodedValue);
+            float markerConversionK = conversionK;
             if (offscreenLight) {
                 lightWorldCoord = reconstructOffscreenLight(lightWorldCoord, encodedValue);
                 lightColor = offscreenLightColor(encodedValue);
+                int projectionCode = (encodedValue >> 16) & 15;
+                markerConversionK = decodeProjectionK(projectionCode);
             }
+            vec3 worldCoord = vec3(
+                screenCoord * markerConversionK * depth,
+                depth
+            );
             float encodedIntensity = clamp(
                 max(max(lightColor.r, lightColor.g), lightColor.b),
                 0.0,
@@ -139,7 +147,7 @@ void main() {
                 MIN_LIGHTR,
                 LIGHTR,
                 pow(encodedIntensity, RADIUS_CURVE)
-            );
+            ) * decodeExpansionScale(expansionCode);
             float lightDist = length(worldCoord - lightWorldCoord);
             if (lightDist < lightRadius) {
                 float rangeFade = clamp(Range - length(lightWorldCoord), 0.0, 6.0) / 6.0;

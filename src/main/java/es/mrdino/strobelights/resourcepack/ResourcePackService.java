@@ -17,6 +17,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,7 +37,7 @@ import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 public final class ResourcePackService implements Listener {
 
     private static final UUID PACK_ID = UUID.fromString("e9a7e606-b52f-4a18-b4dc-cb1919210411");
-    private static final String PACK_REVISION = "0.8.13";
+    private static final String PACK_REVISION = "0.9.6";
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
     private static final String EMBEDDED_PACK =
@@ -44,6 +45,7 @@ public final class ResourcePackService implements Listener {
 
     private final StrobeLightsPlugin plugin;
     private final Set<UUID> loadedPlayers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> compatibilityNotifiedPlayers = ConcurrentHashMap.newKeySet();
     private EmbeddedPackServer httpServer;
     private byte[] sha1;
     private UUID packId;
@@ -146,6 +148,7 @@ public final class ResourcePackService implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         loadedPlayers.remove(player.getUniqueId());
+        compatibilityNotifiedPlayers.remove(player.getUniqueId());
         plugin.manager().setMarkersVisible(player, false);
         sendLater(player);
         warnAdministratorLater(player);
@@ -153,7 +156,9 @@ public final class ResourcePackService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
-        loadedPlayers.remove(event.getPlayer().getUniqueId());
+        UUID playerId = event.getPlayer().getUniqueId();
+        loadedPlayers.remove(playerId);
+        compatibilityNotifiedPlayers.remove(playerId);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -170,6 +175,7 @@ public final class ResourcePackService implements Listener {
                     plugin.messages().text(player, "resource-pack.loaded", "revision", PACK_REVISION),
                     NamedTextColor.GREEN
                 ));
+                sendCompatibilityNoticeLater(player);
             }
             case DECLINED, FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD, DISCARDED -> {
                 loadedPlayers.remove(player.getUniqueId());
@@ -199,6 +205,46 @@ public final class ResourcePackService implements Listener {
             );
             player.setResourcePack(packId, publicUrl, sha1, prompt, required);
         }, sendDelayTicks);
+    }
+
+    private void sendCompatibilityNoticeLater(Player player) {
+        if (!plugin.getConfig().getBoolean("client-compatibility-notices.enabled", false)) {
+            return;
+        }
+        long delayTicks = Math.max(0L, Math.min(
+            1_200L,
+            plugin.getConfig().getLong("client-compatibility-notices.delay-ticks", 20L)
+        ));
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            UUID playerId = player.getUniqueId();
+            if (!active
+                || !player.isOnline()
+                || !loadedPlayers.contains(playerId)
+                || !compatibilityNotifiedPlayers.add(playerId)) {
+                return;
+            }
+
+            boolean optiFine = isOptiFineBrand(player.getClientBrandName());
+            String key = optiFine
+                ? "resource-pack.compatibility.optifine"
+                : "resource-pack.compatibility.fabulous-hint";
+            NamedTextColor accent = optiFine ? NamedTextColor.RED : NamedTextColor.LIGHT_PURPLE;
+            NamedTextColor messageColor = optiFine ? NamedTextColor.YELLOW : NamedTextColor.AQUA;
+            player.sendMessage(
+                Component.text("⚡ STROBELIGHTS", accent)
+                    .decorate(TextDecoration.BOLD)
+                    .append(Component.text(" • ", NamedTextColor.DARK_GRAY))
+                    .append(Component.text(plugin.messages().text(player, key), messageColor))
+            );
+        }, delayTicks);
+    }
+
+    static boolean isOptiFineBrand(String brand) {
+        if (brand == null || brand.isBlank()) {
+            return false;
+        }
+        String normalized = brand.toLowerCase(Locale.ROOT);
+        return normalized.contains("optifine") || normalized.contains("optifabric");
     }
 
     private void warnAdministratorLater(Player player) {

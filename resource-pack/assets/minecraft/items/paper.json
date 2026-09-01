@@ -332,6 +332,34 @@
           "type": "minecraft:model",
           "model": "minecraft:item/paper"
         }
+      },
+      {
+        "threshold": 6823,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/groups"
+        }
+      },
+      {
+        "threshold": 6823.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
+      },
+      {
+        "threshold": 6824,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/gui/expansion"
+        }
+      },
+      {
+        "threshold": 6824.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/paper"
+        }
       }
     ],
     "fallback": {

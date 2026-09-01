@@ -69,7 +69,9 @@ public final class StrobeRepository {
                     section.getBoolean("enabled", false),
                     face,
                     section.getBoolean("placed", true),
-                    mode
+                    mode,
+                    section.getDouble("expansion-scale", Strobe.DEFAULT_EXPANSION),
+                    section.getString("group", Strobe.DEFAULT_GROUP)
                 );
                 result.put(strobe.key(), strobe);
             } catch (RuntimeException exception) {
@@ -113,6 +115,8 @@ public final class StrobeRepository {
         section.set("refresh-ticks", strobe.refreshTicks());
         section.set("light-level", strobe.lightLevel());
         section.set("flash-power", strobe.flashPower());
+        section.set("expansion-scale", strobe.expansion());
+        section.set("group", strobe.hasGroup() ? strobe.group() : null);
         section.set("blindness", strobe.blindness().name());
         section.set("mode", strobe.mode().name());
         section.set("enabled", strobe.enabled());

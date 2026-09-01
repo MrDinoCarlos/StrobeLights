@@ -15,6 +15,11 @@ public final class Strobe {
     public static final int DEFAULT_REFRESH_TICKS = 5;
     public static final int DEFAULT_LIGHT_LEVEL = 15;
     public static final int DEFAULT_FLASH_POWER = 50;
+    public static final double DEFAULT_EXPANSION = 1.0;
+    public static final double MINIMUM_EXPANSION = 0.25;
+    public static final double MAXIMUM_EXPANSION = 4.0;
+    public static final double EXPANSION_STEP = 0.25;
+    public static final String DEFAULT_GROUP = "";
     public static final BlindnessLevel DEFAULT_BLINDNESS = BlindnessLevel.LOW;
     public static final StrobeMode DEFAULT_MODE = StrobeMode.STROBE;
 
@@ -28,6 +33,8 @@ public final class Strobe {
     private int refreshTicks;
     private int lightLevel;
     private int flashPower;
+    private double expansion;
+    private String group;
     private BlindnessLevel blindness;
     private StrobeMode mode;
     private boolean enabled;
@@ -52,7 +59,8 @@ public final class Strobe {
     ) {
         this(
             name, worldId, worldName, x, y, z, rgb, refreshTicks, lightLevel,
-            flashPower, blindness, enabled, face, placed, DEFAULT_MODE
+            flashPower, blindness, enabled, face, placed, DEFAULT_MODE,
+            DEFAULT_EXPANSION, DEFAULT_GROUP
         );
     }
 
@@ -73,6 +81,32 @@ public final class Strobe {
         boolean placed,
         StrobeMode mode
     ) {
+        this(
+            name, worldId, worldName, x, y, z, rgb, refreshTicks, lightLevel,
+            flashPower, blindness, enabled, face, placed, mode,
+            DEFAULT_EXPANSION, DEFAULT_GROUP
+        );
+    }
+
+    public Strobe(
+        String name,
+        UUID worldId,
+        String worldName,
+        double x,
+        double y,
+        double z,
+        int rgb,
+        int refreshTicks,
+        int lightLevel,
+        int flashPower,
+        BlindnessLevel blindness,
+        boolean enabled,
+        BlockFace face,
+        boolean placed,
+        StrobeMode mode,
+        double expansion,
+        String group
+    ) {
         this.name = Objects.requireNonNull(name, "name");
         this.worldId = Objects.requireNonNull(worldId, "worldId");
         this.worldName = Objects.requireNonNull(worldName, "worldName");
@@ -83,6 +117,8 @@ public final class Strobe {
         this.refreshTicks = Math.max(1, refreshTicks);
         this.lightLevel = Math.max(0, Math.min(15, lightLevel));
         this.flashPower = Math.max(0, Math.min(200, flashPower));
+        this.expansion = normalizeExpansion(expansion);
+        this.group = sanitizeGroup(group);
         this.blindness = Objects.requireNonNull(blindness, "blindness");
         this.mode = Objects.requireNonNull(mode, "mode");
         this.enabled = enabled;
@@ -166,6 +202,25 @@ public final class Strobe {
 
     public int flashPower() {
         return flashPower;
+    }
+
+    public double expansion() {
+        return expansion;
+    }
+
+    public int expansionCode() {
+        return Math.max(0, Math.min(
+            15,
+            (int) Math.round(expansion / EXPANSION_STEP) - 1
+        ));
+    }
+
+    public String group() {
+        return group;
+    }
+
+    public boolean hasGroup() {
+        return !group.isEmpty();
     }
 
     public BlindnessLevel blindness() {
@@ -253,6 +308,14 @@ public final class Strobe {
         this.flashPower = Math.max(0, Math.min(200, flashPower));
     }
 
+    public void setExpansion(double expansion) {
+        this.expansion = normalizeExpansion(expansion);
+    }
+
+    public void setGroup(String group) {
+        this.group = sanitizeGroup(group);
+    }
+
     public void setBlindness(BlindnessLevel blindness) {
         this.blindness = Objects.requireNonNull(blindness, "blindness");
     }
@@ -277,5 +340,15 @@ public final class Strobe {
             return BlockFace.UP;
         }
         return face;
+    }
+
+    private static double normalizeExpansion(double expansion) {
+        double finite = Double.isFinite(expansion) ? expansion : DEFAULT_EXPANSION;
+        double clamped = Math.max(MINIMUM_EXPANSION, Math.min(MAXIMUM_EXPANSION, finite));
+        return Math.round(clamped / EXPANSION_STEP) * EXPANSION_STEP;
+    }
+
+    private static String sanitizeGroup(String group) {
+        return group == null ? DEFAULT_GROUP : group.trim();
     }
 }

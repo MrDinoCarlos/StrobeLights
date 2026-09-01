@@ -30,7 +30,8 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
     private static final String PREFIX = ChatColor.DARK_AQUA + "[StrobeLights] " + ChatColor.RESET;
     private static final List<String> SUBCOMMANDS = List.of(
         "help", "create", "delete", "move", "rename", "set", "start", "stop",
-        "toggle", "pulse", "tp", "discover", "flash", "info", "list", "gui", "reload"
+        "toggle", "pulse", "group", "tp", "discover", "flash", "info", "list",
+        "gui", "reload"
     );
 
     private final StrobeLightsPlugin plugin;
@@ -63,6 +64,7 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
                 case "stop" -> startStop(sender, args, false);
                 case "toggle" -> toggle(sender, args);
                 case "pulse" -> pulse(sender, args);
+                case "group" -> group(sender, args);
                 case "tp" -> teleport(sender, args);
                 case "discover" -> discover(sender, args);
                 case "flash" -> flash(sender, args);
@@ -198,7 +200,7 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
     private boolean set(CommandSender sender, String[] args) {
         if (args.length != 4) {
             error(sender, tr(sender, "command.usage", "usage",
-                "/strobe set <name> <color|refresh|mode|brightness|blindness|flashpower> <value>"));
+                "/strobe set <name> <color|refresh|mode|brightness|expansion|group|blindness|flashpower> <value>"));
             return true;
         }
         Optional<Strobe> optional = findOrError(sender, args[1]);
@@ -254,6 +256,33 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
                 success(sender, tr(sender, "command.brightness-set", "name", strobe.name(),
                     "level", level));
             }
+            case "expansion" -> {
+                double expansion = parseExpansion(args[3]);
+                if (!Double.isFinite(expansion)
+                    || expansion < Strobe.MINIMUM_EXPANSION
+                    || expansion > Strobe.MAXIMUM_EXPANSION) {
+                    error(sender, tr(sender, "command.expansion-range"));
+                    return true;
+                }
+                plugin.manager().setExpansion(strobe, expansion);
+                success(sender, tr(sender, "command.expansion-set", "name", strobe.name(),
+                    "scale", formatExpansion(strobe.expansion())));
+            }
+            case "group" -> {
+                if (isNone(args[3])) {
+                    plugin.manager().setGroup(strobe, Strobe.DEFAULT_GROUP);
+                    success(sender, tr(sender, "command.group-cleared", "name", strobe.name()));
+                    return true;
+                }
+                if (!plugin.manager().validGroupName(args[3])) {
+                    error(sender, tr(sender, "command.invalid-group", "maximum",
+                        plugin.manager().maximumGroupNameLength()));
+                    return true;
+                }
+                plugin.manager().setGroup(strobe, args[3]);
+                success(sender, tr(sender, "command.group-set", "name", strobe.name(),
+                    "group", strobe.group()));
+            }
             case "blindness" -> {
                 Optional<BlindnessLevel> level = BlindnessLevel.parse(args[3]);
                 if (level.isEmpty()) {
@@ -278,6 +307,68 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
                     "power", power));
             }
             default -> error(sender, tr(sender, "command.unknown-property"));
+        }
+        return true;
+    }
+
+    private boolean group(CommandSender sender, String[] args) {
+        if (args.length == 2 && args[1].equalsIgnoreCase("list")) {
+            List<String> groups = plugin.manager().groups();
+            if (groups.isEmpty()) {
+                infoLine(sender, tr(sender, "command.group-list-empty"));
+                return true;
+            }
+            sender.sendMessage(PREFIX + ChatColor.LIGHT_PURPLE
+                + tr(sender, "command.group-list-title", "count", groups.size()));
+            for (String group : groups) {
+                Collection<Strobe> members = plugin.manager().inGroup(group);
+                long enabled = members.stream().filter(Strobe::enabled).count();
+                sender.sendMessage(ChatColor.DARK_GRAY + " - " + ChatColor.LIGHT_PURPLE
+                    + group + ChatColor.GRAY + " (" + enabled + "/" + members.size() + ")");
+            }
+            return true;
+        }
+        if (args.length != 3) {
+            error(sender, tr(sender, "command.usage", "usage",
+                "/strobe group <name> <start|stop|toggle|pulse>"));
+            return true;
+        }
+        String group = args[1];
+        Collection<Strobe> members = plugin.manager().inGroup(group);
+        if (members.isEmpty()) {
+            error(sender, tr(sender, "command.group-not-found", "group", group));
+            return true;
+        }
+        String operation = canonicalGroupOperation(args[2]);
+        switch (operation) {
+            case "start" -> {
+                int changed = plugin.manager().setGroupEnabled(group, true);
+                success(sender, tr(sender, "command.group-started", "group", group,
+                    "changed", changed));
+            }
+            case "stop" -> {
+                int changed = plugin.manager().setGroupEnabled(group, false);
+                success(sender, tr(sender, "command.group-stopped", "group", group,
+                    "changed", changed));
+            }
+            case "toggle" -> {
+                boolean enabled = members.stream()
+                    .anyMatch(strobe -> strobe.placed() && !strobe.enabled());
+                int changed = (int) members.stream()
+                    .filter(strobe -> (!enabled || strobe.placed())
+                        && strobe.enabled() != enabled)
+                    .count();
+                plugin.manager().setGroupEnabled(group, enabled);
+                success(sender, tr(sender, enabled
+                    ? "command.group-started" : "command.group-stopped",
+                    "group", group, "changed", changed));
+            }
+            case "pulse" -> {
+                int count = plugin.manager().pulseGroup(group);
+                success(sender, tr(sender, "command.group-pulsed", "group", group,
+                    "count", count));
+            }
+            default -> error(sender, tr(sender, "command.group-operation-values"));
         }
         return true;
     }
@@ -436,6 +527,9 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
         infoLine(sender, tr(sender, "command.info.effects", "level", strobe.lightLevel(),
             "flash", plugin.messages().blindness(sender, strobe.blindness()),
             "power", strobe.flashPower()));
+        infoLine(sender, tr(sender, "command.info.organization",
+            "scale", formatExpansion(strobe.expansion()),
+            "group", strobe.hasGroup() ? strobe.group() : tr(sender, "gui.common.none")));
         return true;
     }
 
@@ -451,7 +545,9 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.DARK_GRAY + " - "
                 + (strobe.enabled() ? ChatColor.GREEN + "● " : ChatColor.RED + "○ ")
                 + ChatColor.WHITE + strobe.name() + ChatColor.GRAY + " "
-                + StrobeColors.hex(strobe.rgb()) + " @ " + coordinates(sender, strobe));
+                + StrobeColors.hex(strobe.rgb())
+                + (strobe.hasGroup() ? " [" + strobe.group() + "]" : "")
+                + " @ " + coordinates(sender, strobe));
         }
         return true;
     }
@@ -493,9 +589,13 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
             + ChatColor.WHITE + " — " + tr(sender, "command.help.refresh"));
         sender.sendMessage(ChatColor.GRAY + "/" + label + " set <name> mode <strobe|static>");
         sender.sendMessage(ChatColor.GRAY + "/" + label + " set <name> brightness <0-15>");
+        sender.sendMessage(ChatColor.GRAY + "/" + label + " set <name> expansion <0.25-4.00>");
+        sender.sendMessage(ChatColor.GRAY + "/" + label + " set <name> group <name|none>");
         sender.sendMessage(ChatColor.GRAY + "/" + label + " set <name> blindness <none|low|medium|high|extreme>");
         sender.sendMessage(ChatColor.GRAY + "/" + label + " set <name> flashpower <0-200>");
         sender.sendMessage(ChatColor.GRAY + "/" + label + " start|stop <name|all>");
+        sender.sendMessage(ChatColor.GRAY + "/" + label
+            + " group <name> <start|stop|toggle|pulse>");
         sender.sendMessage(ChatColor.GRAY + "/" + label
             + " toggle|pulse|info|move|tp|delete <name>");
         sender.sendMessage(ChatColor.GRAY + "/" + label + " discover [on|off]"
@@ -560,9 +660,38 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
         return String.format(Locale.ROOT, "%.2f", StrobeTiming.flashesPerSecond(refreshTicks));
     }
 
+    private static String formatExpansion(double expansion) {
+        return String.format(Locale.ROOT, "%.2f×", expansion);
+    }
+
+    private static double parseExpansion(String value) {
+        String normalized = value.trim().replace(',', '.');
+        if (normalized.endsWith("%")) {
+            return Double.parseDouble(normalized.substring(0, normalized.length() - 1)) / 100.0;
+        }
+        return Double.parseDouble(normalized);
+    }
+
     private static boolean isAll(String value) {
         return List.of("all", "todos", "tous", "alle", "tutti")
             .contains(value.toLowerCase(Locale.ROOT));
+    }
+
+    private static boolean isNone(String value) {
+        return List.of("none", "ninguno", "aucun", "keine", "nessuno", "-")
+            .contains(value.toLowerCase(Locale.ROOT));
+    }
+
+    private static String canonicalGroupOperation(String operation) {
+        return switch (operation.toLowerCase(Locale.ROOT)) {
+            case "encender", "enable", "on", "démarrer", "demarrer", "starten", "avvia" ->
+                "start";
+            case "apagar", "disable", "off", "arrêter", "arreter", "stoppen", "spegni" ->
+                "stop";
+            case "alternar", "basculer", "umschalten", "alterna" -> "toggle";
+            case "pulso", "impulsion", "impuls", "impulso" -> "pulse";
+            default -> operation.toLowerCase(Locale.ROOT);
+        };
     }
 
     private static String canonicalAction(String action) {
@@ -577,6 +706,7 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
             case "apagar", "arrêter", "arreter", "stoppen", "spegni" -> "stop";
             case "alternar", "basculer", "umschalten", "alterna" -> "toggle";
             case "pulso", "impulsion", "impuls", "impulso" -> "pulse";
+            case "grupo", "groupe", "gruppe", "gruppo" -> "group";
             case "teleport", "teletransporte", "teletransportar", "téléporter", "teleporter" -> "tp";
             case "descubrir", "descubrimiento", "découvrir", "decouvrir", "entdecken", "scopri" -> "discover";
             case "flashbang", "granada", "granadaflash", "stungrenade" -> "flash";
@@ -601,6 +731,10 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
             case "flash", "potenciaflash", "potencia-flash", "puissanceflash", "flashstärke",
                 "flashstaerke", "potenzaflash" -> "flashpower";
             case "modo", "modus", "modalità", "modalita" -> "mode";
+            case "size", "radius", "radio", "tamaño", "tamano", "taille", "rayon",
+                "größe", "groesse", "raggio", "dimensione" -> "expansion";
+            case "grupo", "groupe", "gruppe", "gruppo", "category", "categoria",
+                "catégorie", "kategorie" -> "group";
             default -> property.toLowerCase(Locale.ROOT);
         };
     }
@@ -653,6 +787,11 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
             if (action.equals("flash")) {
                 return matching(List.of("give"), args[1]);
             }
+            if (action.equals("group")) {
+                List<String> groups = new ArrayList<>(plugin.manager().groups());
+                groups.add("list");
+                return matching(groups, args[1]);
+            }
             if (action.equals("gui")) {
                 return matching(plugin.manager().names(), args[1]);
             }
@@ -662,8 +801,12 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 3 && action.equals("set")) {
             return matching(List.of(
-                "color", "refresh", "mode", "brightness", "blindness", "flashpower"
+                "color", "refresh", "mode", "brightness", "expansion", "group",
+                "blindness", "flashpower"
             ), args[2]);
+        }
+        if (args.length == 3 && action.equals("group")) {
+            return matching(List.of("start", "stop", "toggle", "pulse"), args[2]);
         }
         if (args.length == 3 && action.equals("flash")
             && args[1].equalsIgnoreCase("give")) {
@@ -681,6 +824,14 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
                 ), args[3]);
                 case "mode" -> matching(List.of("strobe", "static"), args[3]);
                 case "brightness" -> matching(List.of("0", "5", "10", "15"), args[3]);
+                case "expansion" -> matching(List.of(
+                    "0.25", "0.50", "0.75", "1.00", "1.50", "2.00", "3.00", "4.00"
+                ), args[3]);
+                case "group" -> {
+                    List<String> groups = new ArrayList<>(plugin.manager().groups());
+                    groups.add("none");
+                    yield matching(groups, args[3]);
+                }
                 case "blindness" -> matching(
                     List.of("none", "low", "medium", "high", "extreme"), args[3]
                 );

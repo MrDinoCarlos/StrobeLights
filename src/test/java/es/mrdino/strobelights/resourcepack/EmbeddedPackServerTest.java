@@ -17,6 +17,15 @@ import org.junit.jupiter.api.Test;
 class EmbeddedPackServerTest {
 
     @Test
+    void recognizesOnlyExplicitOptiFineClientBrands() {
+        assertTrue(ResourcePackService.isOptiFineBrand("OptiFine"));
+        assertTrue(ResourcePackService.isOptiFineBrand("fabric/OptiFabric"));
+        assertFalse(ResourcePackService.isOptiFineBrand("vanilla"));
+        assertFalse(ResourcePackService.isOptiFineBrand("fabric"));
+        assertFalse(ResourcePackService.isOptiFineBrand(null));
+    }
+
+    @Test
     void detectsOnlyTheBundledPlaceholderHostAsUnconfigured() {
         assertTrue(ResourcePackService.isDefaultPublicUrl(
             "http://serverip.com:8250/strobelights/{token}.zip"
