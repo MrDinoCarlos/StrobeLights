@@ -277,10 +277,12 @@ The HTTP port must be open over TCP and differ from the Minecraft port.
 - The OptiFine carrier contract is protected by automated tests: marker
   detection uses the dedicated neutral texture with an alpha-relative RGB
   check, never an absolute near-white threshold or fog/hand heuristics. The
-  complete RGB, size and zoom payload travels through the color attachment
-  preserved by OptiFine instead of relying on depth-buffer metadata. Its
-  low-intensity micro-carrier avoids solid colored dots when Fast or Fancy
-  graphics render that attachment directly.
+  complete RGB, size and zoom payload is captured from the
+  `entity_translucent_cull` route that Minecraft 1.20.1 actually uses for the
+  leather carrier. It travels as a structured, zero-alpha depth marker, so
+  Vanilla and OptiFine preserve all payload bits without drawing colored dots
+  into the scene. The post chain replaces those nine technical depth pixels
+  with nearby scene depth before lighting and transparency composition.
 - After the pack loads, clients whose reported brand explicitly identifies
   OptiFine can receive a short translated reminder of those settings.
   Standalone OptiFine normally reports itself as vanilla, so it receives the

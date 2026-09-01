@@ -9,6 +9,7 @@
     "swap1",
     "swap2",
     "swap3",
+    "carriers",
     "lightmap1",
     "lightmap2",
     "lights",
@@ -17,15 +18,15 @@
   "passes": [
     {
       "name": "filter",
-      "intarget": "itemEntity",
-      "outtarget": "swap1",
+      "intarget": "minecraft:main",
+      "outtarget": "carriers",
       "auxtargets": [
-        { "name": "DiffuseDepthSampler", "id": "itemEntity:depth" }
+        { "name": "DiffuseDepthSampler", "id": "minecraft:main:depth" }
       ]
     },
     {
       "name": "centers",
-      "intarget": "swap1",
+      "intarget": "carriers",
       "outtarget": "swap3"
     },
     {
@@ -58,7 +59,7 @@
       "intarget": "swap1",
       "outtarget": "lights",
       "auxtargets": [
-        { "name": "ItemEntityDepthSampler", "id": "itemEntity:depth" },
+        { "name": "MainDepthSampler", "id": "minecraft:main:depth" },
         { "name": "ColoredCentersSampler", "id": "swap3" }
       ]
     },

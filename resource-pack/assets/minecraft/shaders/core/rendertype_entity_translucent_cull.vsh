@@ -35,6 +35,7 @@ out vec4 normal;
 out vec4 glpos;
 flat out float marker;
 flat out vec4 markerPayload;
+flat out float carrierLinearDepth;
 out float scale;
 
 // The quad only supplies a 3x3 micro-carrier. Each cell is nearly transparent
@@ -161,6 +162,7 @@ void main() {
     texCoord1 = UV1;
     normal = ProjMat * ModelViewMat * vec4(Normal, 0.0);
     markerPayload = vec4(0.0);
+    carrierLinearDepth = 0.0;
 
     vec4 tmpcol = texture(Sampler0, UV0);
     vec4 tmp = ModelViewMat * vec4(Position, 1.0);
@@ -222,6 +224,7 @@ void main() {
             );
         }
         markerPayload = vertexColor;
+        carrierLinearDepth = clamp(-tmp.z, NEAR, 128.0);
         
         if (gl_VertexID % 4 == 0) {
             tmp.xy += vec2(-HALFMARKER, HALFMARKER);

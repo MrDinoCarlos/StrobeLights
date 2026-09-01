@@ -39,7 +39,7 @@ class ShaderPackContractTest {
         }
         assertContains(
             PACK.resolve("assets/minecraft/shaders/program/filter.fsh"),
-            "float LinearizeDepth(float depth)"
+            "#define CARRIER_DEPTH_BUCKET 0.00001"
         );
         Path legacyPipeline = PACK.resolve(
             "assets/minecraft/shaders/post/transparency.json"
@@ -56,15 +56,15 @@ class ShaderPackContractTest {
         }
         assertContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.json"
+                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.json"
             ),
-            "\"vertex\": \"rendertype_item_entity_translucent_cull\""
+            "\"vertex\": \"rendertype_entity_translucent_cull\""
         );
         assertNotContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.json"
+                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.json"
             ),
-            "minecraft:core/rendertype_item_entity_translucent_cull"
+            "minecraft:core/rendertype_entity_translucent_cull"
         );
     }
 
@@ -118,37 +118,37 @@ class ShaderPackContractTest {
         );
         assertNotContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
             ),
             "ModelViewMat * vec4(0.0, 0.0, 0.0, 1.0)"
         );
         assertContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
             ),
             "ModelViewMat * vec4(Position, 1.0)"
         );
         assertContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
             ),
             "ModelViewMat * vec4(vec3(0.5), 1.0)"
         );
         assertContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
             ),
             "flat out vec4 markerPayload"
         );
         assertContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
             ),
             "flat in vec4 markerPayload"
         );
         assertContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
             ),
             "#define HALFMARKER tmp.z / 64.0"
         );
@@ -168,7 +168,7 @@ class ShaderPackContractTest {
         throws IOException {
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
         );
         assertContains(utils, "#define LIGHTALPHATOLERANCE (2.0 / 255.0)");
         assertContains(
@@ -201,18 +201,17 @@ class ShaderPackContractTest {
         assertNotContains(core, "!hand && !gui");
         assertNotContains(
             PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
             ),
             "bool hand = isHand(FogStart, FogEnd)"
         );
     }
 
     @Test
-    void transportsMarkersThroughTheOptiFineCompatibleColorAttachment()
-        throws IOException {
+    void transportsMarkersThroughTheActualEntityDepthRoute() throws IOException {
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
         );
         Path filter = PACK.resolve("assets/minecraft/shaders/program/filter.fsh");
         Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
@@ -224,25 +223,35 @@ class ShaderPackContractTest {
         assertNotContains(utils, "DEPTHCODEPRECISION");
         assertNotContains(utils, "decodeLightPositionDepth");
         assertContains(core, "inverse(uvPerPixel) * (texCoord2 - vec2(0.5))");
-        assertContains(core, "fragColor = vec4(vec3(0.4), 5.0 / 255.0)");
-        assertContains(core, "fragColor = vec4(bitColor * 0.5, 2.0 / 255.0)");
-        assertContains(core, "gl_FragDepth = centerDepth * LIGHTDEPTH");
+        assertContains(core, "#define CARRIER_DEPTH_BUCKET 0.00001");
+        assertContains(core, "((payloadIndex + 1) << 3) | triplet");
+        assertContains(core, "gl_FragDepth = carrierDepth");
+        assertContains(core, "fragColor = vec4(0.0)");
         assertNotContains(core, "fragColor = vec4(vertexColor.rgb, 1.0)");
         assertNotContains(core, "DEPTHCODESIGNATURE");
         assertContains(filter, "uniform sampler2D DiffuseSampler");
-        assertContains(filter, "depth / LIGHTDEPTH");
+        assertContains(filter, "uniform sampler2D DiffuseDepthSampler");
+        assertContains(filter, "CARRIER_DEPTH_TOLERANCE");
+        assertContains(filter, "cellSignature == payloadIndex + 1");
         assertContains(filter, "int encodedValue = 0");
-        assertContains(filter, "encodedValue |= triplet << (payloadIndex * 3)");
+        assertContains(filter, "encodedValue |= (triplet & 7) << (payloadIndex * 3)");
         assertContains(filter, "if (validCarrier)");
         assertContains(
             aggregate,
-            "texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH"
+            "texture(MainDepthSampler, samplepos).r"
         );
+        assertContains(aggregate, "decodeCarrierLinearDepth");
+        assertContains(aggregateDefinition, "\"MainDepthSampler\"");
         assertNotContains(aggregateDefinition, "\"OutSize\"");
         assertContains(
             pipeline,
             "\"name\": \"filter\""
         );
+        assertContains(pipeline, "\"intarget\": \"minecraft:main\"");
+        assertContains(pipeline, "\"outtarget\": \"carriers\"");
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+        )));
         assertNotContains(pipeline, "markerdata");
     }
 
@@ -298,7 +307,7 @@ class ShaderPackContractTest {
     @Test
     void reconstructsNearAndBehindLightsFromPrivateMarkers() throws IOException {
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
         );
         Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
@@ -343,10 +352,10 @@ class ShaderPackContractTest {
     void carriesPerStrobeExpansionWithoutReducingRgbOrZoomMetadata()
         throws IOException {
         Path coreVertex = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
         );
         Path coreFragment = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
         );
         Path filter = PACK.resolve("assets/minecraft/shaders/program/filter.fsh");
         Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
@@ -466,7 +475,7 @@ class ShaderPackContractTest {
     @Test
     void anchorsSourcesClientSideWithoutProjectingScreenSpaceShadows() throws IOException {
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
         );
         assertContains(core, "offscreenProxy");
         assertContains(core, "float axisScale = 0.0625");

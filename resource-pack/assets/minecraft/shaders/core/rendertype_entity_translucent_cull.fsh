@@ -21,9 +21,20 @@ in vec4 normal;
 in vec4 glpos;
 flat in float marker;
 flat in vec4 markerPayload;
+flat in float carrierLinearDepth;
 in float scale;
 
 out vec4 fragColor;
+
+// Leather horse armor is rendered through entity_translucent_cull in 1.20.1,
+// which targets minecraft:main instead of minecraft:item_entity. Preserve the
+// scene color with zero-alpha blending and use a tiny, structured depth code as
+// an invisible side channel for the Fabulous post pass.
+#define CARRIER_DEPTH_BIAS 0.001
+#define CARRIER_DEPTH_STEP 0.0000005
+#define CARRIER_DEPTH_BUCKET 0.00001
+#define CARRIER_DEPTH_LEVELS 16383.0
+#define CARRIER_MAX_LINEAR_DEPTH 128.0
 
 int markerValue(vec3 color) {
     ivec3 bytes = ivec3(floor(color * 255.0 + 0.5));
@@ -31,24 +42,13 @@ int markerValue(vec3 color) {
 }
 
 void main() {
-    bool gui = isGUI(ProjMat);
-
-    
     if (marker < 0.5) {
-        vec4 color = texture(Sampler0, texCoord0);
+        vec4 color = texture(Sampler0, texCoord0) * vertexColor * ColorModulator;
         if (color.a < 0.1) {
             discard;
         }
-        color *= vertexColor * ColorModulator;
         fragColor = linear_fog(color, vertexDistance, FogStart, FogEnd, FogColor);
-        fragColor.a = fragColor.a < 0.1 ? 0.1 : fragColor.a;
-
-        if (!gui && gl_FragCoord.z <= LIGHTDEPTH) {
-            gl_FragDepth = LIGHTDEPTH + 10e-7;
-        }
-        else {
-            gl_FragDepth = gl_FragCoord.z;
-        }
+        gl_FragDepth = gl_FragCoord.z;
     } else {
         vec2 uvDx = dFdx(texCoord2);
         vec2 uvDy = dFdy(texCoord2);
@@ -63,26 +63,26 @@ void main() {
             discard;
         }
 
-        float centerDepth = gl_FragCoord.z
-            - pixelOffset.x * dFdx(gl_FragCoord.z)
-            - pixelOffset.y * dFdy(gl_FragCoord.z);
         int cellIndex = (cell.y + 1) * 3 + cell.x + 1;
         int encodedValue = markerValue(markerPayload.rgb);
+        int linearDepthCode = int(floor(
+            clamp(
+                carrierLinearDepth / CARRIER_MAX_LINEAR_DEPTH,
+                0.0,
+                1.0
+            ) * CARRIER_DEPTH_LEVELS + 0.5
+        ));
+        float carrierDepth = CARRIER_DEPTH_BIAS
+            + float(linearDepthCode) * CARRIER_DEPTH_BUCKET;
         if (cellIndex == 4) {
-            // The anchor changes a normal scene pixel by roughly one percent.
-            fragColor = vec4(vec3(0.4), 5.0 / 255.0);
+            gl_FragDepth = carrierDepth;
         } else {
             int payloadIndex = cellIndex < 4 ? cellIndex : cellIndex - 1;
             int triplet = (encodedValue >> (payloadIndex * 3)) & 7;
-            vec3 bitColor = vec3(
-                float(triplet & 1),
-                float((triplet >> 1) & 1),
-                float((triplet >> 2) & 1)
-            );
-            // Premultiplied RGBA8 stores each channel as exactly zero or one,
-            // while direct Fast/Fancy rendering remains visually negligible.
-            fragColor = vec4(bitColor * 0.5, 2.0 / 255.0);
+            int cellCode = ((payloadIndex + 1) << 3) | triplet;
+            gl_FragDepth = carrierDepth
+                + float(cellCode + 1) * CARRIER_DEPTH_STEP;
         }
-        gl_FragDepth = centerDepth * LIGHTDEPTH;
+        fragColor = vec4(0.0);
     }
 }
