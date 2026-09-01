@@ -35,7 +35,6 @@ out vec4 normal;
 out vec4 glpos;
 flat out float marker;
 flat out vec4 markerPayload;
-flat out float carrierLinearDepth;
 out float scale;
 
 // The quad only supplies a 3x3 micro-carrier. Each cell is nearly transparent
@@ -49,6 +48,48 @@ float opz(vec4 pos, float factor, float bias) {
 int markerValue(vec3 color) {
     ivec3 bytes = ivec3(floor(color * 255.0 + 0.5));
     return (bytes.r << 16) | (bytes.g << 8) | bytes.b;
+}
+
+int decodeTechnicalPayload(vec4 carrierTexel, ivec2 lightCoordinates) {
+    bool sourceTexture = carrierTexel.b > carrierTexel.g * 2.0;
+    bool flashTexture = carrierTexel.g > carrierTexel.b * 2.0;
+    float reference = max(carrierTexel.g, carrierTexel.b);
+    int highByte = int(floor(clamp(
+        carrierTexel.r / max(reference, 1.0 / 255.0) * 224.0,
+        0.0,
+        255.0
+    ) + 0.5));
+    int blockNibble = clamp(lightCoordinates.x / 16, 0, 15);
+    int skyNibble = clamp(lightCoordinates.y / 16, 0, 15);
+    int lowByte = (skyNibble << 4) | blockNibble;
+    int transportValue = (highByte << 8) | lowByte;
+
+    if (sourceTexture) {
+        int expansionCode = (transportValue >> 12) & 15;
+        int red4 = (transportValue >> 8) & 15;
+        int green4 = (transportValue >> 4) & 15;
+        int blue4 = transportValue & 15;
+        return (10 << 20)
+            | (expansionCode << 16)
+            | (red4 << 12)
+            | (green4 << 8)
+            | (blue4 << 4)
+            | 5;
+    }
+    if (flashTexture) {
+        int power4 = (transportValue >> 12) & 15;
+        int power7 = (power4 * 127 + 7) / 15;
+        int red4 = (transportValue >> 8) & 15;
+        int green4 = (transportValue >> 4) & 15;
+        int blue4 = transportValue & 15;
+        return (13 << 20)
+            | (power7 << 13)
+            | (red4 << 9)
+            | (green4 << 5)
+            | (blue4 << 1)
+            | 1;
+    }
+    return 0;
 }
 
 bool isCameraFlash(int encodedValue) {
@@ -162,27 +203,24 @@ void main() {
     texCoord1 = UV1;
     normal = ProjMat * ModelViewMat * vec4(Normal, 0.0);
     markerPayload = vec4(0.0);
-    carrierLinearDepth = 0.0;
 
     vec4 tmpcol = texture(Sampler0, UV0);
     vec4 tmp = ModelViewMat * vec4(Position, 1.0);
     bool gui = isGUI(ProjMat);
 
-    int encodedValue = markerValue(Color.rgb);
+    int encodedValue = decodeTechnicalPayload(tmpcol, UV2);
     bool encodedTechnicalCarrier = isCameraFlash(encodedValue)
         || isSourceLight(encodedValue);
     // OptiFine can quantize the atlas alpha by one or two 8-bit steps while
     // rebuilding the item model. The payload signature is therefore checked
     // independently instead of treating every low-alpha item as a light.
     bool markerAlpha = abs(tmpcol.a - LIGHTALPHA) <= LIGHTALPHATOLERANCE;
-    // The dedicated carrier texture is neutral white. Compare its chroma and
-    // brightness relative to alpha so OptiFine premultiplication is accepted,
-    // while the black translucent edge pixels of held items are rejected.
-    float markerTextureFloor = tmpcol.a * 0.5;
-    float markerTexturePeak = max(max(tmpcol.r, tmpcol.g), tmpcol.b);
-    float markerTextureBase = min(min(tmpcol.r, tmpcol.g), tmpcol.b);
-    bool markerTextureCarrier = markerTexturePeak >= markerTextureFloor
-        && markerTextureBase >= markerTexturePeak * 0.75;
+    // Blue-dominant texels carry source lights and green-dominant texels carry
+    // camera flashes. Their channel ratio survives OptiFine premultiplication.
+    float markerTexturePeak = max(tmpcol.g, tmpcol.b);
+    float markerTextureBase = min(tmpcol.g, tmpcol.b);
+    bool markerTextureCarrier = markerTexturePeak >= tmpcol.a * 0.5
+        && markerTexturePeak > markerTextureBase * 2.0;
     // Do not infer a first-person render from fog distances. OptiFine's Fog:
     // OFF mode supplies NO_FOG with equal start/end values for world entities,
     // which made every ItemDisplay look like a hand item and removed all
@@ -200,9 +238,12 @@ void main() {
         // neighboring vertices choose different off-screen encodings while
         // the camera moves, especially through OptiFine's item renderer.
         tmp = ModelViewMat * vec4(vec3(0.5), 1.0);
-        // Do not multiply the payload by the atlas RGB. OptiFine may
-        // premultiply that texel, but the custom tint still owns the marker.
-        vertexColor = vec4(Color.rgb, 1.0);
+        vertexColor = vec4(
+            float((encodedValue >> 16) & 255),
+            float((encodedValue >> 8) & 255),
+            float(encodedValue & 255),
+            255.0
+        ) / 255.0;
 
         if (!isCameraFlash(encodedValue)) {
             int lightExpansionCode = 3;
@@ -224,7 +265,6 @@ void main() {
             );
         }
         markerPayload = vertexColor;
-        carrierLinearDepth = clamp(-tmp.z, NEAR, 128.0);
         
         if (gl_VertexID % 4 == 0) {
             tmp.xy += vec2(-HALFMARKER, HALFMARKER);

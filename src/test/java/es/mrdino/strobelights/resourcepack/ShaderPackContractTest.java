@@ -15,14 +15,18 @@ import org.junit.jupiter.api.Test;
 class ShaderPackContractTest {
 
     private static final Path PACK = Path.of("resource-pack");
+    private static final Path GENERATED_PACK = Path.of(
+        "build/generated/legacy-carrier-pack"
+    );
 
     @Test
     void targetsMinecraft1201AndContainsTheLightPipeline() throws IOException {
         assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 15");
-        assertContains(
-            PACK.resolve("assets/minecraft/shaders/post/transparency.json"),
-            "\"name\": \"light\""
+        Path pipeline = PACK.resolve(
+            "assets/minecraft/shaders/post/transparency.json"
         );
+        assertContains(pipeline, "\"name\": \"light\"");
+        assertContains(pipeline, "\"intarget\": \"itemEntity\"");
         assertContains(
             PACK.resolve("assets/minecraft/shaders/program/light.fsh"),
             "lightDist < lightRadius"
@@ -34,15 +38,13 @@ class ShaderPackContractTest {
             "light_t.fsh",
             "transparency.fsh"
         }) {
-            Path shader = PACK.resolve("assets/minecraft/shaders/program").resolve(shaderName);
+            Path shader = PACK.resolve("assets/minecraft/shaders/program")
+                .resolve(shaderName);
             assertNotContains(shader, "#moj_import");
         }
         assertContains(
             PACK.resolve("assets/minecraft/shaders/program/filter.fsh"),
-            "#define CARRIER_DEPTH_BUCKET 0.00001"
-        );
-        Path legacyPipeline = PACK.resolve(
-            "assets/minecraft/shaders/post/transparency.json"
+            "#define LIGHTDEPTH 0.025"
         );
         for (String target : new String[] {
             "\"water\"",
@@ -52,166 +54,111 @@ class ShaderPackContractTest {
             "\"clouds\"",
             "\"weather\""
         }) {
-            assertContains(legacyPipeline, target);
+            assertContains(pipeline, target);
         }
+        Path core = PACK.resolve(
+            "assets/minecraft/shaders/core/"
+                + "rendertype_item_entity_translucent_cull.json"
+        );
         assertContains(
-            PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.json"
-            ),
-            "\"vertex\": \"rendertype_entity_translucent_cull\""
+            core,
+            "\"vertex\": \"rendertype_item_entity_translucent_cull\""
         );
         assertNotContains(
-            PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.json"
-            ),
-            "minecraft:core/rendertype_entity_translucent_cull"
+            core,
+            "minecraft:core/rendertype_item_entity_translucent_cull"
         );
     }
 
     @Test
-    void keepsTheTechnicalMarkerMicroscopicButNonDegenerateForOptiFine()
-        throws IOException {
-        Path technicalItem = PACK.resolve(
-            "assets/minecraft/models/item/leather_horse_armor.json"
+    void generatesAnOptiFineSafeBlockItemCarrier() throws IOException {
+        Path technicalItem = GENERATED_PACK.resolve(
+            "assets/minecraft/models/item/lime_stained_glass.json"
         );
-        assertContains(
-            technicalItem,
-            "\"custom_model_data\": 6700"
-        );
-        assertContains(
-            technicalItem,
-            "minecraft:item/lp_custom"
-        );
+        assertContains(technicalItem, "\"custom_model_data\": 6700");
+        assertContains(technicalItem, "\"custom_model_data\": 6955");
+        assertContains(technicalItem, "\"custom_model_data\": 7200");
+        assertContains(technicalItem, "\"custom_model_data\": 7455");
+        assertContains(technicalItem, "minecraft:item/lp_payload/source_00");
+        assertContains(technicalItem, "minecraft:item/lp_payload/flash_ff");
+
         Path manager = Path.of(
             "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
         );
-        assertContains(manager, "Material.LEATHER_HORSE_ARMOR");
-        assertContains(manager, "LeatherArmorMeta meta");
-        assertNotContains(manager, "display.setBillboard(Display.Billboard.FIXED)");
+        assertContains(manager, "Material.LIME_STAINED_GLASS");
+        assertContains(manager, "applyTechnicalMarker");
+        assertContains(manager, "new Display.Brightness(");
+        assertNotContains(manager, "Material.LEATHER_HORSE_ARMOR");
+        assertNotContains(manager, "LeatherArmorMeta");
+
+        Path sourceModel = PACK.resolve(
+            "assets/minecraft/models/item/lp_payload_source_base.json"
+        );
+        Path flashModel = PACK.resolve(
+            "assets/minecraft/models/item/lp_payload_flash_base.json"
+        );
+        assertContains(sourceModel, "\"from\": [7.5, 8, 7.5]");
+        assertContains(sourceModel, "\"scale\": [0.002, 0.002, 0.002]");
+        assertContains(sourceModel, "\"uv\": [4, 8, 4, 8]");
+        assertContains(flashModel, "\"uv\": [12, 8, 12, 8]");
+
+        Path payloadModels = GENERATED_PACK.resolve(
+            "assets/minecraft/models/item/lp_payload"
+        );
+        try (var files = Files.list(payloadModels)) {
+            assertEquals(512L, files.filter(Files::isRegularFile).count());
+        }
+        var texture = ImageIO.read(GENERATED_PACK.resolve(
+            "assets/minecraft/textures/misc/lp_payload/7f.png"
+        ).toFile());
+        assertEquals(24, texture.getRGB(0, 0) >>> 24);
+        assertEquals(16, texture.getWidth());
+        assertEquals(16, texture.getHeight());
+        assertEquals(0x7F20E0, texture.getRGB(0, 8) & 0xFFFFFF);
+        assertEquals(0x7FE020, texture.getRGB(15, 8) & 0xFFFFFF);
+
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/models/item/leather_horse_armor.json"
+        )));
         assertNotContains(
             PACK.resolve("assets/minecraft/models/item/potion.json"),
             "\"custom_model_data\": 6700"
         );
-        assertContains(
-            PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
-            "\"from\": [7.5,8,7.5]"
-        );
-        assertContains(
-            PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
-            "\"to\": [8.5,8,8.5]"
-        );
-        assertContains(
-            PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
-            "\"scale\":[0.002,0.002,0.002]"
-        );
-        assertNotContains(
-            PACK.resolve("assets/minecraft/models/item/lp_custom.json"),
-            "\"scale\":[0.0,0.0,0.0]"
-        );
-        assertContains(
-            PACK.resolve("assets/minecraft/models/item/lp.json"),
-            "\"from\": [7.5,8,7.5]"
-        );
-        assertContains(
-            PACK.resolve("assets/minecraft/models/item/lp.json"),
-            "\"scale\":[0.002,0.002,0.002]"
-        );
-        assertNotContains(
-            PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
-            ),
-            "ModelViewMat * vec4(0.0, 0.0, 0.0, 1.0)"
-        );
-        assertContains(
-            PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
-            ),
-            "ModelViewMat * vec4(Position, 1.0)"
-        );
-        assertContains(
-            PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
-            ),
-            "ModelViewMat * vec4(vec3(0.5), 1.0)"
-        );
-        assertContains(
-            PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
-            ),
-            "flat out vec4 markerPayload"
-        );
-        assertContains(
-            PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
-            ),
-            "flat in vec4 markerPayload"
-        );
-        assertContains(
-            PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
-            ),
-            "#define HALFMARKER tmp.z / 64.0"
-        );
-        assertFalse(Files.exists(PACK.resolve(
-            "assets/minecraft/optifine/emissive.properties"
-        )));
-        assertFalse(Files.exists(PACK.resolve(
-            "assets/minecraft/textures/misc/white_e.png"
-        )));
-        assertFalse(Files.exists(PACK.resolve(
-            "assets/minecraft/optifine/dynamic_lights.properties"
-        )));
+        assertNotContains(manager, "display.setBillboard(Display.Billboard.FIXED)");
     }
 
     @Test
-    void acceptsOptiFineAlphaQuantizationWithoutUsingFogAsAWorldMarkerGate()
+    void decodesPayloadFromTextureAndLightmapDespiteOptiFinePremultiplication()
         throws IOException {
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
+            "assets/minecraft/shaders/core/"
+                + "rendertype_item_entity_translucent_cull.vsh"
         );
         assertContains(utils, "#define LIGHTALPHATOLERANCE (2.0 / 255.0)");
+        assertContains(core, "decodeTechnicalPayload(tmpcol, UV2)");
+        assertContains(core, "carrierTexel.r / max(reference");
+        assertContains(core, "lightCoordinates.x / 16");
+        assertContains(core, "lightCoordinates.y / 16");
+        assertContains(core, "sourceTexture");
+        assertContains(core, "flashTexture");
         assertContains(
             core,
             "abs(tmpcol.a - LIGHTALPHA) <= LIGHTALPHATOLERANCE"
         );
-        assertContains(core, "float markerTextureFloor = tmpcol.a * 0.5");
-        assertContains(
-            core,
-            "float markerTexturePeak = max(max(tmpcol.r, tmpcol.g), tmpcol.b)"
-        );
-        assertContains(
-            core,
-            "float markerTextureBase = min(min(tmpcol.r, tmpcol.g), tmpcol.b)"
-        );
-        assertContains(core, "markerTexturePeak >= markerTextureFloor");
-        assertContains(
-            core,
-            "markerTextureBase >= markerTexturePeak * 0.75"
-        );
-        assertNotContains(core, "tmpcol.a == LIGHTALPHA");
-        assertContains(core, "bool encodedTechnicalCarrier = isCameraFlash(encodedValue)");
-        assertContains(core, "|| isSourceLight(encodedValue)");
+        assertContains(core, "markerTexturePeak >= tmpcol.a * 0.5");
+        assertContains(core, "markerTexturePeak > markerTextureBase * 2.0");
         assertContains(core, "&& encodedTechnicalCarrier");
-        assertContains(core, "&& markerAlpha");
-        assertContains(core, "&& markerTextureCarrier");
-        assertContains(core, "vertexColor = vec4(Color.rgb, 1.0)");
-        assertNotContains(core, "min(min(tmpcol.r, tmpcol.g), tmpcol.b) > 0.99");
+        assertNotContains(core, "vertexColor = vec4(Color.rgb, 1.0)");
         assertNotContains(core, "bool hand = isHand(FogStart, FogEnd)");
-        assertNotContains(core, "!hand && !gui");
-        assertNotContains(
-            PACK.resolve(
-                "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
-            ),
-            "bool hand = isHand(FogStart, FogEnd)"
-        );
     }
 
     @Test
-    void transportsMarkersThroughTheActualEntityDepthRoute() throws IOException {
-        Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
+    void transportsMarkersThroughLightPaintersItemEntityDepthRoute()
+        throws IOException {
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
+            "assets/minecraft/shaders/core/"
+                + "rendertype_item_entity_translucent_cull.fsh"
         );
         Path filter = PACK.resolve("assets/minecraft/shaders/program/filter.fsh");
         Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
@@ -220,39 +167,29 @@ class ShaderPackContractTest {
         );
         Path pipeline = PACK.resolve("assets/minecraft/shaders/post/transparency.json");
 
-        assertNotContains(utils, "DEPTHCODEPRECISION");
-        assertNotContains(utils, "decodeLightPositionDepth");
         assertContains(core, "inverse(uvPerPixel) * (texCoord2 - vec2(0.5))");
-        assertContains(core, "#define CARRIER_DEPTH_BUCKET 0.00001");
-        assertContains(core, "((payloadIndex + 1) << 3) | triplet");
-        assertContains(core, "gl_FragDepth = carrierDepth");
-        assertContains(core, "fragColor = vec4(0.0)");
-        assertNotContains(core, "fragColor = vec4(vertexColor.rgb, 1.0)");
-        assertNotContains(core, "DEPTHCODESIGNATURE");
-        assertContains(filter, "uniform sampler2D DiffuseSampler");
-        assertContains(filter, "uniform sampler2D DiffuseDepthSampler");
-        assertContains(filter, "CARRIER_DEPTH_TOLERANCE");
-        assertContains(filter, "cellSignature == payloadIndex + 1");
+        assertContains(core, "fragColor = vec4(bitColor * 0.5, 2.0 / 255.0)");
+        assertContains(core, "gl_FragDepth = centerDepth * LIGHTDEPTH");
+        assertContains(filter, "if (depth < LIGHTDEPTH)");
+        assertContains(filter, "depth / LIGHTDEPTH");
         assertContains(filter, "int encodedValue = 0");
-        assertContains(filter, "encodedValue |= (triplet & 7) << (payloadIndex * 3)");
-        assertContains(filter, "if (validCarrier)");
         assertContains(
-            aggregate,
-            "texture(MainDepthSampler, samplepos).r"
+            filter,
+            "encodedValue |= triplet << (payloadIndex * 3)"
         );
-        assertContains(aggregate, "decodeCarrierLinearDepth");
-        assertContains(aggregateDefinition, "\"MainDepthSampler\"");
-        assertNotContains(aggregateDefinition, "\"OutSize\"");
-        assertContains(
-            pipeline,
-            "\"name\": \"filter\""
-        );
-        assertContains(pipeline, "\"intarget\": \"minecraft:main\"");
-        assertContains(pipeline, "\"outtarget\": \"carriers\"");
-        assertFalse(Files.exists(PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+        assertContains(aggregate, "texture(ItemEntityDepthSampler, samplepos).r");
+        assertContains(aggregateDefinition, "\"ItemEntityDepthSampler\"");
+        assertNotContains(aggregateDefinition, "\"MainDepthSampler\"");
+        assertContains(pipeline, "\"intarget\": \"itemEntity\"");
+        assertContains(pipeline, "\"outtarget\": \"swap1\"");
+        assertTrue(Files.exists(PACK.resolve(
+            "assets/minecraft/shaders/core/"
+                + "rendertype_item_entity_translucent_cull.fsh"
         )));
-        assertNotContains(pipeline, "markerdata");
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
+        )));
+        assertNotContains(pipeline, "carriers");
     }
 
     @Test
@@ -269,7 +206,7 @@ class ShaderPackContractTest {
         assertContains(manager, "display.setDisplayHeight(carrier.displayHeight())");
         assertContains(manager, "new Vector3f(0.0f, carrier.translationY(), 0.0f)");
         assertContains(manager, "sourceY,\n            0.0f,\n            0.0f,\n            0.0f");
-        assertContains(manager, "state.marker.setItemStack(technicalMarker(0))");
+        assertContains(manager, "applyTechnicalMarker(state.marker, 0)");
         assertNotContains(manager, "state.marker.setItemStack(new ItemStack(Material.AIR))");
         assertNotContains(manager, "displayAnchor(");
         assertNotContains(manager, "setDisplaySourceOffset(");
@@ -307,7 +244,7 @@ class ShaderPackContractTest {
     @Test
     void reconstructsNearAndBehindLightsFromPrivateMarkers() throws IOException {
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
         Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
@@ -352,10 +289,10 @@ class ShaderPackContractTest {
     void carriesPerStrobeExpansionWithoutReducingRgbOrZoomMetadata()
         throws IOException {
         Path coreVertex = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
         Path coreFragment = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.fsh"
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
         );
         Path filter = PACK.resolve("assets/minecraft/shaders/program/filter.fsh");
         Path aggregate = PACK.resolve("assets/minecraft/shaders/program/aggregate_6.fsh");
@@ -475,7 +412,7 @@ class ShaderPackContractTest {
     @Test
     void anchorsSourcesClientSideWithoutProjectingScreenSpaceShadows() throws IOException {
         Path core = PACK.resolve(
-            "assets/minecraft/shaders/core/rendertype_entity_translucent_cull.vsh"
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
         assertContains(core, "offscreenProxy");
         assertContains(core, "float axisScale = 0.0625");

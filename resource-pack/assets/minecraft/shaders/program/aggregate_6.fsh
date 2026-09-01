@@ -2,17 +2,15 @@
 
 #define BIG 1000000
 #define FIXEDPOINT 1000.0
-#define CARRIER_DEPTH_BIAS 0.001
-#define CARRIER_DEPTH_BUCKET 0.00001
-#define CARRIER_DEPTH_LEVELS 16383.0
-#define CARRIER_MAX_LINEAR_DEPTH 128.0
+#define NEAR 0.05
+#define FAR 1024.0
+#define LIGHTDEPTH 0.025
 
-float decodeCarrierLinearDepth(float depth) {
-    int depthCode = int(floor(
-        (depth - CARRIER_DEPTH_BIAS) / CARRIER_DEPTH_BUCKET + 0.5
-    ));
-    return float(clamp(depthCode, 0, int(CARRIER_DEPTH_LEVELS)))
-        / CARRIER_DEPTH_LEVELS * CARRIER_MAX_LINEAR_DEPTH;
+// Post programs in 1.20.1 cannot import include files. These helpers mirror
+// the core-shader include without relying on unsupported preprocessing.
+float LinearizeDepth(float depth) {
+    float z = depth * 2.0 - 1.0;
+    return 2.0 * (NEAR * FAR) / (FAR + NEAR - z * (FAR - NEAR));
 }
 
 float decodeProjectionK(int code) {
@@ -35,7 +33,7 @@ float decodeProjectionK(int code) {
 }
 
 uniform sampler2D DiffuseSampler;
-uniform sampler2D MainDepthSampler;
+uniform sampler2D ItemEntityDepthSampler;
 uniform sampler2D ColoredCentersSampler;
 uniform vec2 DiffuseSize;
 uniform float Step;
@@ -176,8 +174,8 @@ void main() {
 
         samplepos = vec2(px, py);
         samplepos = (samplepos + 0.5) * inOneTexel;
-        float lightDepth = decodeCarrierLinearDepth(
-            texture(MainDepthSampler, samplepos).r
+        float lightDepth = LinearizeDepth(
+            texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH
         );
         samplepos = (samplepos - vec2(0.5)) * vec2(inAspectRatio, 1.0);
         int encodedValue = markerValue(sampleColor.rgb);

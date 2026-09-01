@@ -8,31 +8,11 @@
 #define RADIUS_CURVE 0.65
 #define FALLOFF_POWER 1.35
 #define LIGHT_BOOST 1.45
-#define CARRIER_SCENE_DEPTH_LIMIT 0.05
 
 // Minecraft 1.20.1 post programs do not support shader include directives.
 float LinearizeDepth(float depth) {
     float z = depth * 2.0 - 1.0;
     return 2.0 * (NEAR * FAR) / (FAR + NEAR - z * (FAR - NEAR));
-}
-
-float resolveSceneDepth(sampler2D depthSampler, vec2 coord, vec2 texelSize) {
-    float depth = texture(depthSampler, coord).r;
-    if (depth >= CARRIER_SCENE_DEPTH_LIMIT) {
-        return depth;
-    }
-    float replacement = 1.0;
-    vec2 offsetX = vec2(texelSize.x * 2.0, 0.0);
-    vec2 offsetY = vec2(0.0, texelSize.y * 2.0);
-    float candidate = texture(depthSampler, coord + offsetX).r;
-    if (candidate >= CARRIER_SCENE_DEPTH_LIMIT) replacement = min(replacement, candidate);
-    candidate = texture(depthSampler, coord - offsetX).r;
-    if (candidate >= CARRIER_SCENE_DEPTH_LIMIT) replacement = min(replacement, candidate);
-    candidate = texture(depthSampler, coord + offsetY).r;
-    if (candidate >= CARRIER_SCENE_DEPTH_LIMIT) replacement = min(replacement, candidate);
-    candidate = texture(depthSampler, coord - offsetY).r;
-    if (candidate >= CARRIER_SCENE_DEPTH_LIMIT) replacement = min(replacement, candidate);
-    return replacement;
 }
 
 float decodeExpansionScale(int code) {
@@ -163,11 +143,7 @@ vec3 reconstructOffscreenLight(vec3 proxyCoord, int encodedValue) {
 void main() {
     outColor = vec4(0.0);
     float oDepth = texture(DiffuseDepthSampler, texCoord).r;
-    float compDepth = resolveSceneDepth(
-        CompareDepthSampler,
-        texCoord,
-        oneTexel
-    );
+    float compDepth = texture(CompareDepthSampler, texCoord).r;
     float depth = LinearizeDepth(oDepth);
     if (oDepth < compDepth && depth < Range + LIGHTR) {
         vec4 aggColor = vec4(0.0, 0.0, 0.0, 1.0);

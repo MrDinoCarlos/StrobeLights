@@ -19,7 +19,6 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-import org.bukkit.Color;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -36,7 +35,6 @@ import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.RayTraceResult;
@@ -52,7 +50,8 @@ import org.bukkit.util.Vector;
  */
 public final class StrobeManager {
 
-    private static final float LIGHT_PAINTER_MODEL_DATA = 6_700.0f;
+    private static final int SOURCE_MARKER_MODEL_DATA = 6_700;
+    private static final int FLASH_MARKER_MODEL_DATA = 7_200;
     private static final float EDITOR_HANDLE_MODEL_DATA = 6_813.0f;
     private static final double MARKER_SURFACE_OFFSET = 0.125;
     private static final int OFFSCREEN_LIGHT_SIGNATURE = 0b110;
@@ -1105,14 +1104,17 @@ public final class StrobeManager {
             // Keep the technical model present with zero RGB. Replacing it
             // with AIR every phase made the client rebuild the render entry
             // and caused visible hitches at the on/off boundary.
-            state.marker.setItemStack(technicalMarker(0));
+            applyTechnicalMarker(state.marker, 0);
             return;
         }
-        state.marker.setItemStack(lightPainterMarker(
-            strobe.rgb(),
-            strobe.lightLevel(),
-            strobe.expansionCode()
-        ));
+        applyTechnicalMarker(
+            state.marker,
+            packSourceLightColor(
+                strobe.rgb(),
+                strobe.lightLevel(),
+                strobe.expansionCode()
+            )
+        );
     }
 
     private void applyVanillaFallback(Strobe strobe, RuntimeState state) {
@@ -1179,14 +1181,6 @@ public final class StrobeManager {
         return nearestAirBlock(preferred);
     }
 
-    private static ItemStack lightPainterMarker(
-        int rgb,
-        int lightLevel,
-        int expansionCode
-    ) {
-        return technicalMarker(packSourceLightColor(rgb, lightLevel, expansionCode));
-    }
-
     static int packSourceLightColor(int rgb, int lightLevel, int expansionCode) {
         double intensity = Math.max(0, Math.min(15, lightLevel)) / 15.0;
         int red4 = (int) Math.round((rgb >> 16 & 0xFF) * intensity * 15.0 / 255.0);
@@ -1200,16 +1194,52 @@ public final class StrobeManager {
             | SOURCE_LIGHT_TRAILER;
     }
 
-    private static ItemStack technicalMarker(int rgb) {
-        // Keep the binary carrier away from OptiFine's potion Custom Colors
-        // path. Leather dye is a direct legacy item tint in 1.20.1 and keeps
-        // all 24 payload bits intact for both RGB lights and camera flashes.
-        ItemStack stack = new ItemStack(Material.LEATHER_HORSE_ARMOR);
-        LeatherArmorMeta meta = (LeatherArmorMeta) stack.getItemMeta();
-        meta.setCustomModelData((int) LIGHT_PAINTER_MODEL_DATA);
-        meta.setColor(Color.fromRGB(rgb));
+    private static void applyTechnicalMarker(ItemDisplay display, int encodedValue) {
+        MarkerCarrier carrier = markerCarrier(encodedValue);
+        ItemStack stack = new ItemStack(Material.LIME_STAINED_GLASS);
+        ItemMeta meta = stack.getItemMeta();
+        meta.setCustomModelData(carrier.customModelData());
         stack.setItemMeta(meta);
-        return stack;
+        display.setItemStack(stack);
+        display.setBrightness(new Display.Brightness(
+            carrier.blockLight(),
+            carrier.skyLight()
+        ));
+    }
+
+    static MarkerCarrier markerCarrier(int encodedValue) {
+        boolean cameraFlash = isPackedCameraFlash(encodedValue);
+        int transportValue;
+        int modelDataBase;
+        if (cameraFlash) {
+            int power7 = encodedValue >> 13 & 127;
+            int power4 = (power7 * 15 + 63) / 127;
+            transportValue = power4 << 12
+                | (encodedValue >> 9 & 15) << 8
+                | (encodedValue >> 5 & 15) << 4
+                | (encodedValue >> 1 & 15);
+            modelDataBase = FLASH_MARKER_MODEL_DATA;
+        } else {
+            if (encodedValue != 0 && !isPackedSourceLight(encodedValue)) {
+                throw new IllegalArgumentException("Unknown marker payload");
+            }
+            transportValue = encodedValue >> 4 & 0xFFFF;
+            modelDataBase = SOURCE_MARKER_MODEL_DATA;
+        }
+        int highByte = transportValue >> 8 & 0xFF;
+        int lowByte = transportValue & 0xFF;
+        return new MarkerCarrier(
+            modelDataBase + highByte,
+            lowByte & 15,
+            lowByte >> 4 & 15,
+            transportValue,
+            cameraFlash
+        );
+    }
+
+    static boolean isPackedSourceLight(int encodedValue) {
+        return encodedValue >>> 20 == SOURCE_LIGHT_SIGNATURE
+            && (encodedValue & 15) == SOURCE_LIGHT_TRAILER;
     }
 
     private static ItemStack guiIcon(float customModelData) {
@@ -1332,11 +1362,14 @@ public final class StrobeManager {
             15,
             plugin.getConfig().getInt("discovery.minimum-light-level", 10)
         ));
-        light.setItemStack(lightPainterMarker(
-            strobe.rgb(),
-            Math.max(minimumLevel, strobe.lightLevel()),
-            strobe.expansionCode()
-        ));
+        applyTechnicalMarker(
+            light,
+            packSourceLightColor(
+                strobe.rgb(),
+                Math.max(minimumLevel, strobe.lightLevel()),
+                strobe.expansionCode()
+            )
+        );
         hideSourceMarker(player, state);
     }
 
@@ -1474,11 +1507,16 @@ public final class StrobeManager {
 
     private ItemDisplay spawnSceneFlashSource(UUID id, Location location) {
         return spawnFixedLightDisplay(location, display -> {
-            display.setItemStack(lightPainterMarker(
-                0xFFFFFF,
-                15,
-                (int) Math.round(Strobe.DEFAULT_EXPANSION / Strobe.EXPANSION_STEP) - 1
-            ));
+            applyTechnicalMarker(
+                display,
+                packSourceLightColor(
+                    0xFFFFFF,
+                    15,
+                    (int) Math.round(
+                        Strobe.DEFAULT_EXPANSION / Strobe.EXPANSION_STEP
+                    ) - 1
+                )
+            );
             display.getPersistentDataContainer().set(
                 sceneFlashEntityKey,
                 PersistentDataType.STRING,
@@ -1682,7 +1720,10 @@ public final class StrobeManager {
         double progress = flash.totalTicks <= 0
             ? 0.0 : (double) flash.remainingTicks / flash.totalTicks;
         double strength = flash.peakStrength * Math.sqrt(Math.max(0.0, progress));
-        flash.marker.setItemStack(cameraFlashMarker(flash.rgb, strength));
+        applyTechnicalMarker(
+            flash.marker,
+            packCameraFlashColor(flash.rgb, strength)
+        );
     }
 
     private ItemDisplay spawnCameraFlashMarker(Player player, Location location) {
@@ -1711,10 +1752,6 @@ public final class StrobeManager {
         });
         player.showEntity(plugin, marker);
         return marker;
-    }
-
-    private static ItemStack cameraFlashMarker(int rgb, double strength) {
-        return technicalMarker(packCameraFlashColor(rgb, strength));
     }
 
     static int packCameraFlashColor(int rgb, double strength) {
@@ -1908,6 +1945,15 @@ public final class StrobeManager {
 
     private void save() {
         repository.save(strobes);
+    }
+
+    static record MarkerCarrier(
+        int customModelData,
+        int blockLight,
+        int skyLight,
+        int transportValue,
+        boolean cameraFlash
+    ) {
     }
 
     private static final class RuntimeState {

@@ -2,9 +2,10 @@
 
 StrobeLights provides configurable 3D RGB strobe lighting based on
 [Light Painter](https://github.com/bradleyq/light_painter), revision `2364940`,
-plus a per-player RGB camera flash. Normal sources do not draw fixtures, beams
-or painted surfaces; throwable flashbangs deliberately emit a brief vanilla
-detonation cue.
+plus a per-player RGB camera flash. Its 1.20.1 carrier follows Light Painter's
+`universal-1-20` block-item/`item_entity` render route. Normal sources do not
+draw fixtures, beams or painted surfaces; throwable flashbangs deliberately
+emit a brief vanilla detonation cue.
 
 ## Requirements and rendering modes
 
@@ -274,15 +275,16 @@ The HTTP port must be open over TCP and differ from the Minecraft port.
   is loaded. If its Graphics control offers only Fast/Fancy, flash particles,
   sound, models and Minecraft's real white `LIGHT` fallback still work, but the
   custom RGB transparency pass cannot run.
-- The OptiFine carrier contract is protected by automated tests: marker
-  detection uses the dedicated neutral texture with an alpha-relative RGB
-  check, never an absolute near-white threshold or fog/hand heuristics. The
-  complete RGB, size and zoom payload is captured from the
-  `entity_translucent_cull` route that Minecraft 1.20.1 actually uses for the
-  leather carrier. It travels as a structured, zero-alpha depth marker, so
-  Vanilla and OptiFine preserve all payload bits without drawing colored dots
-  into the scene. The post chain replaces those nine technical depth pixels
-  with nearby scene depth before lighting and transparency composition.
+- The OptiFine carrier contract is protected by automated tests. The technical
+  item is translucent `LIME_STAINED_GLASS`, matching Light Painter's proven
+  1.20.1 `rendertype_item_entity_translucent_cull` route. A generated payload
+  atlas carries the high byte and the display lightmap coordinates carry the
+  low byte; the shader rebuilds the full RGB/size or camera-flash packet. The
+  atlas uses channel ratios so OptiFine premultiplication cannot change the
+  decoded value. Nine low-alpha pixels carry that packet and compressed source
+  depth inside `itemEntity`; the transparency composite removes them from the
+  visible scene. Fast/Fancy never opens that target, discards the low-alpha
+  technical model and continues to show only the vanilla white fallback.
 - After the pack loads, clients whose reported brand explicitly identifies
   OptiFine can receive a short translated reminder of those settings.
   Standalone OptiFine normally reports itself as vanilla, so it receives the

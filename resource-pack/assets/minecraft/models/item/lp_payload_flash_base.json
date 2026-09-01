@@ -1,0 +1,25 @@
+{
+  "credit": "StrobeLights legacy 1.20.1 carrier",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "#0"
+  },
+  "elements": [
+    {
+      "from": [7.5, 8, 7.5],
+      "to": [8.5, 8, 8.5],
+      "faces": {
+        "up": {
+          "uv": [12, 8, 12, 8],
+          "rotation": 90,
+          "texture": "#0"
+        }
+      }
+    }
+  ],
+  "display": {
+    "head": {
+      "scale": [0.002, 0.002, 0.002]
+    }
+  }
+}

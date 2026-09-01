@@ -3,7 +3,6 @@
         "swap1": {},
         "swap2": {},
         "swap3": {},
-        "carriers": {},
         "passthrough": {},
         "lightmap1": {},
         "lightmap2": {},
@@ -15,15 +14,15 @@
             "inputs": [
                 {
                     "sampler_name": "Diffuse",
-                    "target": "minecraft:main"
+                    "target": "minecraft:item_entity"
                 },
                 {
                     "sampler_name": "DiffuseDepth",
-                    "target": "minecraft:main",
+                    "target": "minecraft:item_entity",
                     "use_depth_buffer": true
                 }
             ],
-            "output": "carriers",
+            "output": "swap1",
             "uniforms": [
                 {
                     "name":"Range",
@@ -36,7 +35,7 @@
             "inputs": [
                 {
                     "sampler_name": "Diffuse",
-                    "target": "carriers"
+                    "target": "swap1"
                 }
             ],
             "output": "swap3"
@@ -149,8 +148,8 @@
                     "target": "swap1"
                 },
                 {
-                    "sampler_name": "MainDepth",
-                    "target": "minecraft:main",
+                    "sampler_name": "ItemEntityDepth",
+                    "target": "minecraft:item_entity",
                     "use_depth_buffer": true
                 },
                 {
@@ -327,7 +326,13 @@
                     "use_depth_buffer": true
                 }
             ],
-            "output": "swap3"
+            "output": "swap3",
+            "uniforms": [
+                {
+                    "name":"Test",
+                    "values": [ 0.0 ]
+                }
+            ]
         },
         {
             "program": "minecraft:post/flash_apply",
