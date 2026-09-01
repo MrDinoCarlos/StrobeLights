@@ -516,6 +516,8 @@ class ShaderPackContractTest {
         Path core = PACK.resolve(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
+        assertContains(core, "vec4 tmp = ModelViewMat * vec4(Position, 1.0)");
+        assertNotContains(core, "ModelViewMat * vec4(vec3(0.5), 1.0)");
         assertContains(core, "offscreenProxy");
         assertContains(core, "float axisScale = 0.0625");
         assertContains(core, "float depthScale = 0.25");

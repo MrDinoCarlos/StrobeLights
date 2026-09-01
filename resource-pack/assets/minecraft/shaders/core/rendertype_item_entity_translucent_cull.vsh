@@ -236,11 +236,11 @@ void main() {
     );
 
     if (marker > 0.0) {
-        // Every vertex must share one carrier origin. Retaining each baked
-        // vertex position can leave the expanded micro-quad edge-on or make
-        // neighboring vertices choose different off-screen encodings while
-        // the camera moves, especially through OptiFine's item renderer.
-        tmp = ModelViewMat * vec4(vec3(0.5), 1.0);
+        // ItemDisplayRenderer has already baked the entity transform into
+        // Position. The zero-scale technical model makes all four vertices
+        // share that exact world anchor. Replacing Position with a local model
+        // coordinate here would erase the source translation, pin normal
+        // lights to the camera and move camera-flash carriers out of view.
         vertexColor = vec4(
             float((encodedValue >> 16) & 255),
             float((encodedValue >> 8) & 255),
