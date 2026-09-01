@@ -471,13 +471,17 @@ class ShaderPackContractTest {
     }
 
     private static void assertContains(Path file, String expected) throws IOException {
-        assertTrue(Files.readString(file).contains(expected), () -> file + " no contiene " + expected);
+        assertTrue(read(file).contains(expected), () -> file + " no contiene " + expected);
     }
 
     private static void assertNotContains(Path file, String forbidden) throws IOException {
         assertFalse(
-            Files.readString(file).contains(forbidden),
+            read(file).contains(forbidden),
             () -> file + " contiene la palabra GLSL reservada " + forbidden
         );
+    }
+
+    private static String read(Path file) throws IOException {
+        return Files.readString(file).replace("\r\n", "\n");
     }
 }
