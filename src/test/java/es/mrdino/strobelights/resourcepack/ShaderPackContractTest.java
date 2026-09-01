@@ -178,6 +178,7 @@ class ShaderPackContractTest {
         assertContains(manager, "Location markerLocation = fixedSourceLocation(strobe)");
         assertContains(manager, "Vector toLight = source.toVector().subtract(eye.toVector())");
         assertContains(manager, "spawnFixedLightDisplay(markerLocation");
+        assertContains(manager, "display.setBillboard(Display.Billboard.CENTER)");
         assertContains(manager, "display.setDisplayWidth(carrier.displayWidth())");
         assertContains(manager, "display.setDisplayHeight(carrier.displayHeight())");
         assertContains(manager, "new Vector3f(0.0f, carrier.translationY(), 0.0f)");
