@@ -1,6 +1,42 @@
 #version 150
 
-#moj_import <utils.glsl>
+#define FIXEDPOINT 1000.0
+#define NEAR 0.05
+#define FAR 1024.0
+#define LIGHTR 18.0
+#define MIN_LIGHTR 3.0
+#define RADIUS_CURVE 0.65
+#define FALLOFF_POWER 1.35
+#define LIGHT_BOOST 1.45
+
+// Minecraft 1.20.1 post programs do not support shader include directives.
+float LinearizeDepth(float depth) {
+    float z = depth * 2.0 - 1.0;
+    return 2.0 * (NEAR * FAR) / (FAR + NEAR - z * (FAR - NEAR));
+}
+
+float decodeExpansionScale(int code) {
+    return float(clamp(code, 0, 15) + 1) * 0.25;
+}
+
+float decodeProjectionK(int code) {
+    if (code <= 0) return 0.125;
+    if (code == 1) return 0.160;
+    if (code == 2) return 0.200;
+    if (code == 3) return 0.250;
+    if (code == 4) return 0.315;
+    if (code == 5) return 0.400;
+    if (code == 6) return 0.500;
+    if (code == 7) return 0.630;
+    if (code == 8) return 0.800;
+    if (code == 9) return 1.000;
+    if (code == 10) return 1.200;
+    if (code == 11) return 1.400;
+    if (code == 12) return 1.600;
+    if (code == 13) return 2.000;
+    if (code == 14) return 2.400;
+    return 3.000;
+}
 
 uniform sampler2D DiffuseDepthSampler;
 uniform sampler2D LightsSampler;

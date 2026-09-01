@@ -854,6 +854,11 @@ public final class StrobeManager {
             applyLitState(strobe, state, false);
         }
 
+        // Reconcile the real LIGHT block even when the logical phase did not
+        // change. This repairs external removals and guarantees that static
+        // fallbacks do not depend on a one-time state-transition write.
+        applyVanillaFallback(strobe, state);
+
         // The entity itself never leaves the saved source. Display culling is
         // disabled so the core shader can carry an off-screen point without a
         // camera- or player-following entity.
@@ -1130,10 +1135,12 @@ public final class StrobeManager {
             state.vanillaLight = target;
             state.originalAir = target.getType().isAir() ? target.getType() : Material.AIR;
         }
-        org.bukkit.block.data.type.Light light =
-            (org.bukkit.block.data.type.Light) Material.LIGHT.createBlockData();
-        light.setLevel(Math.max(1, Math.min(15, strobe.lightLevel())));
-        target.setBlockData(light, false);
+        int level = Math.max(1, Math.min(15, strobe.lightLevel()));
+        if (target.getBlockData() instanceof org.bukkit.block.data.type.Light current
+            && current.getLevel() == level) {
+            return;
+        }
+        setVanillaLight(target, level);
     }
 
     static boolean shouldLightVanillaFallback(
@@ -1142,6 +1149,15 @@ public final class StrobeManager {
         int lightLevel
     ) {
         return fallbackEnabled && lit && lightLevel > 0;
+    }
+
+    private static void setVanillaLight(Block target, int level) {
+        org.bukkit.block.data.type.Light light =
+            (org.bukkit.block.data.type.Light) Material.LIGHT.createBlockData();
+        light.setLevel(Math.max(1, Math.min(15, level)));
+        // Applying physics makes Paper enqueue the neighboring light-engine
+        // update immediately. LIGHT is collisionless and the target is air.
+        target.setBlockData(light, true);
     }
 
     private static Block vanillaLightTarget(Strobe strobe) {
@@ -1478,10 +1494,7 @@ public final class StrobeManager {
         }
         scene.vanillaLight = target;
         scene.originalAir = target.getType();
-        org.bukkit.block.data.type.Light light =
-            (org.bukkit.block.data.type.Light) Material.LIGHT.createBlockData();
-        light.setLevel(15);
-        target.setBlockData(light, false);
+        setVanillaLight(target, 15);
     }
 
     private static Location sceneLightLocation(Location impact) {

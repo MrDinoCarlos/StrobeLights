@@ -27,6 +27,20 @@ class ShaderPackContractTest {
             PACK.resolve("assets/minecraft/shaders/program/light.fsh"),
             "lightDist < lightRadius"
         );
+        for (String shaderName : new String[] {
+            "filter.fsh",
+            "aggregate_6.fsh",
+            "light.fsh",
+            "light_t.fsh",
+            "transparency.fsh"
+        }) {
+            Path shader = PACK.resolve("assets/minecraft/shaders/program").resolve(shaderName);
+            assertNotContains(shader, "#moj_import");
+        }
+        assertContains(
+            PACK.resolve("assets/minecraft/shaders/program/filter.fsh"),
+            "float LinearizeDepth(float depth)"
+        );
         Path legacyPipeline = PACK.resolve(
             "assets/minecraft/shaders/post/transparency.json"
         );
@@ -354,6 +368,12 @@ class ShaderPackContractTest {
         assertContains(definition, "\"custom_model_data\": 6815");
         assertContains(definition, "\"custom_model_data\": 6822");
         assertContains(definition, "\"parent\": \"minecraft:item/generated\"");
+        Path potionDefinition = PACK.resolve("assets/minecraft/models/item/potion.json");
+        assertContains(potionDefinition, "\"custom_model_data\": 6821");
+        assertContains(potionDefinition, "strobelights:item/gui/color_swatch");
+        Path guiSource = Path.of("src/main/java/es/mrdino/strobelights/ui/StrobeGui.java");
+        assertContains(guiSource, "ItemStack stack = item(Material.POTION");
+        assertContains(guiSource, "meta.setColor(Color.fromRGB(rgb & 0xFFFFFF))");
         assertTrue(Files.isRegularFile(PACK.resolve(
             "assets/strobelights/textures/item/gui/strobe.png"
         )));
@@ -486,6 +506,9 @@ class ShaderPackContractTest {
         Path config = Path.of("src/main/resources/config.yml");
         assertContains(manager, "Particle.FLASH");
         assertContains(manager, "0.0,\n            null,\n            true");
+        assertContains(manager, "applyVanillaFallback(strobe, state);\n\n        // The entity");
+        assertContains(manager, "current.getLevel() == level");
+        assertContains(manager, "target.setBlockData(light, true)");
         assertContains(flashbangService, "scheduleFlightTimeout(projectile)");
         assertContains(flashbangService, "throwable-flashbang.maximum-flight-ticks");
         assertContains(flashbangService, "ProjectileLaunchEvent event");

@@ -1,6 +1,8 @@
 #version 150
 
-#moj_import <utils.glsl>
+#define LIGHTDEPTH 0.025
+
+// EffectInstance does not preprocess imports for post programs on 1.20.1.
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D DiffuseDepthSampler;

@@ -1,6 +1,15 @@
 #version 150
 
-#moj_import <utils.glsl>
+#define NEAR 0.05
+#define FAR 1024.0
+#define LIGHTDEPTH 0.025
+
+// Minecraft 1.20.1's post-program loader (and OptiFine I6's wrapper around it)
+// does not preprocess shader include directives. Keep the shared subset inline.
+float LinearizeDepth(float depth) {
+    float z = depth * 2.0 - 1.0;
+    return 2.0 * (NEAR * FAR) / (FAR + NEAR - z * (FAR - NEAR));
+}
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D DiffuseDepthSampler;
