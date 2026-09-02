@@ -524,7 +524,8 @@ class ShaderPackContractTest {
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
             Path shader = PACK.resolve("assets/minecraft/shaders/program").resolve(shaderName);
             assertContains(shader, "lightBlocked");
-            assertContains(shader, "rayIndex < 24");
+            assertContains(shader, "rayIndex < 96");
+            assertContains(shader, "ceil(lightDistance * 2.0)");
             assertContains(shader, "depthGap > depthBias");
             assertContains(shader, "float axisInverse = 16.0");
             assertContains(shader, "float depthInverse = 4.0");
