@@ -51,7 +51,8 @@ render:
   # rendered from above, below and every side without following the camera.
   display-view-range: 128.0
   # RGB sources stay active above, below, on every side and outside the frame.
-  # Opaque geometry occludes each affected surface; glass remains transparent.
+  # The vanilla LIGHT fallback supplies smooth wall-aware brightness; the RGB
+  # pass colorizes it without projecting screen-space silhouettes or shadows.
 
 timing:
   # GUI: normal click changes 1 tick, 20 above 200; Shift changes 100.
@@ -61,8 +62,8 @@ timing:
 discovery:
   enabled: true
   # Nearby strobes are shown to this player as steady RGB lights and editable
-  # handles. Normal depth hides the handle and opaque geometry clips the light;
-  # discovery never changes the saved on/off state of the strobes.
+  # handles. Normal depth hides the handle and vanilla block-light propagation
+  # handles walls; discovery never changes the saved on/off state of strobes.
   range: 32.0
   minimum-light-level: 10
 
