@@ -2,7 +2,6 @@
  
 uniform sampler2D DiffuseSampler;
 uniform sampler2D LightMapSampler;
-const float Intensity = 1.0;
  
 in vec2 texCoord;
 
@@ -16,17 +15,15 @@ vec3 decodeAlphaHDR(vec4 color) {
     outColor = texture(DiffuseSampler, texCoord);
     vec3 lightColor = texture(LightMapSampler, texCoord).rgb;
     if (outColor.a > 0.0) {
-        vec3 illumination = Intensity * lightColor;
-        outColor.rgb = outColor.rgb * (vec3(1.0) + illumination * 0.65)
-            + illumination * 0.22;
         float rawLightStrength = max(max(lightColor.r, lightColor.g), lightColor.b);
         float lightStrength = clamp(rawLightStrength, 0.0, 1.0);
         if (lightStrength > 0.001) {
             vec3 tint = lightColor / max(rawLightStrength, 0.001);
-            float baseLuminance = dot(outColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-            vec3 colorized = outColor.rgb * (vec3(0.28) + tint * 0.72)
+            vec3 baseColor = outColor.rgb;
+            float baseLuminance = dot(baseColor, vec3(0.2126, 0.7152, 0.0722));
+            vec3 colorized = baseColor * (vec3(0.28) + tint * 0.72)
                 + tint * baseLuminance * 0.12;
-            outColor.rgb = mix(outColor.rgb, colorized, lightStrength * 0.72);
+            outColor.rgb = mix(baseColor, colorized, lightStrength * 0.88);
         }
     }
  }

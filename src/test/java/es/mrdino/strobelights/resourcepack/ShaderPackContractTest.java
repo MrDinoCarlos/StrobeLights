@@ -334,7 +334,8 @@ class ShaderPackContractTest {
             Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
             assertNotContains(shader, "BlurSampler");
             assertNotContains(shader, "blurColor");
-            assertContains(shader, "vec3 illumination = Intensity * lightColor");
+            assertNotContains(shader, "vec3 illumination = Intensity * lightColor");
+            assertContains(shader, "vec3 baseColor = outColor.rgb");
         }
     }
 
@@ -399,7 +400,7 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void anchorsSourcesAndOccludesOpaqueGeometryPerPixel() throws IOException {
+    void anchorsSourcesWithoutProjectingScreenSpaceShadows() throws IOException {
         Path core = PACK.resolve(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
@@ -408,10 +409,9 @@ class ShaderPackContractTest {
         assertContains(core, "float depthScale = 0.25");
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
             Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
-            assertContains(shader, "lightBlocked");
-            assertContains(shader, "rayIndex < 96");
-            assertContains(shader, "ceil(lightDistance * 2.0)");
-            assertContains(shader, "depthGap > depthBias");
+            assertNotContains(shader, "lightBlocked");
+            assertNotContains(shader, "rayIndex");
+            assertNotContains(shader, "depthGap");
             assertContains(shader, "float axisInverse = 16.0");
             assertContains(shader, "float depthInverse = 4.0");
             assertContains(shader, "float lightRadius = mix(");
@@ -424,6 +424,14 @@ class ShaderPackContractTest {
         assertContains(
             PACK.resolve("assets/minecraft/shaders/post/light_apply.fsh"),
             "vec3 colorized"
+        );
+        assertNotContains(
+            PACK.resolve("assets/minecraft/shaders/post/light_apply.fsh"),
+            "+ illumination * 0.22"
+        );
+        assertContains(
+            PACK.resolve("assets/minecraft/shaders/post/light_apply.fsh"),
+            "vec3 baseColor = outColor.rgb"
         );
     }
 
@@ -491,7 +499,7 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void keepsRgbSourcesActiveWhileOpaqueGeometryOccludesTheirPixels() throws IOException {
+    void keepsRgbSourcesActiveForVanillaPropagationMasking() throws IOException {
         Path manager = Path.of(
             "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
         );
