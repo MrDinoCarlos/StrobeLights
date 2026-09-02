@@ -246,7 +246,7 @@ throwable-flashbang:
 ```
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.9.7 prints a red translated setup warning in the console and shows a
+0.9.8 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -255,9 +255,9 @@ The HTTP port must be open over TCP and differ from the Minecraft port.
 ## Notes
 
 - RGB sources remain active for every player inside render distance regardless
-  of camera position or direct line of sight. Minecraft's smooth block-light
-  propagation supplies wall-aware brightness and the post shader colorizes it
-  without projecting silhouettes. Glass follows vanilla transparent behavior.
+  of camera position or direct line of sight. The shader smoothly accumulates
+  opaque geometry between a visible surface and the source so RGB does not leak
+  through walls; glass follows vanilla transparent behavior.
 - Per-strobe RGB size scales the physical light radius from `0.25x` to `4.00x`
   in Fabulous mode. Fast/Fancy uses Minecraft's white `LIGHT` fallback, whose
   propagation radius is controlled by the vanilla light engine and therefore
@@ -310,7 +310,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.9.7+mc.1.20.1.jar`.
+For this build: `StrobeLights-v.0.9.8+mc.1.20.1.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

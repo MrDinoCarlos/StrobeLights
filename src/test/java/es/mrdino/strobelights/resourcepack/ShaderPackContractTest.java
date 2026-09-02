@@ -513,7 +513,7 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void anchorsSourcesWithoutProjectingScreenSpaceShadows() throws IOException {
+    void attenuatesRgbBehindOpaqueGeometryWithoutHidingSources() throws IOException {
         Path core = PACK.resolve(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
@@ -525,8 +525,14 @@ class ShaderPackContractTest {
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
             Path shader = PACK.resolve("assets/minecraft/shaders/program").resolve(shaderName);
             assertNotContains(shader, "lightBlocked");
-            assertNotContains(shader, "rayIndex");
-            assertNotContains(shader, "depthGap");
+            assertContains(shader, "float lightTransmission(");
+            assertContains(shader, "ceil(lightDistance * 3.0)");
+            assertContains(shader, "rayIndex < 96");
+            assertContains(shader, "float stepOcclusion = smoothstep(");
+            assertContains(shader, "blockedWeight += stepOcclusion");
+            assertContains(shader, "1.0 - smoothstep(0.15, 1.25, blockedWeight)");
+            assertContains(shader, "float transmission = lightTransmission(");
+            assertContains(shader, "* rangeFade * transmission");
             assertContains(shader, "float axisInverse = 16.0");
             assertContains(shader, "float depthInverse = 4.0");
             assertContains(shader, "float lightRadius = mix(");
@@ -618,7 +624,7 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void keepsRgbSourcesActiveForVanillaPropagationMasking() throws IOException {
+    void keepsRgbSourcesActiveWhileGeometryAttenuatesTheirPixels() throws IOException {
         Path manager = Path.of(
             "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
         );

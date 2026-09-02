@@ -4,7 +4,7 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.9.7
+# Version:     0.9.8
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
@@ -51,8 +51,8 @@ render:
   # rendered from above, below and every side without following the camera.
   display-view-range: 128.0
   # RGB sources stay active above, below, on every side and outside the frame.
-  # The vanilla LIGHT fallback supplies smooth wall-aware brightness; the RGB
-  # pass colorizes it without projecting screen-space silhouettes or shadows.
+  # The RGB pass softly accumulates opaque geometry between each visible
+  # surface and its source, stopping wall leaks without hiding the source.
 
 timing:
   # GUI: normal click changes 1 tick, 20 above 200; Shift changes 100.
@@ -62,8 +62,8 @@ timing:
 discovery:
   enabled: true
   # Nearby strobes are shown to this player as steady RGB lights and editable
-  # handles. Normal depth hides the handle and vanilla block-light propagation
-  # handles walls; discovery never changes the saved on/off state of strobes.
+  # handles. Normal depth hides the handle and attenuates light behind opaque
+  # walls; discovery never changes the saved on/off state of strobes.
   range: 32.0
   minimum-light-level: 10
 
