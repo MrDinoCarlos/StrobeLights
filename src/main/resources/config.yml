@@ -50,8 +50,8 @@ render:
   # the exact saved source and disables client frustum culling, so it can be
   # rendered from above, below and every side without following the camera.
   display-view-range: 128.0
-  # RGB light stays visible above, below, on every side and outside the frame.
-  # It deliberately does not project screen-space shadows or dark silhouettes.
+  # RGB sources stay active above, below, on every side and outside the frame.
+  # Opaque geometry occludes each affected surface; glass remains transparent.
 
 timing:
   # GUI: normal click changes 1 tick, 20 above 200; Shift changes 100.
@@ -61,8 +61,8 @@ timing:
 discovery:
   enabled: true
   # Nearby strobes are shown to this player as steady RGB lights and editable
-  # handles only with clear line of sight. They never show through blocks and
-  # never change the saved on/off state of the strobes.
+  # handles. Normal depth hides the handle and opaque geometry clips the light;
+  # discovery never changes the saved on/off state of the strobes.
   range: 32.0
   minimum-light-level: 10
 

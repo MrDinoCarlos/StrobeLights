@@ -1264,8 +1264,7 @@ public final class StrobeManager {
                 continue;
             }
             if (discoveryApplies(player, source)
-                || source.distanceSquared(player.getEyeLocation()) > maximumDistanceSquared
-                || sourceBlockedForPlayer(player, source)) {
+                || source.distanceSquared(player.getEyeLocation()) > maximumDistanceSquared) {
                 hideSourceMarker(player, state);
                 continue;
             }
@@ -1286,7 +1285,7 @@ public final class StrobeManager {
                 ensureEditorHandle(strobe, state);
                 Location source = fixedSourceLocation(strobe);
                 boolean nearby = active && source != null && discoveryApplies(player, source);
-                boolean visible = nearby && !sourceBlockedForPlayer(player, source);
+                boolean visible = nearby;
                 setEditorHandleVisible(player, state, visible);
                 if (visible && packLoaded) {
                     updateDiscoveryLight(player, strobe, state, source);
@@ -1470,10 +1469,6 @@ public final class StrobeManager {
             Vector toLight = scene.location.toVector().subtract(eye.toVector());
             double distance = toLight.length();
             if (distance > radius) {
-                scene.hideSource(plugin, player);
-                continue;
-            }
-            if (sourceBlockedForPlayer(player, scene.location)) {
                 scene.hideSource(plugin, player);
                 continue;
             }

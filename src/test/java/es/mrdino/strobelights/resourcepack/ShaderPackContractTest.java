@@ -512,7 +512,7 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void anchorsSourcesClientSideWithoutProjectingScreenSpaceShadows() throws IOException {
+    void anchorsSourcesAndOccludesOpaqueGeometryPerPixel() throws IOException {
         Path core = PACK.resolve(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
@@ -523,9 +523,9 @@ class ShaderPackContractTest {
         assertContains(core, "float depthScale = 0.25");
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
             Path shader = PACK.resolve("assets/minecraft/shaders/program").resolve(shaderName);
-            assertNotContains(shader, "lightBlocked");
-            assertNotContains(shader, "rayIndex < 24");
-            assertNotContains(shader, "depthGap > depthBias");
+            assertContains(shader, "lightBlocked");
+            assertContains(shader, "rayIndex < 24");
+            assertContains(shader, "depthGap > depthBias");
             assertContains(shader, "float axisInverse = 16.0");
             assertContains(shader, "float depthInverse = 4.0");
             assertContains(shader, "float lightRadius = mix(");
@@ -609,13 +609,17 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void makesOpaqueBlockOcclusionMandatoryForEveryRgbEffect() throws IOException {
+    void keepsRgbSourcesActiveWhileOpaqueGeometryOccludesTheirPixels() throws IOException {
         Path manager = Path.of(
             "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
         );
         Path config = Path.of("src/main/resources/config.yml");
-        assertContains(manager, "sourceBlockedForPlayer(player, source)");
-        assertContains(manager, "sourceBlockedForPlayer(player, scene.location)");
+        assertContains(manager, "boolean visible = nearby;");
+        assertEquals(
+            1,
+            countOccurrences(read(manager), "sourceBlockedForPlayer(player, source)")
+        );
+        assertNotContains(manager, "sourceBlockedForPlayer(player, scene.location)");
         assertContains(manager, "if (blockedByGeometry(eye, direction, distance))");
         assertContains(manager, "blocksLight(world.getBlockAt(blockX, blockY, blockZ).getType())");
         assertNotContains(manager, "requireLineOfSight");
@@ -635,5 +639,9 @@ class ShaderPackContractTest {
 
     private static String read(Path file) throws IOException {
         return Files.readString(file).replace("\r\n", "\n");
+    }
+
+    private static int countOccurrences(String text, String expected) {
+        return text.split(Pattern.quote(expected), -1).length - 1;
     }
 }

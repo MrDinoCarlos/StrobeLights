@@ -140,6 +140,29 @@ vec3 reconstructOffscreenLight(vec3 proxyCoord, int encodedValue) {
     );
 }
 
+bool lightBlocked(vec3 surfaceCoord, vec3 lightCoord, float projectionK) {
+    for (int rayIndex = 1; rayIndex < 24; rayIndex += 1) {
+        float progress = float(rayIndex) / 24.0;
+        vec3 rayPoint = mix(surfaceCoord, lightCoord, progress);
+        if (rayPoint.z <= NEAR) {
+            break;
+        }
+        vec2 rayUv = rayPoint.xy / (projectionK * rayPoint.z);
+        rayUv = rayUv / vec2(aspectRatio, 1.0) + vec2(0.5);
+        if (rayUv.x <= 0.0 || rayUv.x >= 1.0
+            || rayUv.y <= 0.0 || rayUv.y >= 1.0) {
+            break;
+        }
+        float geometryDepth = LinearizeDepth(texture(CompareDepthSampler, rayUv).r);
+        float depthBias = max(0.08, rayPoint.z * 0.0025);
+        float depthGap = rayPoint.z - geometryDepth;
+        if (depthGap > depthBias) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void main() {
     outColor = vec4(0.0);
     float oDepth = texture(DiffuseDepthSampler, texCoord).r;
@@ -188,7 +211,8 @@ void main() {
                 pow(encodedIntensity, RADIUS_CURVE)
             ) * decodeExpansionScale(expansionCode);
             float lightDist = length(worldCoord - lightWorldCoord);
-            if (lightDist < lightRadius) {
+            if (lightDist < lightRadius
+                && !lightBlocked(worldCoord, lightWorldCoord, markerConversionK)) {
                 float rangeFade = clamp(Range - length(lightWorldCoord), 0.0, 6.0) / 6.0;
                 float radialFalloff = pow(
                     clamp(1.0 - lightDist / lightRadius, 0.0, 1.0),
