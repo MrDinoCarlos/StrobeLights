@@ -251,10 +251,10 @@ The HTTP port must be open over TCP and differ from the Minecraft port.
 
 ## Notes
 
-- RGB lighting is delivered only while the player has an unobstructed path to
-  the source. Every non-air block stops it regardless of RGB size, except glass
-  blocks and panes. The white fallback also follows Minecraft's normal
-  block-light propagation rules.
+- RGB sources remain active for every player inside render distance regardless
+  of camera position or direct line of sight. The post shader clips only the
+  surfaces hidden from the light by opaque geometry; glass blocks and panes let
+  it pass. The white fallback follows Minecraft's normal block-light rules.
 - Per-strobe RGB size scales the physical light radius from `0.25x` to `4.00x`
   in Fabulous mode. Fast/Fancy uses Minecraft's white `LIGHT` fallback, whose
   propagation radius is controlled by the vanilla light engine and therefore
