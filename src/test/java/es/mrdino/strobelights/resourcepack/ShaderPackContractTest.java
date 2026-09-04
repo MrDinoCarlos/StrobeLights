@@ -150,9 +150,10 @@ class ShaderPackContractTest {
         assertEquals(0x7FE020, flashTexture.getRGB(0, 0) & 0xFFFFFF);
         assertEquals(0x7FE020, flashTexture.getRGB(15, 15) & 0xFFFFFF);
 
-        assertFalse(Files.exists(PACK.resolve(
-            "assets/minecraft/models/item/leather_horse_armor.json"
-        )));
+        assertNotContains(
+            PACK.resolve("assets/minecraft/models/item/leather_horse_armor.json"),
+            "\"custom_model_data\": 6700"
+        );
         assertNotContains(
             PACK.resolve("assets/minecraft/models/item/potion.json"),
             "\"custom_model_data\": 6700"
@@ -621,6 +622,43 @@ class ShaderPackContractTest {
         assertNotContains(manager, "throwable-flashbang.scene-light-radius");
         assertContains(config, "maximum-flight-ticks: 1200");
         assertContains(config, "scene-view-range: 128.0");
+    }
+
+    @Test
+    void containsAProjectileFreeFlareLauncherAndTintedCartridge() throws IOException {
+        Path launcherDefinition = PACK.resolve(
+            "assets/minecraft/models/item/blaze_rod.json"
+        );
+        Path cartridgeDefinition = PACK.resolve(
+            "assets/minecraft/models/item/leather_horse_armor.json"
+        );
+        assertContains(launcherDefinition, "\"custom_model_data\": 6910");
+        assertContains(launcherDefinition, "strobelights:item/flare_launcher");
+        assertContains(cartridgeDefinition, "\"custom_model_data\": 6911");
+        assertContains(cartridgeDefinition, "strobelights:item/flare_cartridge");
+
+        for (String asset : new String[] {"flare_launcher", "flare_cartridge"}) {
+            assertTrue(Files.isRegularFile(PACK.resolve(
+                "assets/strobelights/models/item/" + asset + ".json"
+            )));
+            Path texture = PACK.resolve(
+                "assets/strobelights/textures/item/" + asset + ".png"
+            );
+            assertTrue(Files.isRegularFile(texture));
+            var image = ImageIO.read(texture.toFile());
+            assertEquals(64, image.getWidth());
+            assertEquals(64, image.getHeight());
+            assertEquals(0, image.getRGB(0, 0) >>> 24);
+        }
+
+        Path service = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/FlareService.java"
+        );
+        assertContains(service, "new ItemStack(Material.BLAZE_ROD)");
+        assertContains(service, "new ItemStack(Material.LEATHER_HORSE_ARMOR)");
+        assertContains(service, "meta.setCustomModelData(modelData)");
+        assertContains(service, "event.setCancelled(true)");
+        assertNotContains(service, "Material.CROSSBOW");
     }
 
     @Test

@@ -185,7 +185,9 @@ The flare command gives a reusable launcher. Left click it to open the menu of
 16 colored cartridges. Selecting one plays the configurable loading animation;
 right click then launches that color into the sky. It explodes at the configured
 height with a matching firework, RGB scene light and short camera flash. A new
-cartridge must be selected before every shot.
+cartridge must be selected before every shot. The launcher uses a neutral blaze
+rod carrier with its own resource-pack model, so creative mode cannot load or
+shoot vanilla arrows. Launchers created by 0.10.0 upgrade on their next click.
 
 ## Resource-pack delivery
 
@@ -271,7 +273,7 @@ flare:
 ```
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.0 prints a red translated setup warning in the console and shows a
+0.10.1 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -335,7 +337,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.0+mc.1.20.1.jar`.
+For this build: `StrobeLights-v.0.10.1+mc.1.20.1.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
