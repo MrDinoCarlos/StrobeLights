@@ -5,6 +5,7 @@ import es.mrdino.strobelights.i18n.Messages;
 import es.mrdino.strobelights.model.Strobe;
 import es.mrdino.strobelights.resourcepack.ResourcePackService;
 import es.mrdino.strobelights.service.FlashbangService;
+import es.mrdino.strobelights.service.FlareService;
 import es.mrdino.strobelights.service.StrobeManager;
 import es.mrdino.strobelights.service.StrobeRepository;
 import es.mrdino.strobelights.ui.StrobeGui;
@@ -19,6 +20,7 @@ public final class StrobeLightsPlugin extends JavaPlugin {
     private Messages messages;
     private StrobeManager manager;
     private FlashbangService flashbangs;
+    private FlareService flares;
     private StrobeGui gui;
     private ResourcePackService resourcePack;
 
@@ -32,6 +34,7 @@ public final class StrobeLightsPlugin extends JavaPlugin {
         initializeServices();
         resourcePack = new ResourcePackService(this);
         flashbangs = new FlashbangService(this);
+        flares = new FlareService(this);
 
         StrobeCommand commandHandler = new StrobeCommand(this);
         PluginCommand command = Objects.requireNonNull(
@@ -43,6 +46,7 @@ public final class StrobeLightsPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(gui, this);
         getServer().getPluginManager().registerEvents(resourcePack, this);
         getServer().getPluginManager().registerEvents(flashbangs, this);
+        getServer().getPluginManager().registerEvents(flares, this);
         resourcePack.start();
 
         getLogger().info("StrobeLights ready: " + manager.size()
@@ -53,6 +57,9 @@ public final class StrobeLightsPlugin extends JavaPlugin {
     public void onDisable() {
         if (flashbangs != null) {
             flashbangs.shutdown();
+        }
+        if (flares != null) {
+            flares.shutdown();
         }
         if (gui != null) {
             gui.closeAll();
@@ -79,6 +86,10 @@ public final class StrobeLightsPlugin extends JavaPlugin {
 
     public FlashbangService flashbangs() {
         return flashbangs;
+    }
+
+    public FlareService flares() {
+        return flares;
     }
 
     public Messages messages() {

@@ -197,6 +197,20 @@ item:
     lore-2: "Détonation après impact : {seconds} s"
     lore-3: "De près : RVB BLANC 15/15 · flash EXTRÊME"
     lore-4: "La distance réduit l'éblouissement, la durée et le son"
+  flare-launcher:
+    name: "Lance-fusées"
+    empty: "Cartouche : vide"
+    loaded: "Cartouche : {color}"
+    lore-left: "Clic gauche : choisir et charger une couleur"
+    lore-right: "Clic droit : tirer la fusée chargée"
+    loading: "Une cartouche est déjà en cours de chargement."
+    empty-message: "Faites un clic gauche et choisissez d'abord une cartouche."
+    loaded-message: "Cartouche {color} chargée."
+    loading-progress: "Chargement {color} {progress}"
+  flare-cartridge:
+    menu-title: "Cartouches de fusée"
+    name: "Cartouche {color}"
+    select: "Cliquer pour charger"
 
 message:
   maximum-strobes: "Le nombre maximal de strobes est atteint."
@@ -291,6 +305,11 @@ command:
     given: "Grenade flash tactique donnée à {player}."
     received: "Vous avez reçu une grenade flash tactique. Clic droit pour la lancer."
     received-dropped: "Votre inventaire était plein ; la grenade a été déposée à vos pieds."
+  flare:
+    player-not-found: "Le joueur '{player}' n'est pas connecté."
+    given: "Lance-fusées donné à {player}."
+    received: "Vous avez reçu un lance-fusées. Clic gauche pour charger, clic droit pour tirer."
+    received-dropped: "Votre inventaire était plein ; le lance-fusées a été déposé à vos pieds."
   info:
     position: "Position : {position} dans {world} | face : {face}"
     unplaced: "Position : non placé"
@@ -311,4 +330,5 @@ command:
     refresh: "ticks par phase"
     discovery: "révèle les strobes proches comme lumières statiques modifiables"
     flash: "donne une grenade flash lançable à puissance maximale"
+    flare: "donne un lance-fusées colorées réutilisable"
     visual: "configuration visuelle"

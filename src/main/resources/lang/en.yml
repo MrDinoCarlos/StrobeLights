@@ -203,6 +203,20 @@ item:
     lore-2: "Impact fuse: {seconds} s"
     lore-3: "Up close: WHITE RGB 15/15 · EXTREME flash"
     lore-4: "Distance reduces blindness, duration and audio"
+  flare-launcher:
+    name: "Flare launcher"
+    empty: "Cartridge: empty"
+    loaded: "Cartridge: {color}"
+    lore-left: "Left click: choose and load a color"
+    lore-right: "Right click: fire the loaded flare"
+    loading: "A cartridge is already loading."
+    empty-message: "Left click and choose a cartridge first."
+    loaded-message: "{color} cartridge loaded."
+    loading-progress: "Loading {color} {progress}"
+  flare-cartridge:
+    menu-title: "Flare cartridges"
+    name: "{color} cartridge"
+    select: "Click to load"
 
 message:
   maximum-strobes: "The maximum number of strobes has been reached."
@@ -298,6 +312,11 @@ command:
     given: "Gave a tactical flashbang to {player}."
     received: "You received a tactical flashbang. Right click to throw it."
     received-dropped: "Your inventory was full; the flashbang was dropped at your feet."
+  flare:
+    player-not-found: "Player '{player}' is not online."
+    given: "Gave a flare launcher to {player}."
+    received: "You received a flare launcher. Left click to load; right click to fire."
+    received-dropped: "Your inventory was full; the flare launcher was dropped at your feet."
   info:
     position: "Position: {position} in {world} | face: {face}"
     unplaced: "Position: not placed"
@@ -318,4 +337,5 @@ command:
     refresh: "ticks per phase"
     discovery: "reveal nearby strobes as static editable lights"
     flash: "give a throwable maximum-power flashbang"
+    flare: "give a reusable colored flare launcher"
     visual: "visual configuration"
