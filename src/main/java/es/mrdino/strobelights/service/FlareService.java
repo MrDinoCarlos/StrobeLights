@@ -367,6 +367,8 @@ public final class FlareService implements Listener {
         Location origin = player.getEyeLocation().add(direction.clone().multiply(0.65));
         World world = player.getWorld();
         Firework firework = world.spawn(origin, Firework.class);
+        firework.setPersistent(false);
+        firework.setSilent(true);
         FireworkMeta meta = firework.getFireworkMeta();
         FireworkEffect.Builder effect = FireworkEffect.builder()
             .withColor(Color.fromRGB(rgb))
