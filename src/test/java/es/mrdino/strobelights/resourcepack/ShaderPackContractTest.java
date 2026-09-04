@@ -475,6 +475,42 @@ class ShaderPackContractTest {
     }
 
     @Test
+    void containsAProjectileFreeFlareLauncherAndTintedCartridge() throws IOException {
+        Path launcherDefinition = PACK.resolve("assets/minecraft/items/blaze_rod.json");
+        Path cartridgeDefinition = PACK.resolve(
+            "assets/minecraft/items/leather_horse_armor.json"
+        );
+        assertContains(launcherDefinition, "\"threshold\": 6910");
+        assertContains(launcherDefinition, "strobelights:item/flare_launcher");
+        assertContains(cartridgeDefinition, "\"threshold\": 6911");
+        assertContains(cartridgeDefinition, "strobelights:item/flare_cartridge");
+        assertContains(cartridgeDefinition, "minecraft:custom_model_data");
+
+        for (String asset : new String[] {"flare_launcher", "flare_cartridge"}) {
+            assertTrue(Files.isRegularFile(PACK.resolve(
+                "assets/strobelights/models/item/" + asset + ".json"
+            )));
+            Path texture = PACK.resolve(
+                "assets/strobelights/textures/item/" + asset + ".png"
+            );
+            assertTrue(Files.isRegularFile(texture));
+            var image = ImageIO.read(texture.toFile());
+            assertEquals(64, image.getWidth());
+            assertEquals(64, image.getHeight());
+            assertEquals(0, image.getRGB(0, 0) >>> 24);
+        }
+
+        Path service = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/FlareService.java"
+        );
+        assertContains(service, "new ItemStack(Material.BLAZE_ROD)");
+        assertContains(service, "new ItemStack(Material.LEATHER_HORSE_ARMOR)");
+        assertContains(service, "setColors(List.of(tint))");
+        assertContains(service, "event.setCancelled(true)");
+        assertNotContains(service, "Material.CROSSBOW");
+    }
+
+    @Test
     void makesOpaqueBlockOcclusionMandatoryForEveryRgbEffect() throws IOException {
         Path manager = Path.of(
             "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
