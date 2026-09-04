@@ -449,7 +449,7 @@ public final class FlareService implements Listener {
             plugin.getConfig().getDouble("flare.trail-particle-size", 1.25)
         ));
         location.getWorld().spawnParticle(
-            Particle.DUST,
+            Particle.REDSTONE,
             location,
             count,
             0.08,

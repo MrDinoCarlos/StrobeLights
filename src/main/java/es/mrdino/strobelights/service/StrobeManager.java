@@ -547,7 +547,7 @@ public final class StrobeManager {
             0.0,
             0.0,
             0.0,
-            Color.fromRGB(rgb & 0xFFFFFF),
+            null,
             true
         );
         float volume = (float) Math.max(0.0, Math.min(
