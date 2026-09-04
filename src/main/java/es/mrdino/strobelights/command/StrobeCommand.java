@@ -30,7 +30,7 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
     private static final String PREFIX = ChatColor.DARK_AQUA + "[StrobeLights] " + ChatColor.RESET;
     private static final List<String> SUBCOMMANDS = List.of(
         "help", "create", "delete", "move", "rename", "set", "start", "stop",
-        "toggle", "pulse", "group", "tp", "discover", "flash", "info", "list",
+        "toggle", "pulse", "group", "tp", "discover", "flash", "flare", "info", "list",
         "gui", "reload"
     );
 
@@ -68,6 +68,7 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
                 case "tp" -> teleport(sender, args);
                 case "discover" -> discover(sender, args);
                 case "flash" -> flash(sender, args);
+                case "flare" -> flare(sender, args);
                 case "info" -> info(sender, args);
                 case "list" -> list(sender);
                 case "gui" -> gui(sender, args);
@@ -437,6 +438,24 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean flare(CommandSender sender, String[] args) {
+        if (args.length != 3 || !args[1].equalsIgnoreCase("give")) {
+            error(sender, tr(sender, "command.usage", "usage",
+                "/strobe flare give <player>"));
+            return true;
+        }
+        Player target = Bukkit.getPlayerExact(args[2]);
+        if (target == null || !target.isOnline()) {
+            error(sender, tr(sender, "command.flare.player-not-found", "player", args[2]));
+            return true;
+        }
+        boolean stored = plugin.flares().give(target);
+        success(sender, tr(sender, "command.flare.given", "player", target.getName()));
+        target.sendMessage(PREFIX + ChatColor.GOLD
+            + tr(target, stored ? "command.flare.received" : "command.flare.received-dropped"));
+        return true;
+    }
+
     private boolean startStop(CommandSender sender, String[] args, boolean enabled) {
         if (args.length != 2) {
             error(sender, tr(sender, "command.usage", "usage",
@@ -602,6 +621,8 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
             + ChatColor.WHITE + " — " + tr(sender, "command.help.discovery"));
         sender.sendMessage(ChatColor.GRAY + "/" + label + " flash give <player>"
             + ChatColor.WHITE + " — " + tr(sender, "command.help.flash"));
+        sender.sendMessage(ChatColor.GRAY + "/" + label + " flare give <player>"
+            + ChatColor.WHITE + " — " + tr(sender, "command.help.flare"));
         sender.sendMessage(ChatColor.GRAY + "/" + label + " gui [name]"
             + ChatColor.WHITE + " — " + tr(sender, "command.help.visual"));
         sender.sendMessage(ChatColor.GRAY + "/" + label + " rename <name> <new> | list | reload");
@@ -710,6 +731,8 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
             case "teleport", "teletransporte", "teletransportar", "téléporter", "teleporter" -> "tp";
             case "descubrir", "descubrimiento", "découvrir", "decouvrir", "entdecken", "scopri" -> "discover";
             case "flashbang", "granada", "granadaflash", "stungrenade" -> "flash";
+            case "bengala", "bengalas", "flaregun", "lanzabengalas", "fusée", "fusee",
+                "leuchtfackel", "razzo" -> "flare";
             case "informacion", "estado", "infos", "informationen", "informazioni" -> "info";
             case "lista", "liste", "elenco" -> "list";
             case "menu", "menú", "interfaz", "interface", "oberfläche", "oberflaeche",
@@ -784,7 +807,7 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
             if (action.equals("discover")) {
                 return matching(List.of("on", "off", "toggle"), args[1]);
             }
-            if (action.equals("flash")) {
+            if (action.equals("flash") || action.equals("flare")) {
                 return matching(List.of("give"), args[1]);
             }
             if (action.equals("group")) {
@@ -809,6 +832,13 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
             return matching(List.of("start", "stop", "toggle", "pulse"), args[2]);
         }
         if (args.length == 3 && action.equals("flash")
+            && args[1].equalsIgnoreCase("give")) {
+            return matching(
+                plugin.getServer().getOnlinePlayers().stream().map(Player::getName).toList(),
+                args[2]
+            );
+        }
+        if (args.length == 3 && action.equals("flare")
             && args[1].equalsIgnoreCase("give")) {
             return matching(
                 plugin.getServer().getOnlinePlayers().stream().map(Player::getName).toList(),

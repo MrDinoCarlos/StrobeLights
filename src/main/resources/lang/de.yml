@@ -197,6 +197,20 @@ item:
     lore-2: "Zündung nach Aufprall: {seconds} s"
     lore-3: "Nahbereich: WEISSES RGB 15/15 · EXTREMER Blitz"
     lore-4: "Entfernung senkt Blendung, Dauer und Lautstärke"
+  flare-launcher:
+    name: "Leuchtpistole"
+    empty: "Patrone: leer"
+    loaded: "Patrone: {color}"
+    lore-left: "Linksklick: Farbe wählen und laden"
+    lore-right: "Rechtsklick: geladene Leuchtkugel abfeuern"
+    loading: "Eine Patrone wird bereits geladen."
+    empty-message: "Zuerst linksklicken und eine Patrone wählen."
+    loaded-message: "Patrone {color} geladen."
+    loading-progress: "Lade {color} {progress}"
+  flare-cartridge:
+    menu-title: "Leuchtpatronen"
+    name: "Patrone {color}"
+    select: "Zum Laden klicken"
 
 message:
   maximum-strobes: "Die maximale Anzahl an Strobes wurde erreicht."
@@ -291,6 +305,11 @@ command:
     given: "Taktische Blendgranate an {player} gegeben."
     received: "Du hast eine taktische Blendgranate erhalten. Rechtsklick zum Werfen."
     received-dropped: "Dein Inventar war voll; die Blendgranate liegt zu deinen Füßen."
+  flare:
+    player-not-found: "Spieler '{player}' ist nicht online."
+    given: "Leuchtpistole an {player} gegeben."
+    received: "Du hast eine Leuchtpistole erhalten. Linksklick zum Laden, Rechtsklick zum Feuern."
+    received-dropped: "Dein Inventar war voll; die Leuchtpistole liegt zu deinen Füßen."
   info:
     position: "Position: {position} in {world} | Seite: {face}"
     unplaced: "Position: nicht platziert"
@@ -311,4 +330,5 @@ command:
     refresh: "Ticks pro Phase"
     discovery: "zeigt nahe Strobes als statische bearbeitbare Lichter"
     flash: "gibt eine werfbare Blendgranate mit maximaler Leistung"
+    flare: "gibt eine wiederverwendbare farbige Leuchtpistole"
     visual: "visuelle Konfiguration"

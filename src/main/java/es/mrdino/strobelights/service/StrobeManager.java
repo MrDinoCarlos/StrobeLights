@@ -478,14 +478,183 @@ public final class StrobeManager {
         // effects can never prevent the environmental pulse.
         emitThrowableDetonation(sceneLocation);
         UUID id = UUID.randomUUID();
-        SceneFlash scene = new SceneFlash(sceneLocation, duration);
-        scene.source = spawnSceneFlashSource(id, sceneLocation);
+        SceneFlash scene = new SceneFlash(
+            sceneLocation,
+            duration,
+            0xFFFFFF,
+            15,
+            expansionCode(Strobe.DEFAULT_EXPANSION),
+            configuredSceneViewRange("throwable-flashbang.scene-view-range")
+        );
+        scene.source = spawnSceneFlashSource(id, scene);
         placeSceneVanillaLight(scene);
         sceneFlashes.put(id, scene);
         updateSceneFlash(scene);
 
         playThrowableFlashbangSound(impact);
         triggerThrowableCameraFlash(impact);
+    }
+
+    /** Creates the colored sky light and mild camera flash at a flare explosion. */
+    public void detonateFlare(Location location, int rgb) {
+        if (location == null || location.getWorld() == null) {
+            return;
+        }
+        Location explosion = location.clone();
+        Location sceneLocation = sceneLightLocation(explosion);
+        int duration = Math.max(1, Math.min(
+            1_200,
+            plugin.getConfig().getInt(
+                "flare.explosion.scene-light-duration-ticks",
+                40
+            )
+        ));
+        int lightLevel = Math.max(0, Math.min(
+            15,
+            plugin.getConfig().getInt("flare.explosion.scene-light-level", 15)
+        ));
+        double expansion = plugin.getConfig().getDouble(
+            "flare.explosion.scene-light-expansion",
+            2.0
+        );
+        UUID id = UUID.randomUUID();
+        SceneFlash scene = new SceneFlash(
+            sceneLocation,
+            duration,
+            rgb & 0xFFFFFF,
+            lightLevel,
+            expansionCode(expansion),
+            configuredSceneViewRange("flare.explosion.scene-view-range")
+        );
+        scene.source = spawnSceneFlashSource(id, scene);
+        placeSceneVanillaLight(scene);
+        sceneFlashes.put(id, scene);
+        updateSceneFlash(scene);
+        emitFlareFlash(explosion, rgb);
+        triggerFlareCameraFlash(explosion, rgb);
+    }
+
+    private void emitFlareFlash(Location location, int rgb) {
+        World world = location.getWorld();
+        if (world == null) {
+            return;
+        }
+        world.spawnParticle(
+            Particle.FLASH,
+            location,
+            1,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            Color.fromRGB(rgb & 0xFFFFFF),
+            true
+        );
+        float volume = (float) Math.max(0.0, Math.min(
+            16.0,
+            plugin.getConfig().getDouble("flare.explosion.sound-volume", 4.0)
+        ));
+        float pitch = (float) Math.max(0.5, Math.min(
+            2.0,
+            plugin.getConfig().getDouble("flare.explosion.sound-pitch", 1.0)
+        ));
+        if (volume > 0.0f) {
+            world.playSound(
+                location,
+                Sound.ENTITY_FIREWORK_ROCKET_LARGE_BLAST,
+                SoundCategory.PLAYERS,
+                volume,
+                pitch
+            );
+        }
+    }
+
+    private void triggerFlareCameraFlash(Location explosion, int rgb) {
+        if (!plugin.getConfig().getBoolean(
+            "flare.explosion.screen-flash.enabled",
+            true
+        )) {
+            return;
+        }
+        World world = explosion.getWorld();
+        if (world == null) {
+            return;
+        }
+        double radius = Math.max(1.0, Math.min(
+            256.0,
+            plugin.getConfig().getDouble(
+                "flare.explosion.screen-flash.radius",
+                64.0
+            )
+        ));
+        double fullEffectDistance = Math.max(0.0, Math.min(
+            radius,
+            plugin.getConfig().getDouble(
+                "flare.explosion.screen-flash.full-effect-distance",
+                8.0
+            )
+        ));
+        double exponent = Math.max(0.1, Math.min(
+            4.0,
+            plugin.getConfig().getDouble(
+                "flare.explosion.screen-flash.falloff-exponent",
+                1.1
+            )
+        ));
+        int duration = Math.max(1, Math.min(
+            1_200,
+            plugin.getConfig().getInt(
+                "flare.explosion.screen-flash.maximum-duration-ticks",
+                16
+            )
+        ));
+        int strength = Math.max(0, Math.min(
+            200,
+            plugin.getConfig().getInt(
+                "flare.explosion.screen-flash.strength-percent",
+                55
+            )
+        ));
+        boolean requireLooking = plugin.getConfig().getBoolean(
+            "flare.explosion.screen-flash.require-looking-at-light",
+            true
+        );
+        for (Player player : world.getPlayers()) {
+            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+                continue;
+            }
+            Location eye = player.getEyeLocation();
+            Vector toLight = explosion.toVector().subtract(eye.toVector());
+            double distance = toLight.length();
+            double scale = flashbangDistanceScale(
+                distance,
+                fullEffectDistance,
+                radius,
+                exponent
+            );
+            if (scale <= 0.0) {
+                continue;
+            }
+            if (distance > 1.0e-8) {
+                Vector direction = toLight.multiply(1.0 / distance);
+                double viewDot = eye.getDirection().normalize().dot(direction);
+                if (requireLooking
+                    && !meetsFlashViewRequirement(viewDot, BlindnessLevel.EXTREME)) {
+                    continue;
+                }
+                if (blockedByGeometry(eye, direction, distance)) {
+                    continue;
+                }
+            }
+            startCameraFlash(
+                player,
+                rgb & 0xFFFFFF,
+                BlindnessLevel.EXTREME,
+                strength,
+                scale,
+                flashbangDurationTicks(scale, duration)
+            );
+        }
     }
 
     private void emitThrowableDetonation(Location location) {
@@ -1451,13 +1620,7 @@ public final class StrobeManager {
         if (world == null) {
             return;
         }
-        double radius = Math.max(16.0, Math.min(
-            displayViewRangeBlocks(),
-            plugin.getConfig().getDouble(
-                "throwable-flashbang.scene-view-range",
-                displayViewRangeBlocks()
-            )
-        ));
+        double radius = scene.viewRange;
         Set<UUID> eligibleViewers = new HashSet<>();
         for (Player player : world.getPlayers()) {
             UUID playerId = player.getUniqueId();
@@ -1478,16 +1641,14 @@ public final class StrobeManager {
         scene.retainSourceViewers(plugin, eligibleViewers);
     }
 
-    private ItemDisplay spawnSceneFlashSource(UUID id, Location location) {
-        return spawnFixedLightDisplay(location, display -> {
+    private ItemDisplay spawnSceneFlashSource(UUID id, SceneFlash scene) {
+        return spawnFixedLightDisplay(scene.location, display -> {
             applyTechnicalMarker(
                 display,
                 packSourceLightColor(
-                    0xFFFFFF,
-                    15,
-                    (int) Math.round(
-                        Strobe.DEFAULT_EXPANSION / Strobe.EXPANSION_STEP
-                    ) - 1
+                    scene.rgb,
+                    scene.lightLevel,
+                    scene.expansionCode
                 )
             );
             display.getPersistentDataContainer().set(
@@ -1499,7 +1660,8 @@ public final class StrobeManager {
     }
 
     private void placeSceneVanillaLight(SceneFlash scene) {
-        if (!plugin.getConfig().getBoolean("vanilla-fallback.enabled", true)) {
+        if (scene.lightLevel <= 0
+            || !plugin.getConfig().getBoolean("vanilla-fallback.enabled", true)) {
             return;
         }
         Block target = nearestAirBlock(scene.location);
@@ -1508,7 +1670,26 @@ public final class StrobeManager {
         }
         scene.vanillaLight = target;
         scene.originalAir = target.getType();
-        setVanillaLight(target, 15);
+        setVanillaLight(target, scene.lightLevel);
+    }
+
+    private double configuredSceneViewRange(String path) {
+        return Math.max(16.0, Math.min(
+            displayViewRangeBlocks(),
+            plugin.getConfig().getDouble(path, displayViewRangeBlocks())
+        ));
+    }
+
+    private static int expansionCode(double expansion) {
+        double finite = Double.isFinite(expansion) ? expansion : Strobe.DEFAULT_EXPANSION;
+        double clamped = Math.max(
+            Strobe.MINIMUM_EXPANSION,
+            Math.min(Strobe.MAXIMUM_EXPANSION, finite)
+        );
+        return Math.max(0, Math.min(
+            15,
+            (int) Math.round(clamped / Strobe.EXPANSION_STEP) - 1
+        ));
     }
 
     private static Location sceneLightLocation(Location impact) {
@@ -1999,15 +2180,30 @@ public final class StrobeManager {
 
     private static final class SceneFlash {
         private final Location location;
+        private final int rgb;
+        private final int lightLevel;
+        private final int expansionCode;
+        private final double viewRange;
         private final Set<UUID> sourceViewers = new HashSet<>();
         private int remainingTicks;
         private ItemDisplay source;
         private Block vanillaLight;
         private Material originalAir = Material.AIR;
 
-        private SceneFlash(Location location, int remainingTicks) {
+        private SceneFlash(
+            Location location,
+            int remainingTicks,
+            int rgb,
+            int lightLevel,
+            int expansionCode,
+            double viewRange
+        ) {
             this.location = location.clone();
             this.remainingTicks = remainingTicks;
+            this.rgb = rgb & 0xFFFFFF;
+            this.lightLevel = Math.max(0, Math.min(15, lightLevel));
+            this.expansionCode = Math.max(0, Math.min(15, expansionCode));
+            this.viewRange = Math.max(1.0, viewRange);
         }
 
         private void showSource(StrobeLightsPlugin plugin, Player player) {
