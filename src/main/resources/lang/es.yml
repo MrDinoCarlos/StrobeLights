@@ -197,6 +197,20 @@ item:
     lore-2: "Mecha tras impacto: {seconds} s"
     lore-3: "Cerca: RGB BLANCO 15/15 · flash EXTREMO"
     lore-4: "La distancia reduce cegado, duración y audio"
+  flare-launcher:
+    name: "Lanzabengalas"
+    empty: "Cartucho: vacío"
+    loaded: "Cartucho: {color}"
+    lore-left: "Clic izquierdo: elige y carga un color"
+    lore-right: "Clic derecho: dispara la bengala cargada"
+    loading: "Ya se está cargando un cartucho."
+    empty-message: "Haz clic izquierdo y elige primero un cartucho."
+    loaded-message: "Cartucho {color} cargado."
+    loading-progress: "Cargando {color} {progress}"
+  flare-cartridge:
+    menu-title: "Cartuchos de bengala"
+    name: "Cartucho {color}"
+    select: "Clic para cargar"
 
 message:
   maximum-strobes: "Se ha alcanzado el máximo de strobes."
@@ -291,6 +305,11 @@ command:
     given: "Has dado una granada flash táctica a {player}."
     received: "Has recibido una granada flash táctica. Clic derecho para lanzarla."
     received-dropped: "Tu inventario estaba lleno; la granada cayó a tus pies."
+  flare:
+    player-not-found: "El jugador '{player}' no está conectado."
+    given: "Has dado un lanzabengalas a {player}."
+    received: "Has recibido un lanzabengalas. Clic izquierdo para cargar; derecho para disparar."
+    received-dropped: "Tu inventario estaba lleno; el lanzabengalas cayó a tus pies."
   info:
     position: "Posición: {position} en {world} | cara: {face}"
     unplaced: "Posición: sin colocar"
@@ -311,4 +330,5 @@ command:
     refresh: "ticks por fase"
     discovery: "revela strobes cercanos como luces estáticas editables"
     flash: "da una granada flash lanzable a máxima potencia"
+    flare: "da un lanzabengalas de colores reutilizable"
     visual: "configuración visual"

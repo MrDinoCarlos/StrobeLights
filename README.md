@@ -3,8 +3,8 @@
 StrobeLights provides configurable 3D RGB strobe lighting based on
 [Light Painter](https://github.com/bradleyq/light_painter), revision `2364940`,
 plus a per-player RGB camera flash. Normal sources do not draw fixtures, beams
-or painted surfaces; throwable flashbangs deliberately emit a brief vanilla
-detonation cue.
+or painted surfaces; throwable flashbangs and colored sky flares deliberately
+emit visible vanilla effects.
 
 ## Requirements and rendering modes
 
@@ -157,6 +157,7 @@ language:
 /strobe tp <name>
 /strobe discover [on|off|toggle]
 /strobe flash give <player>
+/strobe flare give <player>
 /strobe set <name> color <#RRGGBB|name>
 /strobe set <name> refresh <1-1200|static>
 /strobe set <name> mode <strobe|static>
@@ -176,6 +177,12 @@ language:
 ```
 
 Permission: `strobelights.admin` (operators by default).
+
+The flare command gives a reusable launcher. Left click it to open the menu of
+16 colored cartridges. Selecting one plays the configurable loading animation;
+right click then launches that color into the sky. It explodes at the configured
+height with a matching firework, RGB scene light and short camera flash. A new
+cartridge must be selected before every shot.
 
 ## Resource-pack delivery
 
@@ -240,10 +247,28 @@ throwable-flashbang:
   sound-falloff-exponent: 1.0
   sound-volume: 4.0
   sound-pitch: 1.0
+
+flare:
+  load-duration-ticks: 24
+  launch-speed: 1.15
+  vertical-bias: 1.0
+  launch-height: 32.0
+  maximum-flight-ticks: 200
+  trail-particle-count: 3
+  damage-enabled: false
+  explosion:
+    type: 'BALL_LARGE'
+    scene-light-duration-ticks: 40
+    scene-light-level: 15
+    scene-light-expansion: 2.0
+    screen-flash:
+      enabled: true
+      radius: 64.0
+      strength-percent: 55
 ```
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.9.8 prints a red translated setup warning in the console and shows a
+0.10.0 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -299,7 +324,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.9.8+mc.1.21.11.jar`.
+For this build: `StrobeLights-v.0.10.0+mc.1.21.11.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

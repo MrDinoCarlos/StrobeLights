@@ -197,6 +197,20 @@ item:
     lore-2: "Innesco dopo l'impatto: {seconds} s"
     lore-3: "Da vicino: RGB BIANCO 15/15 · flash ESTREMO"
     lore-4: "La distanza riduce accecamento, durata e volume"
+  flare-launcher:
+    name: "Lanciarazzi"
+    empty: "Cartuccia: vuota"
+    loaded: "Cartuccia: {color}"
+    lore-left: "Clic sinistro: scegli e carica un colore"
+    lore-right: "Clic destro: spara il razzo caricato"
+    loading: "È già in caricamento una cartuccia."
+    empty-message: "Prima fai clic sinistro e scegli una cartuccia."
+    loaded-message: "Cartuccia {color} caricata."
+    loading-progress: "Caricamento {color} {progress}"
+  flare-cartridge:
+    menu-title: "Cartucce segnaletiche"
+    name: "Cartuccia {color}"
+    select: "Clicca per caricare"
 
 message:
   maximum-strobes: "È stato raggiunto il numero massimo di strobe."
@@ -291,6 +305,11 @@ command:
     given: "Granata flash tattica consegnata a {player}."
     received: "Hai ricevuto una granata flash tattica. Clic destro per lanciarla."
     received-dropped: "Il tuo inventario era pieno; la granata è caduta ai tuoi piedi."
+  flare:
+    player-not-found: "Il giocatore '{player}' non è online."
+    given: "Lanciarazzi consegnato a {player}."
+    received: "Hai ricevuto un lanciarazzi. Clic sinistro per caricare, destro per sparare."
+    received-dropped: "Il tuo inventario era pieno; il lanciarazzi è caduto ai tuoi piedi."
   info:
     position: "Posizione: {position} in {world} | faccia: {face}"
     unplaced: "Posizione: non posizionato"
@@ -311,4 +330,5 @@ command:
     refresh: "tick per fase"
     discovery: "mostra gli strobe vicini come luci statiche modificabili"
     flash: "consegna una granata flash lanciabile alla massima potenza"
+    flare: "consegna un lanciarazzi colorato riutilizzabile"
     visual: "configurazione visuale"

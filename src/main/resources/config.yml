@@ -4,7 +4,7 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.9.8
+# Version:     0.10.0
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
@@ -132,6 +132,48 @@ throwable-flashbang:
   sound-falloff-exponent: 1.0
   sound-volume: 4.0
   sound-pitch: 1.0
+
+flare:
+  # /strobe flare give <player>. Left click opens the cartridge menu; choosing
+  # a color plays the loading animation. Right click launches the loaded flare.
+  # The launcher is reusable, but one cartridge must be loaded before each shot.
+  load-duration-ticks: 24
+  fire-cooldown-ticks: 10
+  # The view direction is tilted upward by vertical-bias and then clamped to
+  # minimum-upward-direction so every shot reaches the sky.
+  launch-speed: 1.15
+  vertical-bias: 1.0
+  minimum-upward-direction: 0.35
+  # Vertical blocks above the launch point where the flare explodes.
+  launch-height: 32.0
+  maximum-flight-ticks: 200
+  launch-sound-volume: 1.5
+  launch-sound-pitch: 0.9
+  trail-particle-count: 3
+  trail-particle-size: 1.25
+  # Vanilla firework damage is disabled by default; the flare is a visual tool.
+  damage-enabled: false
+  explosion:
+    # BALL, BALL_LARGE, STAR, BURST or CREEPER.
+    type: 'BALL_LARGE'
+    trail: true
+    flicker: true
+    fade-to-white: true
+    sound-volume: 4.0
+    sound-pitch: 1.0
+    # Colored 3D light from the resource pack plus the vanilla white fallback.
+    scene-light-duration-ticks: 40
+    scene-light-level: 15
+    scene-light-expansion: 2.0
+    scene-view-range: 128.0
+    screen-flash:
+      enabled: true
+      radius: 64.0
+      full-effect-distance: 8.0
+      falloff-exponent: 1.1
+      maximum-duration-ticks: 16
+      strength-percent: 55
+      require-looking-at-light: true
 
 limits:
   maximum-strobes: 256
