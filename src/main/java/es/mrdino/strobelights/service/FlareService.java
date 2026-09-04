@@ -37,6 +37,8 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -44,28 +46,30 @@ import org.bukkit.util.Vector;
 /** Owns the reusable flare launcher, color-cartridge menu and active flare flights. */
 public final class FlareService implements Listener {
 
+    private static final int LAUNCHER_MODEL_DATA = 6_910;
+    private static final int CARTRIDGE_MODEL_DATA = 6_911;
     private static final int MENU_SIZE = 27;
     private static final int[] COLOR_SLOTS = {
         1, 2, 3, 4, 5, 6, 7, 8,
         10, 11, 12, 13, 14, 15, 16, 17
     };
     private static final FlareColor[] COLORS = {
-        new FlareColor("white", Material.WHITE_DYE, 0xFFFFFF),
-        new FlareColor("orange", Material.ORANGE_DYE, 0xFF7A00),
-        new FlareColor("magenta", Material.MAGENTA_DYE, 0xFF00FF),
-        new FlareColor("light-blue", Material.LIGHT_BLUE_DYE, 0x52D9FF),
-        new FlareColor("yellow", Material.YELLOW_DYE, 0xFFFF00),
-        new FlareColor("lime", Material.LIME_DYE, 0x7FFF00),
-        new FlareColor("pink", Material.PINK_DYE, 0xFF69B4),
-        new FlareColor("gray", Material.GRAY_DYE, 0x606068),
-        new FlareColor("light-gray", Material.LIGHT_GRAY_DYE, 0xC8C8C8),
-        new FlareColor("cyan", Material.CYAN_DYE, 0x00FFFF),
-        new FlareColor("purple", Material.PURPLE_DYE, 0x9A35FF),
-        new FlareColor("blue", Material.BLUE_DYE, 0x0066FF),
-        new FlareColor("brown", Material.BROWN_DYE, 0xA65A2E),
-        new FlareColor("green", Material.GREEN_DYE, 0x00FF3C),
-        new FlareColor("red", Material.RED_DYE, 0xFF0000),
-        new FlareColor("black", Material.BLACK_DYE, 0x282838)
+        new FlareColor("white", 0xFFFFFF),
+        new FlareColor("orange", 0xFF7A00),
+        new FlareColor("magenta", 0xFF00FF),
+        new FlareColor("light-blue", 0x52D9FF),
+        new FlareColor("yellow", 0xFFFF00),
+        new FlareColor("lime", 0x7FFF00),
+        new FlareColor("pink", 0xFF69B4),
+        new FlareColor("gray", 0x606068),
+        new FlareColor("light-gray", 0xC8C8C8),
+        new FlareColor("cyan", 0x00FFFF),
+        new FlareColor("purple", 0x9A35FF),
+        new FlareColor("blue", 0x0066FF),
+        new FlareColor("brown", 0xA65A2E),
+        new FlareColor("green", 0x00FF3C),
+        new FlareColor("red", 0xFF0000),
+        new FlareColor("black", 0x282838)
     };
 
     private final StrobeLightsPlugin plugin;
@@ -90,8 +94,9 @@ public final class FlareService implements Listener {
     }
 
     public ItemStack createLauncher(Player viewer) {
-        ItemStack launcher = new ItemStack(Material.CROSSBOW);
+        ItemStack launcher = new ItemStack(Material.BLAZE_ROD);
         ItemMeta meta = launcher.getItemMeta();
+        setCustomModelData(meta, LAUNCHER_MODEL_DATA, null);
         meta.getPersistentDataContainer().set(launcherKey, PersistentDataType.BYTE, (byte) 1);
         launcher.setItemMeta(meta);
         refreshLauncher(launcher, viewer);
@@ -110,7 +115,7 @@ public final class FlareService implements Listener {
 
     public boolean isLauncher(ItemStack stack) {
         return stack != null
-            && stack.getType() == Material.CROSSBOW
+            && stack.getType() == Material.BLAZE_ROD
             && stack.hasItemMeta()
             && stack.getItemMeta().getPersistentDataContainer().has(
                 launcherKey,
@@ -118,12 +123,13 @@ public final class FlareService implements Listener {
             );
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onUse(PlayerInteractEvent event) {
-        if (!isLauncher(event.getItem()) || event.getHand() == null) {
+        if (!isTaggedLauncher(event.getItem()) || event.getHand() == null) {
             return;
         }
         event.setCancelled(true);
+        migrateLegacyLauncher(event.getPlayer(), event.getHand(), event.getItem());
         switch (event.getAction()) {
             case LEFT_CLICK_AIR, LEFT_CLICK_BLOCK -> openMenu(event.getPlayer(), event.getHand());
             case RIGHT_CLICK_AIR, RIGHT_CLICK_BLOCK -> fire(event.getPlayer(), event.getHand());
@@ -214,7 +220,7 @@ public final class FlareService implements Listener {
         }
         for (int index = 0; index < COLORS.length; index++) {
             FlareColor color = COLORS[index];
-            ItemStack cartridge = menuItem(color.material);
+            ItemStack cartridge = cartridgeItem(color);
             ItemMeta meta = cartridge.getItemMeta();
             String colorName = plugin.messages().text(player, "color." + color.key);
             meta.displayName(Component.text(
@@ -250,7 +256,7 @@ public final class FlareService implements Listener {
             plugin.getConfig().getInt("flare.load-duration-ticks", 24)
         ));
         loading.put(player.getUniqueId(), new LoadingCartridge(hand, color, duration));
-        player.setCooldown(Material.CROSSBOW, duration);
+        player.setCooldown(Material.BLAZE_ROD, duration);
         swing(player, hand);
         player.playSound(
             player.getLocation(),
@@ -335,7 +341,7 @@ public final class FlareService implements Listener {
             plugin.getConfig().getInt("flare.fire-cooldown-ticks", 10)
         ));
         if (cooldown > 0 && player.getGameMode() != GameMode.CREATIVE) {
-            player.setCooldown(Material.CROSSBOW, cooldown);
+            player.setCooldown(Material.BLAZE_ROD, cooldown);
         }
     }
 
@@ -572,6 +578,54 @@ public final class FlareService implements Listener {
         return new ItemStack(material);
     }
 
+    private boolean isTaggedLauncher(ItemStack stack) {
+        return stack != null
+            && stack.hasItemMeta()
+            && stack.getItemMeta().getPersistentDataContainer().has(
+                launcherKey,
+                PersistentDataType.BYTE
+            );
+    }
+
+    private void migrateLegacyLauncher(
+        Player player,
+        EquipmentSlot hand,
+        ItemStack launcher
+    ) {
+        if (launcher.getType() == Material.BLAZE_ROD) {
+            return;
+        }
+        Integer loaded = launcher.getItemMeta().getPersistentDataContainer().get(
+            loadedColorKey,
+            PersistentDataType.INTEGER
+        );
+        ItemStack replacement = createLauncher(player);
+        if (loaded != null) {
+            loadColor(replacement, loaded);
+            refreshLauncher(replacement, player);
+        }
+        setItemInHand(player, hand, replacement);
+    }
+
+    private static ItemStack cartridgeItem(FlareColor color) {
+        ItemStack cartridge = new ItemStack(Material.LEATHER_HORSE_ARMOR);
+        LeatherArmorMeta meta = (LeatherArmorMeta) cartridge.getItemMeta();
+        Color tint = Color.fromRGB(color.rgb);
+        meta.setColor(tint);
+        setCustomModelData(meta, CARTRIDGE_MODEL_DATA, tint);
+        cartridge.setItemMeta(meta);
+        return cartridge;
+    }
+
+    private static void setCustomModelData(ItemMeta meta, int modelData, Color tint) {
+        CustomModelDataComponent component = meta.getCustomModelDataComponent();
+        component.setFloats(List.of((float) modelData));
+        if (tint != null) {
+            component.setColors(List.of(tint));
+        }
+        meta.setCustomModelDataComponent(component);
+    }
+
     private static ItemStack itemInHand(Player player, EquipmentSlot hand) {
         return hand == EquipmentSlot.OFF_HAND
             ? player.getInventory().getItemInOffHand()
@@ -610,7 +664,7 @@ public final class FlareService implements Listener {
         return best;
     }
 
-    private record FlareColor(String key, Material material, int rgb) {
+    private record FlareColor(String key, int rgb) {
     }
 
     private static final class LoadingCartridge {
