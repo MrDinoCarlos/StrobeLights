@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "es.mrdino"
-version = "0.10.7"
+version = "0.10.8"
 
 val minecraftVersion = "26.1.2"
 val paperApiVersion = "26.1.2.build.74-stable"
