@@ -20,6 +20,16 @@ class ShaderPackContractTest {
     );
 
     @Test
+    void carriesAnIntegrationRevisionThatInvalidatesMergedPackCaches() throws IOException {
+        Path integration = PACK.resolve(
+            "assets/strobelights/strobelights-integration.json"
+        );
+        assertTrue(Files.isRegularFile(integration));
+        assertContains(integration, "\"version\": \"0.10.10\"");
+        assertContains(integration, "\"render_pipeline\": \"light_painter_rgb\"");
+    }
+
+    @Test
     void targetsMinecraft1201AndContainsTheLightPipeline() throws IOException {
         assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 15");
         Path pipeline = PACK.resolve(
