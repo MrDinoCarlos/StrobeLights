@@ -311,7 +311,7 @@ duplicate pack. See Nexo's
 [resource-pack configuration](https://github.com/Nexo-MC/Nexo-Documentation/blob/master/configuration/resourcepack/README.md).
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.10 prints a red translated setup warning in the console and shows a
+0.10.11 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -370,7 +370,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.10+mc.1.21.10.jar`.
+For this build: `StrobeLights-v.0.10.11+mc.1.21.10.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
