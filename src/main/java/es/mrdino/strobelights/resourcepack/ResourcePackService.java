@@ -37,7 +37,7 @@ import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 public final class ResourcePackService implements Listener {
 
     private static final UUID PACK_ID = UUID.fromString("e9a7e606-b52f-4a18-b4dc-cb1919210411");
-    private static final String PACK_REVISION = "0.10.3";
+    private static final String PACK_REVISION = "0.10.4";
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
     private static final String EMBEDDED_PACK =

@@ -2,24 +2,29 @@ package es.mrdino.strobelights.service;
 
 import es.mrdino.strobelights.StrobeLightsPlugin;
 import es.mrdino.strobelights.util.StrobeColors;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
+import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
+import org.bukkit.entity.Display;
+import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -36,13 +41,17 @@ import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
+import org.bukkit.util.RayTraceResult;
 
 /** Owns the reusable flare launcher, color-cartridge menu and active flare flights. */
 public final class FlareService implements Listener {
 
     private static final int LAUNCHER_MODEL_DATA = 6_910;
     private static final int CARTRIDGE_MODEL_DATA = 6_911;
+    private static final int FLARE_CORE_MODEL_DATA = 6_912;
+    private static final int FLARE_HOT_CORE_MODEL_DATA = 6_913;
     private static final int MENU_SIZE = 27;
     private static final int[] COLOR_SLOTS = {
         1, 2, 3, 4, 5, 6, 7, 8,
@@ -166,8 +175,15 @@ public final class FlareService implements Listener {
     public void shutdown() {
         ticker.cancel();
         loading.clear();
+        flights.values().forEach(flight -> {
+            flight.visual.remove();
+            plugin.manager().finishFlareLight(flight.lightId);
+        });
         flights.clear();
-        burns.values().forEach(burn -> plugin.manager().finishFlareLight(burn.lightId));
+        burns.values().forEach(burn -> {
+            burn.visual.remove();
+            plugin.manager().finishFlareLight(burn.lightId);
+        });
         burns.clear();
         menuBlockedUntilNanos.clear();
     }
@@ -233,7 +249,7 @@ public final class FlareService implements Listener {
         }
         int duration = Math.max(1, Math.min(
             200,
-            plugin.getConfig().getInt("flare.load-duration-ticks", 24)
+            plugin.getConfig().getInt("flare.load-duration-ticks", 34)
         ));
         menuBlockedUntilNanos.put(
             player.getUniqueId(),
@@ -242,12 +258,12 @@ public final class FlareService implements Listener {
         loading.put(player.getUniqueId(), new LoadingCartridge(hand, color, duration));
         player.setCooldown(Material.BLAZE_ROD, duration);
         swing(player, hand);
-        player.playSound(
+        playSpatialSound(
             player.getLocation(),
+            "strobelights:flare_reload_open",
             Sound.ITEM_CROSSBOW_LOADING_START,
-            SoundCategory.PLAYERS,
-            0.8f,
-            0.9f
+            1.0f,
+            1.0f
         );
         sendLoadingProgress(player, color, 0, duration);
     }
@@ -270,12 +286,12 @@ public final class FlareService implements Listener {
             }
             state.elapsed++;
             if (state.elapsed == Math.max(1, state.duration / 2)) {
-                player.playSound(
+                playSpatialSound(
                     player.getLocation(),
+                    "strobelights:flare_reload_insert",
                     Sound.ITEM_CROSSBOW_LOADING_MIDDLE,
-                    SoundCategory.PLAYERS,
-                    0.75f,
-                    1.05f
+                    1.0f,
+                    1.0f
                 );
                 swing(player, state.hand);
             }
@@ -284,12 +300,12 @@ public final class FlareService implements Listener {
                 loadColor(launcher, state.color.rgb);
                 refreshLauncher(launcher, player);
                 setItemInHand(player, state.hand, launcher);
-                player.playSound(
+                playSpatialSound(
                     player.getLocation(),
+                    "strobelights:flare_reload_close",
                     Sound.ITEM_CROSSBOW_LOADING_END,
-                    SoundCategory.PLAYERS,
-                    0.9f,
-                    1.15f
+                    1.0f,
+                    1.0f
                 );
                 swing(player, state.hand);
                 actionBar(
@@ -325,7 +341,7 @@ public final class FlareService implements Listener {
         setItemInHand(player, hand, launcher);
         int cooldown = Math.max(0, Math.min(
             200,
-            plugin.getConfig().getInt("flare.fire-cooldown-ticks", 10)
+            plugin.getConfig().getInt("flare.fire-cooldown-ticks", 12)
         ));
         if (cooldown > 0) {
             player.setCooldown(Material.BLAZE_ROD, cooldown);
@@ -335,15 +351,15 @@ public final class FlareService implements Listener {
     private void launch(Player player, int rgb, FlareColor color) {
         double speed = Math.max(0.1, Math.min(
             3.0,
-            plugin.getConfig().getDouble("flare.launch-speed", 1.15)
+            plugin.getConfig().getDouble("flare.launch-speed", 1.7)
         ));
         double verticalBias = Math.max(0.0, Math.min(
             3.0,
-            plugin.getConfig().getDouble("flare.vertical-bias", 1.0)
+            plugin.getConfig().getDouble("flare.vertical-bias", 0.65)
         ));
         double minimumUpward = Math.max(0.05, Math.min(
             0.95,
-            plugin.getConfig().getDouble("flare.minimum-upward-direction", 0.35)
+            plugin.getConfig().getDouble("flare.minimum-upward-direction", 0.25)
         ));
         Vector direction = player.getEyeLocation().getDirection().normalize();
         direction.setY(direction.getY() + verticalBias).normalize();
@@ -361,13 +377,19 @@ public final class FlareService implements Listener {
         World world = player.getWorld();
         double configuredHeight = Math.max(2.0, Math.min(
             256.0,
-            plugin.getConfig().getDouble("flare.launch-height", 32.0)
+            plugin.getConfig().getDouble("flare.launch-height", 28.0)
         ));
         double targetY = Math.min(world.getMaxHeight() - 1.0, origin.getY() + configuredHeight);
         int maximumTicks = Math.max(10, Math.min(
             1_200,
             plugin.getConfig().getInt("flare.maximum-flight-ticks", 200)
         ));
+        FlareVisual visual = spawnFlareVisual(
+            origin,
+            rgb,
+            configuredVisualSize("flare.visual.flight-size", 0.8)
+        );
+        UUID lightId = plugin.manager().beginFlareFlightLight(origin, rgb);
         flights.put(
             UUID.randomUUID(),
             new FlareFlight(
@@ -375,21 +397,23 @@ public final class FlareService implements Listener {
                 direction.multiply(speed),
                 color,
                 targetY,
-                maximumTicks
+                maximumTicks,
+                visual,
+                lightId
             )
         );
         float volume = (float) Math.max(0.0, Math.min(
             16.0,
-            plugin.getConfig().getDouble("flare.launch-sound-volume", 1.5)
+            plugin.getConfig().getDouble("flare.launch-sound-volume", 4.0)
         ));
         float pitch = (float) Math.max(0.5, Math.min(
             2.0,
-            plugin.getConfig().getDouble("flare.launch-sound-pitch", 0.9)
+            plugin.getConfig().getDouble("flare.launch-sound-pitch", 1.0)
         ));
-        world.playSound(
+        playSpatialSound(
             origin,
+            "strobelights:flare_fire",
             Sound.ITEM_FIRECHARGE_USE,
-            SoundCategory.PLAYERS,
             volume,
             pitch
         );
@@ -401,26 +425,62 @@ public final class FlareService implements Listener {
             FlareFlight flight = iterator.next().getValue();
             World world = flight.location.getWorld();
             if (world == null) {
+                flight.visual.remove();
+                plugin.manager().finishFlareLight(flight.lightId);
                 iterator.remove();
                 continue;
             }
             Location previous = flight.location.clone();
-            flight.location.add(flight.velocity);
-            emitTrail(previous, flight.location, flight.color.rgb);
+            Vector step = flight.velocity.clone();
+            flight.location.add(step);
+            RayTraceResult collision = null;
+            if (plugin.getConfig().getBoolean("flare.explode-on-collision", true)
+                && step.lengthSquared() > 1.0e-8) {
+                collision = world.rayTraceBlocks(
+                    previous,
+                    step.clone().normalize(),
+                    step.length(),
+                    FluidCollisionMode.NEVER,
+                    true
+                );
+                if (collision != null && collision.getHitPosition() != null) {
+                    Vector impact = collision.getHitPosition().subtract(
+                        step.clone().normalize().multiply(0.04)
+                    );
+                    flight.location.set(
+                        impact.getX(),
+                        impact.getY(),
+                        impact.getZ()
+                    );
+                }
+            }
+            flight.visual.moveTo(flight.location, configuredVisualSize(
+                "flare.visual.flight-size",
+                0.8
+            ));
+            plugin.manager().moveFlareLight(flight.lightId, flight.location);
             flight.elapsed++;
+            if (flight.elapsed % 30 == 1) {
+                playSpatialSound(
+                    flight.location,
+                    "strobelights:flare_flight",
+                    Sound.ENTITY_FIREWORK_ROCKET_LAUNCH,
+                    0.7f,
+                    1.15f
+                );
+            }
             double drag = Math.max(0.8, Math.min(
                 1.0,
-                plugin.getConfig().getDouble("flare.flight-drag", 0.995)
+                plugin.getConfig().getDouble("flare.flight-drag", 0.99)
             ));
             double gravity = Math.max(0.0, Math.min(
                 0.1,
-                plugin.getConfig().getDouble("flare.flight-gravity", 0.006)
+                plugin.getConfig().getDouble("flare.flight-gravity", 0.012)
             ));
             flight.velocity.multiply(drag);
             flight.velocity.setY(flight.velocity.getY() - gravity);
             boolean reachedApex = flight.elapsed > 5 && flight.velocity.getY() <= 0.0;
-            boolean hitBlock = plugin.getConfig().getBoolean("flare.explode-on-collision", true)
-                && flight.location.getBlock().getType().isSolid();
+            boolean hitBlock = collision != null;
             if (flight.location.getY() < flight.targetY
                 && !reachedApex
                 && !hitBlock
@@ -428,123 +488,35 @@ public final class FlareService implements Listener {
                 continue;
             }
             iterator.remove();
-            igniteFlare(flight.location, flight.color, flight.velocity);
-        }
-    }
-
-    private void emitTrail(Location start, Location location, int rgb) {
-        int count = Math.max(0, Math.min(
-            20,
-            plugin.getConfig().getInt("flare.trail-particle-count", 2)
-        ));
-        if (location.getWorld() == null) {
-            return;
-        }
-        float size = (float) Math.max(0.1, Math.min(
-            4.0,
-            plugin.getConfig().getDouble("flare.trail-particle-size", 1.6)
-        ));
-        int pointsPerBlock = Math.max(1, Math.min(
-            16,
-            plugin.getConfig().getInt("flare.trail-points-per-block", 6)
-        ));
-        Vector segment = location.toVector().subtract(start.toVector());
-        int points = Math.max(1, Math.min(40, (int) Math.ceil(
-            segment.length() * pointsPerBlock
-        )));
-        Particle.DustOptions dust = new Particle.DustOptions(Color.fromRGB(rgb), size);
-        if (count > 0) {
-            for (int index = 1; index <= points; index++) {
-                Location point = start.clone().add(segment.clone().multiply(index / (double) points));
-                location.getWorld().spawnParticle(
-                    Particle.DUST,
-                    point,
-                    count,
-                    0.025,
-                    0.025,
-                    0.025,
-                    0.0,
-                    dust,
-                    true
-                );
-            }
-        }
-        int hotCoreCount = Math.max(0, Math.min(
-            4,
-            plugin.getConfig().getInt("flare.trail-hot-core-count", 1)
-        ));
-        if (hotCoreCount > 0) {
-            location.getWorld().spawnParticle(
-                Particle.END_ROD,
-                location,
-                hotCoreCount,
-                0.015,
-                0.015,
-                0.015,
-                0.0,
-                null,
-                true
-            );
-        }
-        int flameCount = Math.max(0, Math.min(
-            8,
-            plugin.getConfig().getInt("flare.trail-flame-count", 1)
-        ));
-        if (flameCount > 0) {
-            location.getWorld().spawnParticle(
-                Particle.FLAME,
-                location,
-                flameCount,
-                0.04,
-                0.04,
-                0.04,
-                0.005,
-                null,
-                true
-            );
-        }
-        int smokeCount = Math.max(0, Math.min(
-            8,
-            plugin.getConfig().getInt("flare.trail-smoke-count", 1)
-        ));
-        if (smokeCount > 0) {
-            location.getWorld().spawnParticle(
-                Particle.CAMPFIRE_COSY_SMOKE,
-                location,
-                smokeCount,
-                0.03,
-                0.03,
-                0.03,
-                0.005,
-                null,
-                true
+            igniteFlare(
+                flight.location,
+                flight.color,
+                flight.velocity,
+                flight.visual,
+                flight.lightId
             );
         }
     }
 
-    private void igniteFlare(Location location, FlareColor color, Vector incomingVelocity) {
+    private void igniteFlare(
+        Location location,
+        FlareColor color,
+        Vector incomingVelocity,
+        FlareVisual visual,
+        UUID flightLightId
+    ) {
         if (location.getWorld() == null) {
+            visual.remove();
+            plugin.manager().finishFlareLight(flightLightId);
             return;
         }
         int burnDuration = Math.max(1, Math.min(
             1_200,
-            plugin.getConfig().getInt("flare.explosion.burn-duration-ticks", 600)
-        ));
-        int burstDuration = Math.max(1, Math.min(
-            100,
-            plugin.getConfig().getInt("flare.explosion.burst-duration-ticks", 8)
-        ));
-        int sparkCount = Math.max(0, Math.min(
-            200,
-            plugin.getConfig().getInt("flare.explosion.burst-particle-count", 14)
-        ));
-        double sparkSpeed = Math.max(0.01, Math.min(
-            2.0,
-            plugin.getConfig().getDouble("flare.explosion.burst-speed", 0.12)
+            plugin.getConfig().getInt("flare.explosion.burn-duration-ticks", 800)
         ));
         double driftSpeed = Math.max(0.0, Math.min(
             0.1,
-            plugin.getConfig().getDouble("flare.explosion.drift-speed", 0.006)
+            plugin.getConfig().getDouble("flare.explosion.drift-speed", 0.012)
         ));
         Vector drift = incomingVelocity.clone().setY(0.0);
         if (drift.lengthSquared() > 1.0e-8) {
@@ -553,6 +525,7 @@ public final class FlareService implements Listener {
             drift.setX(driftSpeed);
         }
         UUID burnId = UUID.randomUUID();
+        plugin.manager().finishFlareLight(flightLightId);
         UUID lightId = plugin.manager().detonateFlare(location, color.rgb);
         burns.put(
             burnId,
@@ -560,35 +533,12 @@ public final class FlareService implements Listener {
                 location.clone(),
                 color,
                 burnDuration,
-                burstDuration,
-                createBurstSparks(location, sparkCount, sparkSpeed),
                 drift,
                 (burnId.getLeastSignificantBits() & 0xFFFF) * Math.PI / 32_768.0,
-                lightId
+                lightId,
+                visual
             )
         );
-    }
-
-    private List<FlareSpark> createBurstSparks(
-        Location center,
-        int count,
-        double speed
-    ) {
-        List<FlareSpark> sparks = new ArrayList<>(count);
-        double goldenAngle = Math.PI * (3.0 - Math.sqrt(5.0));
-        for (int index = 0; index < count; index++) {
-            double y = 1.0 - 2.0 * (index + 0.5) / Math.max(1, count);
-            double horizontal = Math.sqrt(Math.max(0.0, 1.0 - y * y));
-            double angle = goldenAngle * index;
-            double variation = 0.8 + 0.2 * ((index * 37) % 11) / 10.0;
-            Vector velocity = new Vector(
-                Math.cos(angle) * horizontal,
-                y,
-                Math.sin(angle) * horizontal
-            ).multiply(speed * variation);
-            sparks.add(new FlareSpark(center.clone(), velocity));
-        }
-        return sparks;
     }
 
     private void tickBurns() {
@@ -597,15 +547,39 @@ public final class FlareService implements Listener {
             FlareBurn burn = iterator.next().getValue();
             World world = burn.location.getWorld();
             if (world == null || burn.elapsed >= burn.duration) {
+                burn.visual.remove();
                 plugin.manager().finishFlareLight(burn.lightId);
                 iterator.remove();
                 continue;
             }
             tickBurnPosition(burn);
             plugin.manager().moveFlareLight(burn.lightId, burn.location);
-            emitBurnCore(burn);
-            if (burn.elapsed < burn.burstDuration) {
-                tickBurstSparks(burn);
+            plugin.manager().refreshFlareCameraGlare(burn.location, burn.color.rgb);
+            double remainingScale = Math.min(
+                1.0,
+                Math.max(0.0, (burn.duration - burn.elapsed) / 40.0)
+            );
+            double ignitionBloom = burn.elapsed < 10
+                ? 1.0 + (10 - burn.elapsed) * 0.05
+                : 1.0;
+            double flicker = 0.965
+                + Math.sin(burn.swayPhase + burn.elapsed * 0.73) * 0.025
+                + Math.sin(burn.elapsed * 1.91) * 0.01;
+            burn.visual.moveTo(
+                burn.location,
+                configuredVisualSize("flare.visual.burn-size", 3.2)
+                    * ignitionBloom
+                    * flicker
+                    * remainingScale
+            );
+            if (burn.elapsed % 36 == 0) {
+                playSpatialSound(
+                    burn.location,
+                    "strobelights:flare_burn",
+                    Sound.BLOCK_FIRE_AMBIENT,
+                    1.1f,
+                    0.9f
+                );
             }
             burn.elapsed++;
         }
@@ -614,16 +588,16 @@ public final class FlareService implements Listener {
     private void tickBurnPosition(FlareBurn burn) {
         double configuredFallSpeed = Math.max(0.0, Math.min(
             0.3,
-            plugin.getConfig().getDouble("flare.explosion.fall-speed", 0.012)
+            plugin.getConfig().getDouble("flare.explosion.fall-speed", 0.035)
         ));
         burn.fallSpeed = Math.min(configuredFallSpeed, burn.fallSpeed + 0.0005);
         double swayStrength = Math.max(0.0, Math.min(
             0.05,
-            plugin.getConfig().getDouble("flare.explosion.sway-strength", 0.0025)
+            plugin.getConfig().getDouble("flare.explosion.sway-strength", 0.005)
         ));
         double swayFrequency = Math.max(0.001, Math.min(
             1.0,
-            plugin.getConfig().getDouble("flare.explosion.sway-frequency", 0.08)
+            plugin.getConfig().getDouble("flare.explosion.sway-frequency", 0.09)
         ));
         double sway = Math.sin(burn.swayPhase + burn.elapsed * swayFrequency) * swayStrength;
         double driftLength = Math.max(1.0e-8, burn.drift.length());
@@ -637,122 +611,144 @@ public final class FlareService implements Listener {
         }
     }
 
-    private void emitBurnCore(FlareBurn burn) {
-        World world = burn.location.getWorld();
+    private FlareVisual spawnFlareVisual(Location location, int rgb, double size) {
+        World world = location.getWorld();
+        if (world == null) {
+            throw new IllegalArgumentException("A flare visual requires a world");
+        }
+        double viewRange = Math.max(16.0, Math.min(
+            256.0,
+            plugin.getConfig().getDouble("flare.visual.view-range", 192.0)
+        ));
+        ItemDisplay halo = spawnFlareDisplay(
+            world,
+            location,
+            flareCoreItem(rgb),
+            viewRange
+        );
+        ItemDisplay hotCore = spawnFlareDisplay(
+            world,
+            location,
+            flareHotCoreItem(),
+            viewRange
+        );
+        FlareVisual visual = new FlareVisual(halo, hotCore, viewRange);
+        visual.moveTo(location, size);
+        return visual;
+    }
+
+    private ItemDisplay spawnFlareDisplay(
+        World world,
+        Location location,
+        ItemStack item,
+        double viewRange
+    ) {
+        return world.spawn(location, ItemDisplay.class, entity -> {
+            entity.setPersistent(false);
+            entity.setVisibleByDefault(false);
+            entity.setGravity(false);
+            entity.setInvulnerable(true);
+            entity.setSilent(true);
+            entity.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.HEAD);
+            entity.setBillboard(Display.Billboard.CENTER);
+            entity.setBrightness(new Display.Brightness(15, 15));
+            entity.setShadowRadius(0.0f);
+            entity.setShadowStrength(0.0f);
+            entity.setViewRange((float) (viewRange / 64.0));
+            entity.setInterpolationDelay(0);
+            entity.setInterpolationDuration(2);
+            entity.setTeleportDuration(1);
+            entity.setItemStack(item);
+        });
+    }
+
+    private static ItemStack flareCoreItem(int rgb) {
+        ItemStack core = new ItemStack(Material.LEATHER_HORSE_ARMOR);
+        LeatherArmorMeta meta = (LeatherArmorMeta) core.getItemMeta();
+        Color tint = Color.fromRGB(rgb & 0xFFFFFF);
+        meta.setColor(tint);
+        setCustomModelData(meta, FLARE_CORE_MODEL_DATA, tint);
+        core.setItemMeta(meta);
+        return core;
+    }
+
+    private static ItemStack flareHotCoreItem() {
+        ItemStack core = new ItemStack(Material.LEATHER_HORSE_ARMOR);
+        ItemMeta meta = core.getItemMeta();
+        setCustomModelData(meta, FLARE_HOT_CORE_MODEL_DATA, null);
+        core.setItemMeta(meta);
+        return core;
+    }
+
+    private double configuredVisualSize(String path, double fallback) {
+        return Math.max(0.1, Math.min(
+            12.0,
+            plugin.getConfig().getDouble(path, fallback)
+        ));
+    }
+
+    private void updateFlareViewers(FlareVisual visual, Location location) {
+        World world = location.getWorld();
         if (world == null) {
             return;
         }
-        int count = Math.max(0, Math.min(
-            40,
-            plugin.getConfig().getInt("flare.explosion.burn-particle-count", 12)
-        ));
-        float size = (float) Math.max(0.1, Math.min(
-            8.0,
-            plugin.getConfig().getDouble("flare.explosion.burn-particle-size", 3.5)
-        ));
-        size *= (float) (0.94 + Math.sin(burn.elapsed * 0.55) * 0.06);
-        if (count > 0) {
-            world.spawnParticle(
-                Particle.DUST,
-                burn.location,
-                count,
-                0.13,
-                0.13,
-                0.13,
-                0.0,
-                new Particle.DustOptions(Color.fromRGB(burn.color.rgb), size),
-                true
-            );
+        Set<UUID> eligible = new HashSet<>();
+        double rangeSquared = visual.viewRange * visual.viewRange;
+        for (Player player : world.getPlayers()) {
+            if (player.getEyeLocation().distanceSquared(location) > rangeSquared
+                || plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+                continue;
+            }
+            eligible.add(player.getUniqueId());
+            if (visual.viewers.add(player.getUniqueId())) {
+                player.showEntity(plugin, visual.halo);
+                player.showEntity(plugin, visual.hotCore);
+            }
         }
-        int hotCoreCount = Math.max(0, Math.min(
-            8,
-            plugin.getConfig().getInt("flare.explosion.hot-core-particle-count", 2)
-        ));
-        if (hotCoreCount > 0) {
-            world.spawnParticle(
-                Particle.END_ROD,
-                burn.location,
-                hotCoreCount,
-                0.04,
-                0.04,
-                0.04,
-                0.0,
-                null,
-                true
-            );
-        }
-        int flameCount = Math.max(0, Math.min(
-            20,
-            plugin.getConfig().getInt("flare.explosion.flame-particle-count", 2)
-        ));
-        if (flameCount > 0) {
-            world.spawnParticle(
-                Particle.FLAME,
-                burn.location,
-                flameCount,
-                0.1,
-                0.1,
-                0.1,
-                0.01,
-                null,
-                true
-            );
-        }
-        int smokeCount = Math.max(0, Math.min(
-            20,
-            plugin.getConfig().getInt("flare.explosion.smoke-particle-count", 1)
-        ));
-        if (smokeCount > 0 && burn.elapsed % 2 == 0) {
-            world.spawnParticle(
-                Particle.CAMPFIRE_COSY_SMOKE,
-                burn.location,
-                smokeCount,
-                0.12,
-                0.08,
-                0.12,
-                0.01,
-                null,
-                true
-            );
+        var viewerIterator = visual.viewers.iterator();
+        while (viewerIterator.hasNext()) {
+            UUID playerId = viewerIterator.next();
+            if (eligible.contains(playerId)) {
+                continue;
+            }
+            Player player = plugin.getServer().getPlayer(playerId);
+            if (player != null) {
+                player.hideEntity(plugin, visual.halo);
+                player.hideEntity(plugin, visual.hotCore);
+            }
+            viewerIterator.remove();
         }
     }
 
-    private void tickBurstSparks(FlareBurn burn) {
-        World world = burn.location.getWorld();
-        if (world == null) {
+    private void playSpatialSound(
+        Location source,
+        String customSound,
+        Sound vanillaFallback,
+        float volume,
+        float pitch
+    ) {
+        World world = source.getWorld();
+        if (world == null || volume <= 0.0f) {
             return;
         }
-        float size = (float) Math.max(0.1, Math.min(
-            4.0,
-            plugin.getConfig().getDouble("flare.explosion.burst-particle-size", 1.25)
-        ));
-        Particle.DustOptions dust = new Particle.DustOptions(
-            Color.fromRGB(burn.color.rgb),
-            size
-        );
-        double gravity = Math.max(0.0, Math.min(
-            0.1,
-            plugin.getConfig().getDouble("flare.explosion.spark-gravity", 0.012)
-        ));
-        double drag = Math.max(0.5, Math.min(
-            1.0,
-            plugin.getConfig().getDouble("flare.explosion.spark-drag", 0.94)
-        ));
-        for (FlareSpark spark : burn.sparks) {
-            spark.location.add(spark.velocity);
-            spark.velocity.multiply(drag);
-            spark.velocity.setY(spark.velocity.getY() - gravity);
-            world.spawnParticle(
-                Particle.DUST,
-                spark.location,
-                1,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                dust,
-                true
-            );
+        for (Player player : world.getPlayers()) {
+            if (plugin.resourcePack() == null || plugin.resourcePack().isLoaded(player)) {
+                player.playSound(
+                    source,
+                    customSound,
+                    SoundCategory.PLAYERS,
+                    volume,
+                    pitch
+                );
+            } else {
+                player.playSound(
+                    source,
+                    vanillaFallback,
+                    SoundCategory.PLAYERS,
+                    volume,
+                    pitch
+                );
+            }
         }
     }
 
@@ -961,6 +957,8 @@ public final class FlareService implements Listener {
         private final FlareColor color;
         private final double targetY;
         private final int maximumTicks;
+        private final FlareVisual visual;
+        private final UUID lightId;
         private int elapsed;
 
         private FlareFlight(
@@ -968,13 +966,17 @@ public final class FlareService implements Listener {
             Vector velocity,
             FlareColor color,
             double targetY,
-            int maximumTicks
+            int maximumTicks,
+            FlareVisual visual,
+            UUID lightId
         ) {
             this.location = location;
             this.velocity = velocity;
             this.color = color;
             this.targetY = targetY;
             this.maximumTicks = maximumTicks;
+            this.visual = visual;
+            this.lightId = lightId;
         }
     }
 
@@ -982,11 +984,10 @@ public final class FlareService implements Listener {
         private Location location;
         private final FlareColor color;
         private final int duration;
-        private final int burstDuration;
-        private final List<FlareSpark> sparks;
         private final Vector drift;
         private final double swayPhase;
         private final UUID lightId;
+        private final FlareVisual visual;
         private double fallSpeed;
         private int elapsed;
 
@@ -994,30 +995,63 @@ public final class FlareService implements Listener {
             Location location,
             FlareColor color,
             int duration,
-            int burstDuration,
-            List<FlareSpark> sparks,
             Vector drift,
             double swayPhase,
-            UUID lightId
+            UUID lightId,
+            FlareVisual visual
         ) {
             this.location = location;
             this.color = color;
             this.duration = duration;
-            this.burstDuration = burstDuration;
-            this.sparks = sparks;
             this.drift = drift;
             this.swayPhase = swayPhase;
             this.lightId = lightId;
+            this.visual = visual;
         }
     }
 
-    private static final class FlareSpark {
-        private final Location location;
-        private final Vector velocity;
+    private final class FlareVisual {
+        private final ItemDisplay halo;
+        private final ItemDisplay hotCore;
+        private final double viewRange;
+        private final Set<UUID> viewers = new HashSet<>();
 
-        private FlareSpark(Location location, Vector velocity) {
-            this.location = location;
-            this.velocity = velocity;
+        private FlareVisual(ItemDisplay halo, ItemDisplay hotCore, double viewRange) {
+            this.halo = halo;
+            this.hotCore = hotCore;
+            this.viewRange = viewRange;
+        }
+
+        private void moveTo(Location location, double size) {
+            moveDisplay(halo, location, size);
+            moveDisplay(hotCore, location, Math.max(0.14, size * 0.18));
+            updateFlareViewers(this, location);
+        }
+
+        private void moveDisplay(ItemDisplay display, Location location, double size) {
+            if (!display.isValid() || display.isDead()) {
+                return;
+            }
+            display.teleport(location);
+            float scale = (float) Math.max(0.01, size);
+            display.setDisplayWidth(scale * 1.25f);
+            display.setDisplayHeight(scale * 1.25f);
+            display.setTransformation(new Transformation(
+                new Vector3f(),
+                new Quaternionf(),
+                new Vector3f(scale, scale, scale),
+                new Quaternionf()
+            ));
+        }
+
+        private void remove() {
+            viewers.clear();
+            if (halo.isValid() && !halo.isDead()) {
+                halo.remove();
+            }
+            if (hotCore.isValid() && !hotCore.isDead()) {
+                hotCore.remove();
+            }
         }
     }
 

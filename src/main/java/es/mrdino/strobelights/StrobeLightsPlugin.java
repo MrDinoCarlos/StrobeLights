@@ -16,7 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class StrobeLightsPlugin extends JavaPlugin {
 
-    private static final int CONFIG_VERSION = 2;
+    private static final int CONFIG_VERSION = 3;
 
     private StrobeRepository repository;
     private Messages messages;
@@ -140,7 +140,56 @@ public final class StrobeLightsPlugin extends JavaPlugin {
         replaceLegacyDouble("flare.explosion.burn-particle-size", 2.4, 3.5);
         replaceLegacyDouble("flare.explosion.fall-speed", 0.035, 0.012);
         replaceLegacyInt("flare.explosion.scene-light-duration-ticks", 160, 600);
+
+        replaceLegacyInt("flare.load-duration-ticks", 24, 34);
+        replaceLegacyInt("flare.fire-cooldown-ticks", 10, 12);
+        replaceLegacyDouble("flare.launch-speed", 1.15, 1.7);
+        replaceLegacyDouble("flare.vertical-bias", 1.0, 0.65);
+        replaceLegacyDouble("flare.minimum-upward-direction", 0.35, 0.25);
+        replaceLegacyDouble("flare.launch-height", 32.0, 28.0);
+        replaceLegacyDouble("flare.flight-drag", 0.995, 0.99);
+        replaceLegacyDouble("flare.flight-gravity", 0.006, 0.012);
+        replaceLegacyDouble("flare.launch-sound-volume", 1.5, 4.0);
+        replaceLegacyDouble("flare.launch-sound-pitch", 0.9, 1.0);
+        replaceLegacyInt("flare.explosion.burn-duration-ticks", 600, 800);
+        replaceLegacyDouble("flare.explosion.fall-speed", 0.012, 0.035);
+        replaceLegacyDouble("flare.explosion.drift-speed", 0.006, 0.012);
+        replaceLegacyDouble("flare.explosion.sway-strength", 0.0025, 0.005);
+        replaceLegacyDouble("flare.explosion.sway-frequency", 0.08, 0.09);
+        replaceLegacyDouble("flare.explosion.sound-volume", 4.0, 6.0);
+        replaceLegacyInt("flare.explosion.scene-light-duration-ticks", 600, 800);
+        replaceLegacyDouble("flare.explosion.scene-light-expansion", 2.0, 4.0);
+        replaceLegacyDouble("flare.explosion.screen-flash.radius", 64.0, 96.0);
+        replaceLegacyDouble("flare.explosion.screen-flash.full-effect-distance", 8.0, 12.0);
+        replaceLegacyDouble("flare.explosion.screen-flash.falloff-exponent", 1.1, 0.85);
+        replaceLegacyInt("flare.explosion.screen-flash.maximum-duration-ticks", 16, 80);
+        replaceLegacyInt("flare.explosion.screen-flash.strength-percent", 55, 135);
+        removeRetiredFlareParticleSettings();
         getConfig().set("config-version", CONFIG_VERSION);
+    }
+
+    private void removeRetiredFlareParticleSettings() {
+        for (String path : new String[] {
+            "flare.trail-points-per-block",
+            "flare.trail-particle-count",
+            "flare.trail-particle-size",
+            "flare.trail-hot-core-count",
+            "flare.trail-flame-count",
+            "flare.trail-smoke-count",
+            "flare.explosion.burst-particle-count",
+            "flare.explosion.burst-particle-size",
+            "flare.explosion.burst-duration-ticks",
+            "flare.explosion.burst-speed",
+            "flare.explosion.spark-drag",
+            "flare.explosion.spark-gravity",
+            "flare.explosion.burn-particle-count",
+            "flare.explosion.burn-particle-size",
+            "flare.explosion.hot-core-particle-count",
+            "flare.explosion.flame-particle-count",
+            "flare.explosion.smoke-particle-count"
+        }) {
+            getConfig().set(path, null);
+        }
     }
 
     private void replaceLegacyInt(String path, int previousDefault, int replacement) {
