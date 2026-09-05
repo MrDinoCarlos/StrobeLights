@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.bukkit.Material;
+import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
 class CameraFlashCodecTest {
@@ -173,6 +174,23 @@ class CameraFlashCodecTest {
         assertTrue(edge > 0.0);
         assertTrue(centered > edge);
         assertEquals(1.0, StrobeManager.flareGlareViewScale(1.0, 0.72, 0.6));
+    }
+
+    @Test
+    void burningFlareKeepsHorizontalMomentumAndAcceleratesToTerminalFallSpeed() {
+        Vector velocity = new Vector(0.24, 0.01, -0.12);
+        Vector wind = new Vector(0.00018, 0.0, 0.00009);
+
+        Vector next = FlareService.nextBurnVelocity(velocity, 0.992, 0.0035, 0.06, wind);
+
+        assertTrue(next.getX() > 0.0);
+        assertTrue(next.getZ() < 0.0);
+        assertTrue(next.getY() < velocity.getY());
+        for (int tick = 0; tick < 100; tick++) {
+            next = FlareService.nextBurnVelocity(next, 0.992, 0.0035, 0.06, wind);
+        }
+        assertEquals(-0.06, next.getY(), 1.0e-9);
+        assertTrue(Math.hypot(next.getX(), next.getZ()) > 0.01);
     }
 
     @Test
