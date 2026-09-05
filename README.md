@@ -251,16 +251,22 @@ throwable-flashbang:
   sound-pitch: 1.0
 
 flare:
+  reload-required: true
   load-duration-ticks: 24
   launch-speed: 1.15
   vertical-bias: 1.0
   launch-height: 32.0
   maximum-flight-ticks: 200
   trail-particle-count: 3
-  damage-enabled: false
+  trail-flame-count: 1
+  trail-smoke-count: 1
   explosion:
-    type: 'BALL_LARGE'
-    scene-light-duration-ticks: 40
+    burst-particle-count: 48
+    burst-duration-ticks: 18
+    burn-duration-ticks: 160
+    burn-particle-count: 7
+    fall-speed: 0.035
+    scene-light-duration-ticks: 160
     scene-light-level: 15
     scene-light-expansion: 2.0
     screen-flash:
@@ -270,7 +276,7 @@ flare:
 ```
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.1 prints a red translated setup warning in the console and shows a
+0.10.2 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -326,7 +332,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.1+mc.1.21.4.jar`.
+For this build: `StrobeLights-v.0.10.2+mc.1.21.4.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

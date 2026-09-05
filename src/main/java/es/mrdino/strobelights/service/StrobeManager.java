@@ -548,7 +548,7 @@ public final class StrobeManager {
             0.0,
             0.0,
             0.0,
-            Color.fromRGB(rgb & 0xFFFFFF),
+            null,
             true
         );
         float volume = (float) Math.max(0.0, Math.min(
@@ -562,7 +562,7 @@ public final class StrobeManager {
         if (volume > 0.0f) {
             world.playSound(
                 location,
-                Sound.ENTITY_FIREWORK_ROCKET_LARGE_BLAST,
+                Sound.ENTITY_GENERIC_EXPLODE,
                 SoundCategory.PLAYERS,
                 volume,
                 pitch

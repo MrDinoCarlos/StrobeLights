@@ -474,7 +474,7 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void containsAProjectileFreeFlareLauncherAndTintedCartridge() throws IOException {
+    void containsAProjectileFreeSimulatedFlareAndTintedCartridge() throws IOException {
         Path launcherDefinition = PACK.resolve("assets/minecraft/items/blaze_rod.json");
         Path cartridgeDefinition = PACK.resolve(
             "assets/minecraft/items/leather_horse_armor.json"
@@ -502,11 +502,31 @@ class ShaderPackContractTest {
         Path service = Path.of(
             "src/main/java/es/mrdino/strobelights/service/FlareService.java"
         );
+        Path manager = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
+        );
+        Path config = Path.of("src/main/resources/config.yml");
         assertContains(service, "new ItemStack(Material.BLAZE_ROD)");
         assertContains(service, "new ItemStack(Material.LEATHER_HORSE_ARMOR)");
         assertContains(service, "setColors(List.of(tint))");
         assertContains(service, "event.setCancelled(true)");
+        assertContains(service, "Particle.CAMPFIRE_COSY_SMOKE");
+        assertContains(service, "tickBurstSparks(burn)");
+        assertContains(service, "flare.reload-required");
         assertNotContains(service, "Material.CROSSBOW");
+        assertNotContains(service, "Firework");
+        assertContains(config, "reload-required: true");
+        assertContains(config, "burn-duration-ticks: 160");
+        assertContains(config, "burst-particle-count: 48");
+        assertFalse(Pattern.compile(
+            "Particle\\.FLASH,[\\s\\S]{0,180}Color\\."
+        ).matcher(read(manager)).find());
+
+        Path launcherModel = PACK.resolve(
+            "assets/strobelights/models/item/flare_launcher.json"
+        );
+        assertContains(launcherModel, "\"firstperson_righthand\"");
+        assertContains(launcherModel, "\"scale\": [0.42, 0.42, 0.42]");
     }
 
     @Test
