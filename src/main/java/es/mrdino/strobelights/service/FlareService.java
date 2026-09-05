@@ -656,7 +656,6 @@ public final class FlareService implements Listener {
             entity.setViewRange((float) (viewRange / 64.0));
             entity.setInterpolationDelay(0);
             entity.setInterpolationDuration(2);
-            entity.setTeleportDuration(1);
             entity.setItemStack(item);
         });
     }
