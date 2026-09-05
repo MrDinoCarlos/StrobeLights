@@ -44,7 +44,7 @@ import org.bukkit.plugin.Plugin;
 /** Loads, hosts and sends the Light Painter shader and GUI icon resource pack. */
 public final class ResourcePackService implements Listener {
 
-    private static final String PACK_REVISION = "0.10.10";
+    private static final String PACK_REVISION = "0.10.11";
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
     private static final String EMBEDDED_PACK =

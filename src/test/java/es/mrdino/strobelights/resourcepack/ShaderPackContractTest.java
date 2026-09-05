@@ -22,7 +22,7 @@ class ShaderPackContractTest {
             "assets/strobelights/strobelights-integration.json"
         );
         assertTrue(Files.isRegularFile(integration));
-        assertContains(integration, "\"version\": \"0.10.10\"");
+        assertContains(integration, "\"version\": \"0.10.11\"");
         assertContains(integration, "\"render_pipeline\": \"light_painter_rgb\"");
     }
 
@@ -138,10 +138,15 @@ class ShaderPackContractTest {
             "markerTextureBase >= markerTexturePeak * 0.75"
         );
         assertNotContains(core, "tmpcol.a == LIGHTALPHA");
-        assertContains(core, "bool technicalCarrierGeometry");
-        assertContains(core, "abs(Position.y - 8.0) < 0.01");
-        assertContains(core, "abs(abs(Normal.y) - 1.0) < 0.01");
-        assertContains(core, "&& technicalCarrierGeometry");
+        assertContains(core, "int encodedValue = markerValue(Color.rgb)");
+        assertContains(
+            core,
+            "bool encodedTechnicalCarrier = isCameraFlash(encodedValue)\n"
+                + "        || isSourceLight(encodedValue);"
+        );
+        assertContains(core, "&& encodedTechnicalCarrier");
+        assertNotContains(core, "technicalCarrierGeometry");
+        assertNotContains(core, "Position.y - 8.0");
         assertContains(core, "vertexColor = vec4(Color.rgb, 1.0)");
         assertNotContains(core, "min(min(tmpcol.r, tmpcol.g), tmpcol.b) > 0.99");
         assertNotContains(core, "bool hand = isHand(FogStart, FogEnd)");
