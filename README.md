@@ -180,12 +180,13 @@ Permission: `strobelights.admin` (operators by default).
 
 The flare command gives a reusable launcher. Left click it to open the menu of
 16 colored cartridges. Selecting one plays a three-stage mechanical reload;
-right click then launches that color into the sky. The projectile and burning
+right click then launches that color with a short flare-pistol report. The projectile and burning
 core form one smooth emissive flare with a white-hot center and custom halo,
-without Minecraft particle clouds. At the apex it expands into a 40-second flare whose
-level-15 RGB light uses the maximum `4.00x` expansion. Looking directly at the
-core continuously refreshes an intense glare; looking away leaves an afterimage
-that can fade for up to four seconds. A new cartridge must be selected before
+without Minecraft particle clouds. At the apex it expands into a 40-second flare that
+keeps its horizontal momentum, curves under gravity and wind, and continues lighting
+nearby terrain while descending or resting on the ground. Its level-15 RGB light uses
+the maximum `4.00x` expansion. Looking directly at the core refreshes a controlled
+glare; looking away leaves an afterimage that can fade for up to 2.5 seconds. A new cartridge must be selected before
 every shot. The launcher uses a neutral blaze rod carrier with its own
 resource-pack model, so creative mode cannot load or shoot vanilla arrows.
 Launchers created by 0.10.0 upgrade on their next click.
@@ -269,21 +270,25 @@ flare:
     view-range: 192.0
   explosion:
     burn-duration-ticks: 800
-    fall-speed: 0.035
-    drift-speed: 0.012
+    ignition-velocity-retention: 0.45
+    minimum-horizontal-speed: 0.035
+    horizontal-drag: 0.992
+    gravity: 0.0035
+    terminal-fall-speed: 0.06
+    wind-acceleration: 0.00018
     scene-light-duration-ticks: 800
     scene-light-level: 15
     scene-light-expansion: 4.0
     screen-flash:
       enabled: true
-      radius: 96.0
+      radius: 72.0
       minimum-view-dot: 0.72
-      maximum-duration-ticks: 80
-      strength-percent: 135
+      maximum-duration-ticks: 50
+      strength-percent: 85
 ```
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.5 prints a red translated setup warning in the console and shows a
+0.10.6 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -339,7 +344,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.5+mc.1.21.4.jar`.
+For this build: `StrobeLights-v.0.10.6+mc.1.21.4.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
