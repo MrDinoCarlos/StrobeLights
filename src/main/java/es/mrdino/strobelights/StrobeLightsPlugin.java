@@ -16,7 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class StrobeLightsPlugin extends JavaPlugin {
 
-    private static final int CONFIG_VERSION = 3;
+    private static final int CONFIG_VERSION = 4;
 
     private StrobeRepository repository;
     private Messages messages;
@@ -164,7 +164,15 @@ public final class StrobeLightsPlugin extends JavaPlugin {
         replaceLegacyDouble("flare.explosion.screen-flash.falloff-exponent", 1.1, 0.85);
         replaceLegacyInt("flare.explosion.screen-flash.maximum-duration-ticks", 16, 80);
         replaceLegacyInt("flare.explosion.screen-flash.strength-percent", 55, 135);
+        replaceLegacyDouble("flare.launch-sound-volume", 4.0, 3.0);
+        replaceLegacyDouble("flare.explosion.sound-volume", 6.0, 3.0);
+        replaceLegacyDouble("flare.explosion.screen-flash.radius", 96.0, 72.0);
+        replaceLegacyDouble("flare.explosion.screen-flash.full-effect-distance", 12.0, 8.0);
+        replaceLegacyDouble("flare.explosion.screen-flash.falloff-exponent", 0.85, 1.05);
+        replaceLegacyInt("flare.explosion.screen-flash.maximum-duration-ticks", 80, 50);
+        replaceLegacyInt("flare.explosion.screen-flash.strength-percent", 135, 85);
         removeRetiredFlareParticleSettings();
+        migrateRetiredFlareMotionSettings();
         getConfig().set("config-version", CONFIG_VERSION);
     }
 
@@ -190,6 +198,27 @@ public final class StrobeLightsPlugin extends JavaPlugin {
         }) {
             getConfig().set(path, null);
         }
+    }
+
+    private void migrateRetiredFlareMotionSettings() {
+        if (getConfig().contains("flare.explosion.fall-speed", true)
+            && !getConfig().contains("flare.explosion.terminal-fall-speed", true)) {
+            double previous = getConfig().getDouble("flare.explosion.fall-speed");
+            getConfig().set(
+                "flare.explosion.terminal-fall-speed",
+                Math.abs(previous - 0.035) < 1.0e-9 ? 0.06 : previous
+            );
+        }
+        if (getConfig().contains("flare.explosion.drift-speed", true)
+            && !getConfig().contains("flare.explosion.minimum-horizontal-speed", true)) {
+            double previous = getConfig().getDouble("flare.explosion.drift-speed");
+            getConfig().set(
+                "flare.explosion.minimum-horizontal-speed",
+                Math.abs(previous - 0.012) < 1.0e-9 ? 0.035 : previous
+            );
+        }
+        getConfig().set("flare.explosion.fall-speed", null);
+        getConfig().set("flare.explosion.drift-speed", null);
     }
 
     private void replaceLegacyInt(String path, int previousDefault, int replacement) {

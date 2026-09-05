@@ -75,6 +75,42 @@ public sealed class FlareSoundBuilder
         }
     }
 
+    public void AddSustainedNoise(
+        double start,
+        double duration,
+        double amplitude,
+        double attack,
+        double release,
+        double highPass,
+        double lowPass,
+        double modulationFrequency,
+        double modulationDepth)
+    {
+        int first = Math.Max(0, (int)(start * SampleRate));
+        int count = Math.Min(samples.Length - first, (int)(duration * SampleRate));
+        double highState = 0.0;
+        double bandState = 0.0;
+        double highAlpha = 1.0 - Math.Exp(-2.0 * Math.PI * highPass / SampleRate);
+        double lowAlpha = 1.0 - Math.Exp(-2.0 * Math.PI * lowPass / SampleRate);
+        for (int i = 0; i < count; i++)
+        {
+            double raw = random.NextDouble() * 2.0 - 1.0;
+            highState += highAlpha * (raw - highState);
+            double high = raw - highState;
+            bandState += lowAlpha * (high - bandState);
+            double attackGain = attack <= 0.0
+                ? 1.0 : Math.Min(1.0, i / (attack * SampleRate));
+            double releaseGain = release <= 0.0
+                ? 1.0 : Math.Min(1.0, (count - 1 - i) / (release * SampleRate));
+            double modulation = 1.0 - modulationDepth * 0.5
+                + modulationDepth * 0.5 * Math.Sin(
+                    Math.PI * 2.0 * modulationFrequency * i / SampleRate
+                );
+            samples[first + i] += bandState * amplitude
+                * attackGain * releaseGain * modulation;
+        }
+    }
+
     public void AddCrackles(double start, double duration, int count, double amplitude)
     {
         for (int eventIndex = 0; eventIndex < count; eventIndex++)
@@ -142,59 +178,69 @@ function Export-FlareSound([string] $Name, [FlareSoundBuilder] $Builder) {
 }
 
 try {
-    $open = [FlareSoundBuilder]::new(0.42, 691201)
-    $open.AddNoise(0.01, 0.10, 0.70, 0.001, 3.2, 500.0, 9000.0)
-    $open.AddTone(0.015, 0.30, 1750.0, 1180.0, 0.36, 0.001, 3.6)
-    $open.AddTone(0.025, 0.24, 2550.0, 2150.0, 0.22, 0.001, 4.0)
-    $open.AddTone(0.16, 0.20, 310.0, 190.0, 0.42, 0.001, 4.0)
-    $open.AddCrackles(0.12, 0.15, 3, 0.34)
+    # Break-action latch, hinge movement and the barrel reaching its stop.
+    $open = [FlareSoundBuilder]::new(0.34, 691201)
+    $open.AddNoise(0.00, 0.045, 0.95, 0.0003, 5.0, 550.0, 12000.0)
+    $open.AddTone(0.002, 0.13, 3300.0, 1750.0, 0.34, 0.0003, 5.2)
+    $open.AddTone(0.006, 0.17, 980.0, 610.0, 0.24, 0.0005, 4.0)
+    $open.AddSustainedNoise(0.07, 0.16, 0.15, 0.02, 0.03, 90.0, 1600.0, 7.0, 0.25)
+    $open.AddNoise(0.225, 0.045, 0.58, 0.0003, 5.5, 700.0, 10500.0)
+    $open.AddTone(0.228, 0.09, 2350.0, 1450.0, 0.18, 0.0003, 5.5)
     Export-FlareSound 'flare_reload_open' $open
 
-    $insert = [FlareSoundBuilder]::new(0.48, 691202)
-    $insert.AddNoise(0.00, 0.27, 0.34, 0.03, 1.5, 650.0, 5200.0)
-    $insert.AddTone(0.17, 0.24, 240.0, 125.0, 0.62, 0.001, 3.8)
-    $insert.AddNoise(0.18, 0.11, 0.58, 0.001, 3.0, 240.0, 6100.0)
-    $insert.AddTone(0.205, 0.25, 1120.0, 780.0, 0.24, 0.001, 4.2)
-    $insert.AddCrackles(0.24, 0.10, 2, 0.24)
+    # Brass shell sliding into the chamber, rim contact and a padded seat thump.
+    $insert = [FlareSoundBuilder]::new(0.40, 691202)
+    $insert.AddSustainedNoise(0.015, 0.19, 0.19, 0.025, 0.025, 500.0, 3600.0, 11.0, 0.20)
+    $insert.AddNoise(0.165, 0.035, 0.72, 0.0003, 5.0, 900.0, 12500.0)
+    $insert.AddTone(0.166, 0.12, 4150.0, 2050.0, 0.27, 0.0003, 5.0)
+    $insert.AddTone(0.195, 0.18, 205.0, 105.0, 0.64, 0.0008, 4.8)
+    $insert.AddNoise(0.205, 0.09, 0.30, 0.0005, 4.0, 110.0, 2600.0)
+    $insert.AddCrackles(0.235, 0.055, 2, 0.18)
     Export-FlareSound 'flare_reload_insert' $insert
 
-    $close = [FlareSoundBuilder]::new(0.42, 691203)
-    $close.AddNoise(0.01, 0.13, 0.82, 0.001, 4.0, 300.0, 10000.0)
-    $close.AddTone(0.012, 0.31, 920.0, 520.0, 0.55, 0.001, 4.4)
-    $close.AddTone(0.018, 0.24, 1880.0, 1380.0, 0.27, 0.001, 4.8)
-    $close.AddTone(0.21, 0.17, 2700.0, 1700.0, 0.22, 0.001, 5.0)
-    $close.AddCrackles(0.18, 0.08, 2, 0.30)
+    # Heavy barrel closure followed by the compact locking click.
+    $close = [FlareSoundBuilder]::new(0.36, 691203)
+    $close.AddNoise(0.00, 0.065, 1.00, 0.0003, 5.2, 90.0, 10500.0)
+    $close.AddTone(0.002, 0.22, 185.0, 82.0, 0.82, 0.0005, 5.0)
+    $close.AddTone(0.004, 0.13, 780.0, 410.0, 0.38, 0.0003, 5.5)
+    $close.AddNoise(0.105, 0.038, 0.68, 0.0003, 5.8, 850.0, 13000.0)
+    $close.AddTone(0.108, 0.11, 2850.0, 1600.0, 0.23, 0.0003, 6.0)
     Export-FlareSound 'flare_reload_close' $close
 
-    $fire = [FlareSoundBuilder]::new(1.18, 691204)
-    $fire.AddNoise(0.00, 0.20, 1.00, 0.0005, 4.0, 35.0, 12000.0)
-    $fire.AddTone(0.00, 0.48, 105.0, 48.0, 0.90, 0.001, 3.4)
-    $fire.AddTone(0.005, 0.31, 215.0, 95.0, 0.52, 0.001, 4.0)
-    $fire.AddNoise(0.03, 0.88, 0.46, 0.015, 1.7, 420.0, 8200.0)
-    $fire.AddTone(0.07, 0.82, 1450.0, 760.0, 0.25, 0.01, 2.3)
-    $fire.AddCrackles(0.015, 0.25, 6, 0.34)
+    # A flare pistol has a short primer click and a broad low-pressure muzzle
+    # report. Two filtered reflections give it outdoor space without a rifle crack.
+    $fire = [FlareSoundBuilder]::new(0.58, 691204)
+    $fire.AddNoise(0.000, 0.018, 0.34, 0.0002, 7.0, 1600.0, 14000.0)
+    $fire.AddTone(0.001, 0.055, 3900.0, 2100.0, 0.13, 0.0002, 7.0)
+    $fire.AddNoise(0.012, 0.095, 1.00, 0.0002, 4.8, 32.0, 12500.0)
+    $fire.AddTone(0.013, 0.31, 92.0, 44.0, 0.96, 0.0004, 4.2)
+    $fire.AddTone(0.017, 0.21, 188.0, 83.0, 0.52, 0.0004, 4.8)
+    $fire.AddNoise(0.025, 0.28, 0.47, 0.001, 3.0, 115.0, 4700.0)
+    $fire.AddNoise(0.165, 0.075, 0.30, 0.001, 4.5, 180.0, 6800.0)
+    $fire.AddTone(0.168, 0.19, 128.0, 66.0, 0.24, 0.001, 4.0)
+    $fire.AddNoise(0.325, 0.10, 0.18, 0.002, 3.8, 230.0, 5200.0)
     Export-FlareSound 'flare_fire' $fire
 
-    $flight = [FlareSoundBuilder]::new(1.62, 691205)
-    $flight.AddNoise(0.00, 1.62, 0.70, 0.08, 0.45, 720.0, 11500.0)
-    $flight.AddTone(0.00, 1.56, 1260.0, 860.0, 0.23, 0.05, 0.45)
-    $flight.AddTone(0.04, 1.42, 630.0, 430.0, 0.13, 0.04, 0.55)
-    $flight.AddCrackles(0.08, 1.35, 14, 0.16)
+    $flight = [FlareSoundBuilder]::new(1.46, 691205)
+    $flight.AddSustainedNoise(0.00, 1.46, 0.68, 0.045, 0.10, 820.0, 12500.0, 7.2, 0.28)
+    $flight.AddSustainedNoise(0.00, 1.46, 0.16, 0.05, 0.12, 120.0, 1450.0, 3.6, 0.18)
+    $flight.AddTone(0.02, 1.36, 510.0, 390.0, 0.055, 0.04, 0.22)
+    $flight.AddCrackles(0.08, 1.24, 10, 0.12)
     Export-FlareSound 'flare_flight' $flight
 
-    $ignite = [FlareSoundBuilder]::new(0.92, 691206)
-    $ignite.AddNoise(0.00, 0.26, 0.94, 0.001, 3.2, 70.0, 12000.0)
-    $ignite.AddTone(0.00, 0.42, 155.0, 72.0, 0.74, 0.001, 3.2)
-    $ignite.AddNoise(0.035, 0.83, 0.55, 0.015, 1.25, 800.0, 13000.0)
-    $ignite.AddTone(0.05, 0.70, 1920.0, 1180.0, 0.20, 0.008, 2.4)
-    $ignite.AddCrackles(0.02, 0.52, 11, 0.30)
+    $ignite = [FlareSoundBuilder]::new(0.76, 691206)
+    $ignite.AddNoise(0.00, 0.075, 0.92, 0.0003, 5.0, 75.0, 13000.0)
+    $ignite.AddTone(0.002, 0.20, 142.0, 68.0, 0.58, 0.0005, 4.5)
+    $ignite.AddSustainedNoise(0.035, 0.70, 0.53, 0.012, 0.09, 980.0, 14000.0, 8.5, 0.25)
+    $ignite.AddSustainedNoise(0.05, 0.65, 0.13, 0.015, 0.10, 130.0, 1800.0, 4.0, 0.20)
+    $ignite.AddCrackles(0.025, 0.55, 9, 0.23)
     Export-FlareSound 'flare_ignite' $ignite
 
-    $burn = [FlareSoundBuilder]::new(1.92, 691207)
-    $burn.AddNoise(0.00, 1.92, 0.78, 0.09, 0.28, 950.0, 13500.0)
-    $burn.AddNoise(0.00, 1.92, 0.23, 0.12, 0.35, 80.0, 980.0)
-    $burn.AddTone(0.00, 1.86, 720.0, 670.0, 0.075, 0.10, 0.35)
-    $burn.AddCrackles(0.10, 1.62, 24, 0.22)
+    $burn = [FlareSoundBuilder]::new(1.78, 691207)
+    $burn.AddSustainedNoise(0.00, 1.78, 0.72, 0.07, 0.10, 1050.0, 14500.0, 9.2, 0.30)
+    $burn.AddSustainedNoise(0.00, 1.78, 0.20, 0.08, 0.11, 95.0, 1250.0, 4.6, 0.24)
+    $burn.AddTone(0.00, 1.72, 460.0, 420.0, 0.035, 0.08, 0.12)
+    $burn.AddCrackles(0.08, 1.56, 20, 0.18)
     Export-FlareSound 'flare_burn' $burn
 }
 finally {
