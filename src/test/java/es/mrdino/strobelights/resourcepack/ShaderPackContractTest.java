@@ -627,6 +627,8 @@ class ShaderPackContractTest {
         );
         assertContains(launcherModel, "\"firstperson_righthand\"");
         assertContains(launcherModel, "\"scale\": [0.32, 0.32, 0.32]");
+        assertContains(launcherModel, "\"rotation\": [0, -90, -35]");
+        assertContains(launcherModel, "\"rotation\": [0, 90, 35]");
     }
 
     @Test
