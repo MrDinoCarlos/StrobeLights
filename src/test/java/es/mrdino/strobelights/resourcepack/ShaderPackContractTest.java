@@ -515,8 +515,12 @@ class ShaderPackContractTest {
         assertNotContains(service, "Material.CROSSBOW");
         assertNotContains(service, "Firework");
         assertContains(config, "reload-required: true");
-        assertContains(config, "burn-duration-ticks: 160");
-        assertContains(config, "burst-particle-count: 48");
+        assertContains(config, "burn-duration-ticks: 600");
+        assertContains(config, "burst-particle-count: 14");
+        assertContains(config, "fall-speed: 0.012");
+        assertContains(service, "flare.trail-points-per-block");
+        assertContains(service, "moveFlareLight(burn.lightId, burn.location)");
+        assertContains(manager, "public void moveFlareLight(UUID id, Location location)");
         assertFalse(Pattern.compile(
             "Particle\\.FLASH,[\\s\\S]{0,180}Color\\."
         ).matcher(Files.readString(manager, StandardCharsets.UTF_8)).find());
@@ -525,7 +529,7 @@ class ShaderPackContractTest {
             "assets/strobelights/models/item/flare_launcher.json"
         );
         assertContains(launcherModel, "\"firstperson_righthand\"");
-        assertContains(launcherModel, "\"scale\": [0.42, 0.42, 0.42]");
+        assertContains(launcherModel, "\"scale\": [0.32, 0.32, 0.32]");
     }
 
     @Test
