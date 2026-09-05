@@ -4,7 +4,7 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.10.8
+# Version:     0.10.9
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
@@ -16,7 +16,7 @@
 
 # Internal schema used to migrate defaults from older releases without deleting
 # administrator customizations.
-config-version: 6
+config-version: 7
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
@@ -36,11 +36,15 @@ resource-pack:
   # one pack from replacing the other during proxy/server switches.
   nexo-integration:
     enabled: true
-    # Regenerate only when StrobeLights missed Nexo's normal startup generation.
+    # Check Nexo after startup. An active Nexo generation is never interrupted.
     regeneration-delay-ticks: 40
+    # If Nexo never fires its post-generation event, restore standalone delivery.
+    fallback-delay-ticks: 600
   # Replace serverip.com with the public server address. Leaving this example
   # URL unchanged produces a red console warning and an admin join title.
   # The HTTP port must differ from Minecraft's and be allowed by the firewall.
+  # {token} becomes the ZIP's SHA-1. Backends using the same ZIP therefore use
+  # the same immutable path, including when embedded.enabled is false.
   public-url: 'http://serverip.com:8250/strobelights/{token}.zip'
   embedded:
     enabled: true
