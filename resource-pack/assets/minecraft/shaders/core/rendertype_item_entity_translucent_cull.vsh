@@ -179,7 +179,18 @@ void main() {
     // OFF mode supplies NO_FOG with equal start/end values for world entities,
     // which made every ItemDisplay look like a hand item and removed all
     // StrobeLights markers before the Fabulous post chain.
-    marker = float(!gui && markerAlpha && markerTextureCarrier);
+    // The dedicated carrier is the only item model with a horizontal face at
+    // local Y=8. Texture filtering can produce alpha 24 on the translucent
+    // outline of an ordinary held item, so texture color alone is not a safe
+    // marker signature (the flare launcher used to become a fake white light).
+    bool technicalCarrierGeometry = abs(Position.y - 8.0) < 0.01
+        && abs(abs(Normal.y) - 1.0) < 0.01;
+    marker = float(
+        !gui
+        && markerAlpha
+        && markerTextureCarrier
+        && technicalCarrierGeometry
+    );
 
     if (marker > 0.0) {
         // Do not multiply the payload by the atlas RGB. OptiFine may
