@@ -1,8 +1,10 @@
 package es.mrdino.strobelights.resourcepack;
 
 import es.mrdino.strobelights.StrobeLightsPlugin;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.net.BindException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -26,23 +28,26 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.title.Title;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
+import org.bukkit.plugin.Plugin;
 
 /** Loads, hosts and sends the Light Painter shader and GUI icon resource pack. */
 public final class ResourcePackService implements Listener {
 
-    private static final String PACK_REVISION = "0.10.7";
+    private static final String PACK_REVISION = "0.10.8";
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
     private static final String EMBEDDED_PACK =
         "embedded/StrobeLights-ResourcePack-1.20.1.zip";
 
     private final StrobeLightsPlugin plugin;
+    private final Listener nexoPackListener = new Listener() { };
     private final Set<UUID> loadedPlayers = ConcurrentHashMap.newKeySet();
     private final Set<UUID> compatibilityNotifiedPlayers = ConcurrentHashMap.newKeySet();
     private EmbeddedPackServer httpServer;
@@ -53,6 +58,11 @@ public final class ResourcePackService implements Listener {
     private long sendDelayTicks;
     private boolean active;
     private boolean defaultUrlConfigured;
+    private boolean nexoManaged;
+    private volatile boolean nexoMerged;
+    private boolean nexoListenerRegistered;
+    private Plugin nexoPlugin;
+    private Path nexoPackPath;
 
     public ResourcePackService(StrobeLightsPlugin plugin) {
         this.plugin = plugin;
@@ -60,6 +70,8 @@ public final class ResourcePackService implements Listener {
 
     public void start() {
         defaultUrlConfigured = false;
+        nexoManaged = false;
+        nexoMerged = false;
         if (!plugin.getConfig().getBoolean("resource-pack.enabled", true)) {
             plugin.getLogger().warning(
                 "Automatic shader delivery is disabled; an external installation is assumed."
@@ -70,12 +82,23 @@ public final class ResourcePackService implements Listener {
         byte[] packBytes = readEmbeddedPack();
         sha1 = sha1(packBytes);
         sha1Hash = hexDigest(sha1);
-        exportPack(packBytes);
+        Path exportedPack = exportPack(packBytes);
         required = plugin.getConfig().getBoolean("resource-pack.required", true);
         sendDelayTicks = Math.max(
             0L,
             plugin.getConfig().getLong("resource-pack.send-delay-ticks", 10L)
         );
+
+        if (startNexoIntegration(exportedPack)) {
+            active = true;
+            plugin.getServer().getOnlinePlayers().forEach(
+                player -> plugin.manager().setMarkersVisible(player, true)
+            );
+            plugin.getLogger().info(
+                "Nexo detected: StrobeLights will be merged into Nexo's resource pack."
+            );
+            return;
+        }
 
         boolean embedded = plugin.getConfig().getBoolean(
             "resource-pack.embedded.enabled",
@@ -119,6 +142,10 @@ public final class ResourcePackService implements Listener {
     public void stop() {
         active = false;
         defaultUrlConfigured = false;
+        nexoManaged = false;
+        nexoMerged = false;
+        nexoPlugin = null;
+        nexoPackPath = null;
         loadedPlayers.clear();
         if (httpServer != null) {
             httpServer.close();
@@ -127,7 +154,7 @@ public final class ResourcePackService implements Listener {
     }
 
     public boolean isLoaded(Player player) {
-        return !active || loadedPlayers.contains(player.getUniqueId());
+        return nexoManaged || !active || loadedPlayers.contains(player.getUniqueId());
     }
 
     public String revision() {
@@ -136,6 +163,10 @@ public final class ResourcePackService implements Listener {
 
     public void resend(Player player) {
         if (!active) {
+            return;
+        }
+        if (nexoManaged) {
+            sendNexoPack(player);
             return;
         }
         loadedPlayers.remove(player.getUniqueId());
@@ -148,6 +179,10 @@ public final class ResourcePackService implements Listener {
         Player player = event.getPlayer();
         loadedPlayers.remove(player.getUniqueId());
         compatibilityNotifiedPlayers.remove(player.getUniqueId());
+        if (nexoManaged) {
+            plugin.manager().setMarkersVisible(player, true);
+            return;
+        }
         plugin.manager().setMarkersVisible(player, false);
         sendLater(player);
         warnAdministratorLater(player);
@@ -162,7 +197,7 @@ public final class ResourcePackService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPackStatus(PlayerResourcePackStatusEvent event) {
-        if (!active || (event.getHash() != null
+        if (!active || nexoManaged || (event.getHash() != null
             && !event.getHash().equalsIgnoreCase(sha1Hash))) {
             return;
         }
@@ -192,7 +227,7 @@ public final class ResourcePackService implements Listener {
     }
 
     private void sendLater(Player player) {
-        if (!active) {
+        if (!active || nexoManaged) {
             return;
         }
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
@@ -339,14 +374,149 @@ public final class ResourcePackService implements Listener {
         }
     }
 
-    private void exportPack(byte[] bytes) {
+    private Path exportPack(byte[] bytes) {
         try {
             Path directory = plugin.getDataFolder().toPath().resolve("resource-pack");
             Files.createDirectories(directory);
-            Files.write(directory.resolve("StrobeLights-ResourcePack-1.20.1.zip"), bytes);
+            return Files.write(
+                directory.resolve("StrobeLights-ResourcePack-1.20.1.zip"),
+                bytes
+            );
         } catch (IOException exception) {
             plugin.getLogger().warning("Could not export a copy of the resource pack: "
                 + exception.getMessage());
+            return null;
+        }
+    }
+
+    private boolean startNexoIntegration(Path exportedPack) {
+        if (!plugin.getConfig().getBoolean("resource-pack.nexo-integration.enabled", true)) {
+            return false;
+        }
+        Plugin detected = plugin.getServer().getPluginManager().getPlugin("Nexo");
+        if (detected == null || !detected.isEnabled()) {
+            return false;
+        }
+        if (exportedPack == null) {
+            plugin.getLogger().warning(
+                "Nexo integration needs the exported StrobeLights resource-pack ZIP; "
+                    + "using standalone delivery instead."
+            );
+            return false;
+        }
+
+        try {
+            ClassLoader loader = detected.getClass().getClassLoader();
+            Class<? extends Event> eventType = Class.forName(
+                "com.nexomc.nexo.api.events.resourcepack.NexoPostPackGenerateEvent",
+                true,
+                loader
+            ).asSubclass(Event.class);
+
+            nexoPlugin = detected;
+            nexoPackPath = exportedPack;
+            nexoManaged = true;
+            if (!nexoListenerRegistered) {
+                plugin.getServer().getPluginManager().registerEvent(
+                    eventType,
+                    nexoPackListener,
+                    EventPriority.HIGHEST,
+                    (listener, event) -> mergeIntoNexo(event),
+                    plugin,
+                    true
+                );
+                nexoListenerRegistered = true;
+            }
+            scheduleNexoRegenerationFallback();
+            return true;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            nexoManaged = false;
+            nexoPlugin = null;
+            nexoPackPath = null;
+            plugin.getLogger().warning(
+                "Nexo was detected but its pack integration API is unavailable ("
+                    + exception.getClass().getSimpleName() + ": " + exception.getMessage()
+                    + "). StrobeLights will use standalone delivery."
+            );
+            return false;
+        }
+    }
+
+    private void mergeIntoNexo(Event event) {
+        Path packPath = nexoPackPath;
+        if (!active || !nexoManaged || packPath == null) {
+            return;
+        }
+        try {
+            Method addResourcePack = event.getClass().getMethod("addResourcePack", File.class);
+            Object result = addResourcePack.invoke(event, packPath.toFile());
+            if (Boolean.FALSE.equals(result)) {
+                plugin.getLogger().warning(
+                    "Nexo rejected the StrobeLights resource-pack ZIP: " + packPath
+                );
+                return;
+            }
+            nexoMerged = true;
+            plugin.getLogger().info(
+                "StrobeLights shaders and models were added to Nexo's generated pack."
+            );
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().warning(
+                "Could not add StrobeLights to Nexo's generated pack: "
+                    + exception.getClass().getSimpleName() + ": " + exception.getMessage()
+            );
+        }
+    }
+
+    private void scheduleNexoRegenerationFallback() {
+        long delay = Math.max(1L, Math.min(
+            1_200L,
+            plugin.getConfig().getLong(
+                "resource-pack.nexo-integration.regeneration-delay-ticks",
+                40L
+            )
+        ));
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (!active || !nexoManaged || nexoMerged || nexoPlugin == null) {
+                return;
+            }
+            try {
+                Object generator = nexoPlugin.getClass()
+                    .getMethod("packGenerator")
+                    .invoke(nexoPlugin);
+                generator.getClass().getMethod("regeneratePack").invoke(generator);
+                plugin.getLogger().info(
+                    "Requested a Nexo pack regeneration so StrobeLights can be merged."
+                );
+            } catch (ReflectiveOperationException | LinkageError exception) {
+                plugin.getLogger().warning(
+                    "Could not request Nexo pack regeneration: "
+                        + exception.getClass().getSimpleName() + ": " + exception.getMessage()
+                );
+            }
+        }, delay);
+    }
+
+    private void sendNexoPack(Player player) {
+        Plugin detected = nexoPlugin;
+        if (detected == null || !detected.isEnabled()) {
+            plugin.getLogger().warning(
+                "Cannot resend the resource pack because Nexo is not enabled."
+            );
+            return;
+        }
+        try {
+            Class<?> nexoPack = Class.forName(
+                "com.nexomc.nexo.api.NexoPack",
+                true,
+                detected.getClass().getClassLoader()
+            );
+            nexoPack.getMethod("sendPack", Player.class).invoke(null, player);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().warning(
+                "Could not ask Nexo to resend its pack to " + player.getName() + ": "
+                    + exception.getClass().getSimpleName() + ": " + exception.getMessage()
+            );
         }
     }
 
