@@ -167,6 +167,7 @@ public final class FlareService implements Listener {
         ticker.cancel();
         loading.clear();
         flights.clear();
+        burns.values().forEach(burn -> plugin.manager().finishFlareLight(burn.lightId));
         burns.clear();
         menuBlockedUntilNanos.clear();
     }
@@ -403,8 +404,9 @@ public final class FlareService implements Listener {
                 iterator.remove();
                 continue;
             }
+            Location previous = flight.location.clone();
             flight.location.add(flight.velocity);
-            emitTrail(flight.location, flight.color.rgb);
+            emitTrail(previous, flight.location, flight.color.rgb);
             flight.elapsed++;
             double drag = Math.max(0.8, Math.min(
                 1.0,
@@ -426,33 +428,64 @@ public final class FlareService implements Listener {
                 continue;
             }
             iterator.remove();
-            igniteFlare(flight.location, flight.color);
+            igniteFlare(flight.location, flight.color, flight.velocity);
         }
     }
 
-    private void emitTrail(Location location, int rgb) {
+    private void emitTrail(Location start, Location location, int rgb) {
         int count = Math.max(0, Math.min(
             20,
-            plugin.getConfig().getInt("flare.trail-particle-count", 3)
+            plugin.getConfig().getInt("flare.trail-particle-count", 2)
         ));
-        if (count == 0 || location.getWorld() == null) {
+        if (location.getWorld() == null) {
             return;
         }
         float size = (float) Math.max(0.1, Math.min(
             4.0,
-            plugin.getConfig().getDouble("flare.trail-particle-size", 1.25)
+            plugin.getConfig().getDouble("flare.trail-particle-size", 1.6)
         ));
-        location.getWorld().spawnParticle(
-            Particle.DUST,
-            location,
-            count,
-            0.08,
-            0.08,
-            0.08,
-            0.0,
-            new Particle.DustOptions(Color.fromRGB(rgb), size),
-            true
-        );
+        int pointsPerBlock = Math.max(1, Math.min(
+            16,
+            plugin.getConfig().getInt("flare.trail-points-per-block", 6)
+        ));
+        Vector segment = location.toVector().subtract(start.toVector());
+        int points = Math.max(1, Math.min(40, (int) Math.ceil(
+            segment.length() * pointsPerBlock
+        )));
+        Particle.DustOptions dust = new Particle.DustOptions(Color.fromRGB(rgb), size);
+        if (count > 0) {
+            for (int index = 1; index <= points; index++) {
+                Location point = start.clone().add(segment.clone().multiply(index / (double) points));
+                location.getWorld().spawnParticle(
+                    Particle.DUST,
+                    point,
+                    count,
+                    0.025,
+                    0.025,
+                    0.025,
+                    0.0,
+                    dust,
+                    true
+                );
+            }
+        }
+        int hotCoreCount = Math.max(0, Math.min(
+            4,
+            plugin.getConfig().getInt("flare.trail-hot-core-count", 1)
+        ));
+        if (hotCoreCount > 0) {
+            location.getWorld().spawnParticle(
+                Particle.END_ROD,
+                location,
+                hotCoreCount,
+                0.015,
+                0.015,
+                0.015,
+                0.0,
+                null,
+                true
+            );
+        }
         int flameCount = Math.max(0, Math.min(
             8,
             plugin.getConfig().getInt("flare.trail-flame-count", 1)
@@ -489,35 +522,49 @@ public final class FlareService implements Listener {
         }
     }
 
-    private void igniteFlare(Location location, FlareColor color) {
+    private void igniteFlare(Location location, FlareColor color, Vector incomingVelocity) {
         if (location.getWorld() == null) {
             return;
         }
-        plugin.manager().detonateFlare(location, color.rgb);
         int burnDuration = Math.max(1, Math.min(
             1_200,
-            plugin.getConfig().getInt("flare.explosion.burn-duration-ticks", 160)
+            plugin.getConfig().getInt("flare.explosion.burn-duration-ticks", 600)
         ));
         int burstDuration = Math.max(1, Math.min(
             100,
-            plugin.getConfig().getInt("flare.explosion.burst-duration-ticks", 18)
+            plugin.getConfig().getInt("flare.explosion.burst-duration-ticks", 8)
         ));
         int sparkCount = Math.max(0, Math.min(
             200,
-            plugin.getConfig().getInt("flare.explosion.burst-particle-count", 48)
+            plugin.getConfig().getInt("flare.explosion.burst-particle-count", 14)
         ));
         double sparkSpeed = Math.max(0.01, Math.min(
             2.0,
-            plugin.getConfig().getDouble("flare.explosion.burst-speed", 0.32)
+            plugin.getConfig().getDouble("flare.explosion.burst-speed", 0.12)
         ));
+        double driftSpeed = Math.max(0.0, Math.min(
+            0.1,
+            plugin.getConfig().getDouble("flare.explosion.drift-speed", 0.006)
+        ));
+        Vector drift = incomingVelocity.clone().setY(0.0);
+        if (drift.lengthSquared() > 1.0e-8) {
+            drift.normalize().multiply(driftSpeed);
+        } else {
+            drift.setX(driftSpeed);
+        }
+        UUID burnId = UUID.randomUUID();
+        UUID lightId = plugin.manager().detonateFlare(location, color.rgb);
         burns.put(
-            UUID.randomUUID(),
+            burnId,
             new FlareBurn(
                 location.clone(),
                 color,
                 burnDuration,
                 burstDuration,
-                createBurstSparks(location, sparkCount, sparkSpeed)
+                createBurstSparks(location, sparkCount, sparkSpeed),
+                drift,
+                (burnId.getLeastSignificantBits() & 0xFFFF) * Math.PI / 32_768.0,
+                lightId
             )
         );
     }
@@ -550,10 +597,12 @@ public final class FlareService implements Listener {
             FlareBurn burn = iterator.next().getValue();
             World world = burn.location.getWorld();
             if (world == null || burn.elapsed >= burn.duration) {
+                plugin.manager().finishFlareLight(burn.lightId);
                 iterator.remove();
                 continue;
             }
             tickBurnPosition(burn);
+            plugin.manager().moveFlareLight(burn.lightId, burn.location);
             emitBurnCore(burn);
             if (burn.elapsed < burn.burstDuration) {
                 tickBurstSparks(burn);
@@ -565,10 +614,24 @@ public final class FlareService implements Listener {
     private void tickBurnPosition(FlareBurn burn) {
         double configuredFallSpeed = Math.max(0.0, Math.min(
             0.3,
-            plugin.getConfig().getDouble("flare.explosion.fall-speed", 0.035)
+            plugin.getConfig().getDouble("flare.explosion.fall-speed", 0.012)
         ));
-        burn.fallSpeed = Math.min(configuredFallSpeed, burn.fallSpeed + 0.0015);
-        Location next = burn.location.clone().subtract(0.0, burn.fallSpeed, 0.0);
+        burn.fallSpeed = Math.min(configuredFallSpeed, burn.fallSpeed + 0.0005);
+        double swayStrength = Math.max(0.0, Math.min(
+            0.05,
+            plugin.getConfig().getDouble("flare.explosion.sway-strength", 0.0025)
+        ));
+        double swayFrequency = Math.max(0.001, Math.min(
+            1.0,
+            plugin.getConfig().getDouble("flare.explosion.sway-frequency", 0.08)
+        ));
+        double sway = Math.sin(burn.swayPhase + burn.elapsed * swayFrequency) * swayStrength;
+        double driftLength = Math.max(1.0e-8, burn.drift.length());
+        Location next = burn.location.clone().add(
+            burn.drift.getX() - burn.drift.getZ() / driftLength * sway,
+            -burn.fallSpeed,
+            burn.drift.getZ() + burn.drift.getX() / driftLength * sway
+        );
         if (!next.getBlock().getType().isSolid()) {
             burn.location = next;
         }
@@ -581,12 +644,13 @@ public final class FlareService implements Listener {
         }
         int count = Math.max(0, Math.min(
             40,
-            plugin.getConfig().getInt("flare.explosion.burn-particle-count", 7)
+            plugin.getConfig().getInt("flare.explosion.burn-particle-count", 12)
         ));
         float size = (float) Math.max(0.1, Math.min(
             8.0,
-            plugin.getConfig().getDouble("flare.explosion.burn-particle-size", 2.4)
+            plugin.getConfig().getDouble("flare.explosion.burn-particle-size", 3.5)
         ));
+        size *= (float) (0.94 + Math.sin(burn.elapsed * 0.55) * 0.06);
         if (count > 0) {
             world.spawnParticle(
                 Particle.DUST,
@@ -597,6 +661,23 @@ public final class FlareService implements Listener {
                 0.13,
                 0.0,
                 new Particle.DustOptions(Color.fromRGB(burn.color.rgb), size),
+                true
+            );
+        }
+        int hotCoreCount = Math.max(0, Math.min(
+            8,
+            plugin.getConfig().getInt("flare.explosion.hot-core-particle-count", 2)
+        ));
+        if (hotCoreCount > 0) {
+            world.spawnParticle(
+                Particle.END_ROD,
+                burn.location,
+                hotCoreCount,
+                0.04,
+                0.04,
+                0.04,
+                0.0,
+                null,
                 true
             );
         }
@@ -903,6 +984,9 @@ public final class FlareService implements Listener {
         private final int duration;
         private final int burstDuration;
         private final List<FlareSpark> sparks;
+        private final Vector drift;
+        private final double swayPhase;
+        private final UUID lightId;
         private double fallSpeed;
         private int elapsed;
 
@@ -911,13 +995,19 @@ public final class FlareService implements Listener {
             FlareColor color,
             int duration,
             int burstDuration,
-            List<FlareSpark> sparks
+            List<FlareSpark> sparks,
+            Vector drift,
+            double swayPhase,
+            UUID lightId
         ) {
             this.location = location;
             this.color = color;
             this.duration = duration;
             this.burstDuration = burstDuration;
             this.sparks = sparks;
+            this.drift = drift;
+            this.swayPhase = swayPhase;
+            this.lightId = lightId;
         }
     }
 
