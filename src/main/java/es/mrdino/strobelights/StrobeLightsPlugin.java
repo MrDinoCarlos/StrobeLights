@@ -16,6 +16,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class StrobeLightsPlugin extends JavaPlugin {
 
+    private static final int CONFIG_VERSION = 2;
+
     private StrobeRepository repository;
     private Messages messages;
     private StrobeManager manager;
@@ -27,6 +29,7 @@ public final class StrobeLightsPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        migrateConfiguration();
         getConfig().options().copyDefaults(true);
         saveConfig();
         messages = new Messages(this);
@@ -104,6 +107,7 @@ public final class StrobeLightsPlugin extends JavaPlugin {
             manager.shutdown();
         }
         reloadConfig();
+        migrateConfiguration();
         getConfig().options().copyDefaults(true);
         saveConfig();
         messages.load();
@@ -118,5 +122,41 @@ public final class StrobeLightsPlugin extends JavaPlugin {
         Map<String, Strobe> strobes = repository.load();
         manager = new StrobeManager(this, repository, strobes);
         manager.start();
+    }
+
+    private void migrateConfiguration() {
+        if (getConfig().contains("config-version", true)
+            && getConfig().getInt("config-version") >= CONFIG_VERSION) {
+            return;
+        }
+        replaceLegacyInt("flare.trail-particle-count", 3, 2);
+        replaceLegacyDouble("flare.trail-particle-size", 1.25, 1.6);
+        replaceLegacyInt("flare.explosion.burst-particle-count", 48, 14);
+        replaceLegacyDouble("flare.explosion.burst-particle-size", 1.25, 1.1);
+        replaceLegacyInt("flare.explosion.burst-duration-ticks", 18, 8);
+        replaceLegacyDouble("flare.explosion.burst-speed", 0.32, 0.12);
+        replaceLegacyInt("flare.explosion.burn-duration-ticks", 160, 600);
+        replaceLegacyInt("flare.explosion.burn-particle-count", 7, 12);
+        replaceLegacyDouble("flare.explosion.burn-particle-size", 2.4, 3.5);
+        replaceLegacyDouble("flare.explosion.fall-speed", 0.035, 0.012);
+        replaceLegacyInt("flare.explosion.scene-light-duration-ticks", 160, 600);
+        getConfig().set("config-version", CONFIG_VERSION);
+    }
+
+    private void replaceLegacyInt(String path, int previousDefault, int replacement) {
+        if (getConfig().contains(path, true) && getConfig().getInt(path) == previousDefault) {
+            getConfig().set(path, replacement);
+        }
+    }
+
+    private void replaceLegacyDouble(
+        String path,
+        double previousDefault,
+        double replacement
+    ) {
+        if (getConfig().contains(path, true)
+            && Math.abs(getConfig().getDouble(path) - previousDefault) < 1.0e-9) {
+            getConfig().set(path, replacement);
+        }
     }
 }
