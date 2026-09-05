@@ -154,29 +154,37 @@ flare:
   explode-on-collision: true
   launch-sound-volume: 1.5
   launch-sound-pitch: 0.9
-  trail-particle-count: 3
-  trail-particle-size: 1.25
+  # Dense interpolation makes the rising projectile look like a continuous flare.
+  trail-points-per-block: 6
+  trail-particle-count: 2
+  trail-particle-size: 1.6
+  trail-hot-core-count: 1
   trail-flame-count: 1
   trail-smoke-count: 1
   explosion:
-    # Custom simulated flare burst; no vanilla firework entity is spawned.
-    burst-particle-count: 48
-    burst-particle-size: 1.25
-    burst-duration-ticks: 18
-    burst-speed: 0.32
+    # A short ignition pop, followed by a long-lived aerial illumination flare.
+    # No vanilla firework entity or spherical firework effect is spawned.
+    burst-particle-count: 14
+    burst-particle-size: 1.1
+    burst-duration-ticks: 8
+    burst-speed: 0.12
     spark-drag: 0.94
     spark-gravity: 0.012
-    # Bright burning core that hangs in the sky and slowly descends.
-    burn-duration-ticks: 160
-    burn-particle-count: 7
-    burn-particle-size: 2.4
+    # 600 ticks = 30 seconds. The light follows the drifting burning core.
+    burn-duration-ticks: 600
+    burn-particle-count: 12
+    burn-particle-size: 3.5
+    hot-core-particle-count: 2
     flame-particle-count: 2
     smoke-particle-count: 1
-    fall-speed: 0.035
+    fall-speed: 0.012
+    drift-speed: 0.006
+    sway-strength: 0.0025
+    sway-frequency: 0.08
     sound-volume: 4.0
     sound-pitch: 1.0
     # Colored 3D light from the resource pack plus the vanilla white fallback.
-    scene-light-duration-ticks: 160
+    scene-light-duration-ticks: 600
     scene-light-level: 15
     scene-light-expansion: 2.0
     scene-view-range: 128.0
