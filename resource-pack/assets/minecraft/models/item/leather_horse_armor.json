@@ -7,6 +7,14 @@
     {
       "predicate": { "custom_model_data": 6911 },
       "model": "strobelights:item/flare_cartridge"
+    },
+    {
+      "predicate": { "custom_model_data": 6912 },
+      "model": "strobelights:item/flare_core"
+    },
+    {
+      "predicate": { "custom_model_data": 6913 },
+      "model": "strobelights:item/flare_hot_core"
     }
   ]
 }

@@ -164,6 +164,18 @@ class CameraFlashCodecTest {
     }
 
     @Test
+    void flareGlareBecomesIntenseOnlyAsTheCameraCentersOnTheFlare() {
+        double outsideCone = StrobeManager.flareGlareViewScale(0.71, 0.72, 0.6);
+        double edge = StrobeManager.flareGlareViewScale(0.80, 0.72, 0.6);
+        double centered = StrobeManager.flareGlareViewScale(0.98, 0.72, 0.6);
+
+        assertEquals(0.0, outsideCone);
+        assertTrue(edge > 0.0);
+        assertTrue(centered > edge);
+        assertEquals(1.0, StrobeManager.flareGlareViewScale(1.0, 0.72, 0.6));
+    }
+
+    @Test
     void glassIsTransparentToServerSideLightOcclusion() {
         assertTrue(StrobeManager.letsLightThrough(Material.GLASS));
         assertTrue(StrobeManager.letsLightThrough(Material.RED_STAINED_GLASS));
