@@ -16,7 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class StrobeLightsPlugin extends JavaPlugin {
 
-    private static final int CONFIG_VERSION = 4;
+    private static final int CONFIG_VERSION = 5;
 
     private StrobeRepository repository;
     private Messages messages;
@@ -171,6 +171,8 @@ public final class StrobeLightsPlugin extends JavaPlugin {
         replaceLegacyDouble("flare.explosion.screen-flash.falloff-exponent", 0.85, 1.05);
         replaceLegacyInt("flare.explosion.screen-flash.maximum-duration-ticks", 80, 50);
         replaceLegacyInt("flare.explosion.screen-flash.strength-percent", 135, 85);
+        replaceLegacyDouble("render.display-view-range", 128.0, 192.0);
+        replaceLegacyDouble("flare.explosion.scene-view-range", 128.0, 192.0);
         removeRetiredFlareParticleSettings();
         migrateRetiredFlareMotionSettings();
         getConfig().set("config-version", CONFIG_VERSION);

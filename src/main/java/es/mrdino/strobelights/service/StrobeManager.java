@@ -571,6 +571,54 @@ public final class StrobeManager {
         return id;
     }
 
+    /**
+     * Starts a second light on the first solid surface below a burning flare.
+     * The aerial source keeps the flare itself luminous while this projected
+     * source makes terrain visibly receive its light during the descent.
+     */
+    public UUID beginFlareGroundLight(Location flareLocation, int rgb) {
+        if (flareLocation == null || flareLocation.getWorld() == null
+            || !plugin.getConfig().getBoolean(
+                "flare.explosion.ground-projection.enabled",
+                true
+            )) {
+            return null;
+        }
+        int duration = Math.max(1, Math.min(
+            1_200,
+            plugin.getConfig().getInt(
+                "flare.explosion.scene-light-duration-ticks",
+                800
+            )
+        ));
+        int lightLevel = Math.max(0, Math.min(
+            15,
+            plugin.getConfig().getInt(
+                "flare.explosion.ground-projection.light-level",
+                15
+            )
+        ));
+        double expansion = plugin.getConfig().getDouble(
+            "flare.explosion.ground-projection.expansion",
+            2.5
+        );
+        Location projected = flareGroundLightLocation(flareLocation);
+        UUID id = UUID.randomUUID();
+        SceneFlash scene = new SceneFlash(
+            sceneLightLocation(projected),
+            duration,
+            rgb & 0xFFFFFF,
+            lightLevel,
+            expansionCode(expansion),
+            configuredSceneViewRange("flare.explosion.scene-view-range")
+        );
+        scene.source = spawnSceneFlashSource(id, scene);
+        placeSceneVanillaLight(scene);
+        sceneFlashes.put(id, scene);
+        updateSceneFlash(scene);
+        return id;
+    }
+
     /** Keeps the RGB and vanilla scene lights attached to a descending flare. */
     public void moveFlareLight(UUID id, Location location) {
         if (id == null || location == null || location.getWorld() == null) {
@@ -641,6 +689,14 @@ public final class StrobeManager {
                 );
             }
         }
+    }
+
+    /** Moves the terrain illumination pool below the descending flare. */
+    public void moveFlareGroundLight(UUID id, Location flareLocation) {
+        if (id == null || flareLocation == null || flareLocation.getWorld() == null) {
+            return;
+        }
+        moveFlareLight(id, flareGroundLightLocation(flareLocation));
     }
 
     /** Refreshes the intense glare while a player keeps the burning flare in view. */
@@ -1759,6 +1815,38 @@ public final class StrobeManager {
         return air == null
             ? impact.clone()
             : air.getLocation().add(0.5, 0.5, 0.5);
+    }
+
+    private Location flareGroundLightLocation(Location flareLocation) {
+        World world = flareLocation.getWorld();
+        if (world == null) {
+            return flareLocation.clone();
+        }
+        double maximumDrop = Math.max(8.0, Math.min(
+            256.0,
+            plugin.getConfig().getDouble(
+                "flare.explosion.ground-projection.maximum-drop-distance",
+                128.0
+            )
+        ));
+        RayTraceResult hit = rayTraceBlocksIgnoringTechnicalBlocks(
+            world,
+            flareLocation,
+            new Vector(0.0, -1.0, 0.0),
+            maximumDrop,
+            FluidCollisionMode.NEVER,
+            true
+        );
+        if (hit == null || hit.getHitPosition() == null) {
+            return flareLocation.clone();
+        }
+        Vector position = hit.getHitPosition();
+        return new Location(
+            world,
+            position.getX(),
+            position.getY() + 0.08,
+            position.getZ()
+        );
     }
 
     private static Block nearestAirBlock(Location location) {
