@@ -137,6 +137,34 @@ class ShaderPackContractTest {
     }
 
     @Test
+    void visibleItemTexturesCannotImpersonateTechnicalLightMarkers() throws IOException {
+        Path visibleTextures = PACK.resolve("assets/strobelights/textures/item");
+        try (var files = Files.walk(visibleTextures)) {
+            for (Path texture : files.filter(path -> path.toString().endsWith(".png")).toList()) {
+                var image = ImageIO.read(texture.toFile());
+                for (int y = 0; y < image.getHeight(); y++) {
+                    for (int x = 0; x < image.getWidth(); x++) {
+                        int argb = image.getRGB(x, y);
+                        int alpha = argb >>> 24;
+                        int red = argb >> 16 & 0xFF;
+                        int green = argb >> 8 & 0xFF;
+                        int blue = argb & 0xFF;
+                        int peak = Math.max(red, Math.max(green, blue));
+                        int base = Math.min(red, Math.min(green, blue));
+                        boolean reservedAlpha = alpha >= 22 && alpha <= 26;
+                        boolean neutralCarrier = peak >= alpha * 0.5
+                            && base >= peak * 0.75;
+                        assertFalse(
+                            reservedAlpha && neutralCarrier,
+                            () -> texture + " contains a false technical marker"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     void transportsMarkersThroughTheOptiFineCompatibleColorAttachment()
         throws IOException {
         Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
@@ -551,13 +579,23 @@ class ShaderPackContractTest {
         assertContains(config, "reload-required: true");
         assertContains(config, "burn-duration-ticks: 800");
         assertContains(config, "burn-size: 3.2");
-        assertContains(config, "fall-speed: 0.035");
+        assertContains(config, "ignition-velocity-retention: 0.45");
+        assertContains(config, "minimum-horizontal-speed: 0.035");
+        assertContains(config, "horizontal-drag: 0.992");
+        assertContains(config, "gravity: 0.0035");
+        assertContains(config, "terminal-fall-speed: 0.06");
+        assertContains(config, "wind-acceleration: 0.00018");
         assertContains(config, "scene-light-expansion: 4.0");
         assertContains(config, "flight-light-expansion: 2.0");
-        assertContains(config, "maximum-duration-ticks: 80");
-        assertContains(config, "config-version: 3");
+        assertContains(config, "maximum-duration-ticks: 50");
+        assertContains(config, "strength-percent: 85");
+        assertContains(config, "config-version: 4");
         assertNotContains(config, "particle-count");
+        assertNotContains(config, "\n    fall-speed:");
+        assertNotContains(config, "\n    drift-speed:");
         assertNotContains(service, "flare.trail-points-per-block");
+        assertContains(service, "nextBurnVelocity(");
+        assertContains(service, "burn.grounded = true");
         assertContains(service, "moveFlareLight(burn.lightId, burn.location)");
         assertContains(service, "refreshFlareCameraGlare(burn.location, burn.color.rgb)");
         assertContains(manager, "public void moveFlareLight(UUID id, Location location)");
