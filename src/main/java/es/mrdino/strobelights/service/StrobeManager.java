@@ -497,9 +497,9 @@ public final class StrobeManager {
     }
 
     /** Creates the colored sky light and mild camera flash at a flare explosion. */
-    public void detonateFlare(Location location, int rgb) {
+    public UUID detonateFlare(Location location, int rgb) {
         if (location == null || location.getWorld() == null) {
-            return;
+            return null;
         }
         Location explosion = location.clone();
         Location sceneLocation = sceneLightLocation(explosion);
@@ -507,7 +507,7 @@ public final class StrobeManager {
             1_200,
             plugin.getConfig().getInt(
                 "flare.explosion.scene-light-duration-ticks",
-                40
+                600
             )
         ));
         int lightLevel = Math.max(0, Math.min(
@@ -533,6 +533,42 @@ public final class StrobeManager {
         updateSceneFlash(scene);
         emitFlareFlash(explosion, rgb);
         triggerFlareCameraFlash(explosion, rgb);
+        return id;
+    }
+
+    /** Keeps the RGB and vanilla scene lights attached to a descending flare. */
+    public void moveFlareLight(UUID id, Location location) {
+        if (id == null || location == null || location.getWorld() == null) {
+            return;
+        }
+        SceneFlash scene = sceneFlashes.get(id);
+        if (scene == null || scene.location.getWorld() != location.getWorld()) {
+            return;
+        }
+        boolean changedBlock = scene.location.getBlockX() != location.getBlockX()
+            || scene.location.getBlockY() != location.getBlockY()
+            || scene.location.getBlockZ() != location.getBlockZ();
+        if (changedBlock) {
+            scene.clearVanillaLight();
+        }
+        scene.location = location.clone();
+        if (scene.source != null && scene.source.isValid() && !scene.source.isDead()) {
+            positionFixedLightDisplay(scene.source, scene.location);
+        }
+        if (changedBlock) {
+            placeSceneVanillaLight(scene);
+        }
+    }
+
+    /** Removes the moving scene light when the visible flare has finished burning. */
+    public void finishFlareLight(UUID id) {
+        if (id == null) {
+            return;
+        }
+        SceneFlash scene = sceneFlashes.remove(id);
+        if (scene != null) {
+            scene.remove();
+        }
     }
 
     private void emitFlareFlash(Location location, int rgb) {
@@ -2123,7 +2159,7 @@ public final class StrobeManager {
     }
 
     private static final class SceneFlash {
-        private final Location location;
+        private Location location;
         private final int rgb;
         private final int lightLevel;
         private final int expansionCode;
@@ -2182,6 +2218,10 @@ public final class StrobeManager {
                 source.remove();
                 source = null;
             }
+            clearVanillaLight();
+        }
+
+        private void clearVanillaLight() {
             if (vanillaLight != null && vanillaLight.getType() == Material.LIGHT) {
                 vanillaLight.setType(originalAir.isAir() ? originalAir : Material.AIR, false);
             }
