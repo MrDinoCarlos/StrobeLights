@@ -1685,7 +1685,7 @@ public final class StrobeManager {
     private double displayViewRangeBlocks() {
         return Math.max(16.0, Math.min(
             256.0,
-            plugin.getConfig().getDouble("render.display-view-range", 128.0)
+            plugin.getConfig().getDouble("render.display-view-range", 192.0)
         ));
     }
 
