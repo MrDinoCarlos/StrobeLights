@@ -550,9 +550,15 @@ class ShaderPackContractTest {
         assertContains(config, "burn-duration-ticks: 600");
         assertContains(config, "burst-particle-count: 14");
         assertContains(config, "fall-speed: 0.012");
+        assertContains(config, "config-version: 2");
         assertContains(service, "flare.trail-points-per-block");
         assertContains(service, "moveFlareLight(burn.lightId, burn.location)");
         assertContains(manager, "public void moveFlareLight(UUID id, Location location)");
+        Path plugin = Path.of(
+            "src/main/java/es/mrdino/strobelights/StrobeLightsPlugin.java"
+        );
+        assertContains(plugin, "migrateConfiguration();");
+        assertContains(plugin, "burn-duration-ticks\", 160, 600");
         assertFalse(Pattern.compile(
             "Particle\\.FLASH,[\\s\\S]{0,180}Color\\."
         ).matcher(Files.readString(manager, StandardCharsets.UTF_8)).find());
