@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "ambientocclusion": false,
+  "textures": {
+    "layer0": "strobelights:item/flare_core"
+  },
+  "display": {
+    "head": {
+      "rotation": [0, 0, 0],
+      "translation": [0, 0, 0],
+      "scale": [1, 1, 1]
+    }
+  }
+}
