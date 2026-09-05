@@ -25,7 +25,7 @@ class ShaderPackContractTest {
             "assets/strobelights/strobelights-integration.json"
         );
         assertTrue(Files.isRegularFile(integration));
-        assertContains(integration, "\"version\": \"0.10.10\"");
+        assertContains(integration, "\"version\": \"0.10.11\"");
         assertContains(integration, "\"render_pipeline\": \"light_painter_rgb\"");
     }
 
@@ -98,10 +98,10 @@ class ShaderPackContractTest {
         assertContains(coreVertex, "in vec2 UV1");
         assertContains(coreVertex, "in ivec2 UV2");
         assertContains(coreVertex, "in vec3 Normal");
-        assertContains(coreVertex, "bool technicalCarrierGeometry");
-        assertContains(coreVertex, "abs(Position.y - 8.0) < 0.01");
-        assertContains(coreVertex, "abs(abs(Normal.y) - 1.0) < 0.01");
-        assertContains(coreVertex, "&& technicalCarrierGeometry");
+        assertContains(coreVertex, "bool encodedTechnicalCarrier");
+        assertContains(coreVertex, "&& encodedTechnicalCarrier");
+        assertNotContains(coreVertex, "technicalCarrierGeometry");
+        assertNotContains(coreVertex, "Position.y - 8.0");
     }
 
     @Test

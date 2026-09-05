@@ -1,6 +1,6 @@
 {
   "pack": {
     "pack_format": 15,
-    "description": "StrobeLights 0.10.10 - resilient RGB render delivery - Paper 1.20.1"
+    "description": "StrobeLights 0.10.11 - restored RGB carrier decoding - Paper 1.20.1"
   }
 }

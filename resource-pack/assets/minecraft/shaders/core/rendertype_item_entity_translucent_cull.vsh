@@ -227,16 +227,13 @@ void main() {
     // OFF mode supplies NO_FOG with equal start/end values for world entities,
     // which made every ItemDisplay look like a hand item and removed all
     // StrobeLights markers before the Fabulous post chain.
-    // The dedicated carrier is the only item model with a horizontal face at
-    // local Y=8, which also prevents ordinary held items from matching it.
-    bool technicalCarrierGeometry = abs(Position.y - 8.0) < 0.01
-        && abs(abs(Normal.y) - 1.0) < 0.01;
+    // The texture itself carries a validated StrobeLights payload on 1.20.1;
+    // renderer-baked Position values must never be compared with JSON units.
     marker = float(
         !gui
         && encodedTechnicalCarrier
         && markerAlpha
         && markerTextureCarrier
-        && technicalCarrierGeometry
     );
 
     if (marker > 0.0) {
