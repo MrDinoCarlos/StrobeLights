@@ -404,7 +404,7 @@ public final class FlareService implements Listener {
         );
         float volume = (float) Math.max(0.0, Math.min(
             16.0,
-            plugin.getConfig().getDouble("flare.launch-sound-volume", 4.0)
+            plugin.getConfig().getDouble("flare.launch-sound-volume", 3.0)
         ));
         float pitch = (float) Math.max(0.5, Math.min(
             2.0,
@@ -515,17 +515,29 @@ public final class FlareService implements Listener {
             1_200,
             plugin.getConfig().getInt("flare.explosion.burn-duration-ticks", 800)
         ));
-        double driftSpeed = Math.max(0.0, Math.min(
-            0.1,
-            plugin.getConfig().getDouble("flare.explosion.drift-speed", 0.012)
+        double velocityRetention = Math.max(0.0, Math.min(
+            1.0,
+            plugin.getConfig().getDouble(
+                "flare.explosion.ignition-velocity-retention",
+                0.45
+            )
         ));
-        Vector drift = incomingVelocity.clone().setY(0.0);
-        if (drift.lengthSquared() > 1.0e-8) {
-            drift.normalize().multiply(driftSpeed);
-        } else {
-            drift.setX(driftSpeed);
-        }
         UUID burnId = UUID.randomUUID();
+        double swayPhase = (burnId.getLeastSignificantBits() & 0xFFFF)
+            * Math.PI / 32_768.0;
+        Vector burnVelocity = incomingVelocity.clone().multiply(velocityRetention);
+        double minimumHorizontalSpeed = Math.max(0.0, Math.min(
+            0.25,
+            plugin.getConfig().getDouble(
+                "flare.explosion.minimum-horizontal-speed",
+                0.035
+            )
+        ));
+        double horizontalSpeed = Math.hypot(burnVelocity.getX(), burnVelocity.getZ());
+        if (horizontalSpeed < minimumHorizontalSpeed) {
+            burnVelocity.setX(Math.cos(swayPhase) * minimumHorizontalSpeed);
+            burnVelocity.setZ(Math.sin(swayPhase) * minimumHorizontalSpeed);
+        }
         plugin.manager().finishFlareLight(flightLightId);
         UUID lightId = plugin.manager().detonateFlare(location, color.rgb);
         burns.put(
@@ -534,8 +546,8 @@ public final class FlareService implements Listener {
                 location.clone(),
                 color,
                 burnDuration,
-                drift,
-                (burnId.getLeastSignificantBits() & 0xFFFF) * Math.PI / 32_768.0,
+                burnVelocity,
+                swayPhase,
                 lightId,
                 visual
             )
@@ -587,29 +599,93 @@ public final class FlareService implements Listener {
     }
 
     private void tickBurnPosition(FlareBurn burn) {
-        double configuredFallSpeed = Math.max(0.0, Math.min(
-            0.3,
-            plugin.getConfig().getDouble("flare.explosion.fall-speed", 0.035)
+        if (burn.grounded) {
+            return;
+        }
+        double horizontalDrag = Math.max(0.8, Math.min(
+            1.0,
+            plugin.getConfig().getDouble("flare.explosion.horizontal-drag", 0.992)
         ));
-        burn.fallSpeed = Math.min(configuredFallSpeed, burn.fallSpeed + 0.0005);
+        double gravity = Math.max(0.0, Math.min(
+            0.1,
+            plugin.getConfig().getDouble("flare.explosion.gravity", 0.0035)
+        ));
+        double terminalFallSpeed = Math.max(0.01, Math.min(
+            0.3,
+            plugin.getConfig().getDouble("flare.explosion.terminal-fall-speed", 0.06)
+        ));
+        double windAcceleration = Math.max(0.0, Math.min(
+            0.01,
+            plugin.getConfig().getDouble("flare.explosion.wind-acceleration", 0.00018)
+        ));
         double swayStrength = Math.max(0.0, Math.min(
             0.05,
-            plugin.getConfig().getDouble("flare.explosion.sway-strength", 0.005)
+            plugin.getConfig().getDouble("flare.explosion.sway-strength", 0.0018)
         ));
         double swayFrequency = Math.max(0.001, Math.min(
             1.0,
-            plugin.getConfig().getDouble("flare.explosion.sway-frequency", 0.09)
+            plugin.getConfig().getDouble("flare.explosion.sway-frequency", 0.08)
         ));
-        double sway = Math.sin(burn.swayPhase + burn.elapsed * swayFrequency) * swayStrength;
-        double driftLength = Math.max(1.0e-8, burn.drift.length());
-        Location next = burn.location.clone().add(
-            burn.drift.getX() - burn.drift.getZ() / driftLength * sway,
-            -burn.fallSpeed,
-            burn.drift.getZ() + burn.drift.getX() / driftLength * sway
+        double windAngle = burn.swayPhase + burn.elapsed * swayFrequency * 0.18;
+        Vector wind = new Vector(
+            Math.cos(windAngle) * windAcceleration,
+            0.0,
+            Math.sin(windAngle) * windAcceleration
         );
-        if (!next.getBlock().getType().isSolid()) {
-            burn.location = next;
+        burn.velocity = nextBurnVelocity(
+            burn.velocity,
+            horizontalDrag,
+            gravity,
+            terminalFallSpeed,
+            wind
+        );
+        Vector movement = burn.velocity.clone();
+        double horizontalSpeed = Math.hypot(movement.getX(), movement.getZ());
+        if (horizontalSpeed > 1.0e-8 && swayStrength > 0.0) {
+            double sway = Math.sin(burn.swayPhase + burn.elapsed * swayFrequency)
+                * swayStrength;
+            movement.add(new Vector(
+                -movement.getZ() / horizontalSpeed * sway,
+                0.0,
+                movement.getX() / horizontalSpeed * sway
+            ));
         }
+        if (movement.lengthSquared() <= 1.0e-10) {
+            return;
+        }
+        World world = burn.location.getWorld();
+        RayTraceResult collision = StrobeManager.rayTraceBlocksIgnoringTechnicalBlocks(
+            world,
+            burn.location,
+            movement.clone().normalize(),
+            movement.length(),
+            FluidCollisionMode.NEVER,
+            true
+        );
+        if (collision != null && collision.getHitPosition() != null) {
+            Vector impact = collision.getHitPosition().subtract(
+                movement.clone().normalize().multiply(0.025)
+            );
+            burn.location.set(impact.getX(), impact.getY(), impact.getZ());
+            burn.velocity.zero();
+            burn.grounded = true;
+            return;
+        }
+        burn.location.add(movement);
+    }
+
+    static Vector nextBurnVelocity(
+        Vector velocity,
+        double horizontalDrag,
+        double gravity,
+        double terminalFallSpeed,
+        Vector wind
+    ) {
+        return new Vector(
+            velocity.getX() * horizontalDrag + wind.getX(),
+            Math.max(-terminalFallSpeed, velocity.getY() - gravity),
+            velocity.getZ() * horizontalDrag + wind.getZ()
+        );
     }
 
     private FlareVisual spawnFlareVisual(Location location, int rgb, double size) {
@@ -985,18 +1061,18 @@ public final class FlareService implements Listener {
         private Location location;
         private final FlareColor color;
         private final int duration;
-        private final Vector drift;
+        private Vector velocity;
         private final double swayPhase;
         private final UUID lightId;
         private final FlareVisual visual;
-        private double fallSpeed;
+        private boolean grounded;
         private int elapsed;
 
         private FlareBurn(
             Location location,
             FlareColor color,
             int duration,
-            Vector drift,
+            Vector velocity,
             double swayPhase,
             UUID lightId,
             FlareVisual visual
@@ -1004,7 +1080,7 @@ public final class FlareService implements Listener {
             this.location = location;
             this.color = color;
             this.duration = duration;
-            this.drift = drift;
+            this.velocity = velocity;
             this.swayPhase = swayPhase;
             this.lightId = lightId;
             this.visual = visual;
