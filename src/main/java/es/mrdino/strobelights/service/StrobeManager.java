@@ -613,7 +613,7 @@ public final class StrobeManager {
         }
         float volume = (float) Math.max(0.0, Math.min(
             16.0,
-            plugin.getConfig().getDouble("flare.explosion.sound-volume", 4.0)
+            plugin.getConfig().getDouble("flare.explosion.sound-volume", 3.0)
         ));
         float pitch = (float) Math.max(0.5, Math.min(
             2.0,
@@ -659,21 +659,21 @@ public final class StrobeManager {
             256.0,
             plugin.getConfig().getDouble(
                 "flare.explosion.screen-flash.radius",
-                96.0
+                72.0
             )
         ));
         double fullEffectDistance = Math.max(0.0, Math.min(
             radius,
             plugin.getConfig().getDouble(
                 "flare.explosion.screen-flash.full-effect-distance",
-                12.0
+                8.0
             )
         ));
         double exponent = Math.max(0.1, Math.min(
             4.0,
             plugin.getConfig().getDouble(
                 "flare.explosion.screen-flash.falloff-exponent",
-                0.85
+                1.05
             )
         ));
         double minimumViewDot = Math.max(-1.0, Math.min(
@@ -694,14 +694,14 @@ public final class StrobeManager {
             1_200,
             plugin.getConfig().getInt(
                 "flare.explosion.screen-flash.maximum-duration-ticks",
-                80
+                50
             )
         ));
         int strength = Math.max(0, Math.min(
             200,
             plugin.getConfig().getInt(
                 "flare.explosion.screen-flash.strength-percent",
-                135
+                85
             )
         ));
         boolean requireLooking = plugin.getConfig().getBoolean(

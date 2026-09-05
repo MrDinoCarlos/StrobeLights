@@ -4,7 +4,7 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.10.5
+# Version:     0.10.6
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
@@ -16,7 +16,7 @@
 
 # Internal schema used to migrate defaults from older releases without deleting
 # administrator customizations.
-config-version: 3
+config-version: 4
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
@@ -159,7 +159,7 @@ flare:
   # The projectile already lights nearby terrain before the main flare ignites.
   flight-light-level: 15
   flight-light-expansion: 2.0
-  launch-sound-volume: 4.0
+  launch-sound-volume: 3.0
   launch-sound-pitch: 1.0
   # A smooth halo and white-hot core follow the shot and replace vanilla particles.
   visual:
@@ -167,13 +167,18 @@ flare:
     burn-size: 3.2
     view-range: 192.0
   explosion:
-    # 800 ticks = 40 seconds. The light follows the slowly descending core.
+    # 800 ticks = 40 seconds. Momentum, gravity, drag and wind keep the burning
+    # flare on a curved path; after landing, its light remains active.
     burn-duration-ticks: 800
-    fall-speed: 0.035
-    drift-speed: 0.012
-    sway-strength: 0.005
-    sway-frequency: 0.09
-    sound-volume: 6.0
+    ignition-velocity-retention: 0.45
+    minimum-horizontal-speed: 0.035
+    horizontal-drag: 0.992
+    gravity: 0.0035
+    terminal-fall-speed: 0.06
+    wind-acceleration: 0.00018
+    sway-strength: 0.0018
+    sway-frequency: 0.08
+    sound-volume: 3.0
     sound-pitch: 1.0
     # Colored 3D light from the resource pack plus the vanilla white fallback.
     scene-light-duration-ticks: 800
@@ -182,14 +187,14 @@ flare:
     scene-view-range: 128.0
     screen-flash:
       enabled: true
-      radius: 96.0
-      full-effect-distance: 12.0
-      falloff-exponent: 0.85
+      radius: 72.0
+      full-effect-distance: 8.0
+      falloff-exponent: 1.05
       # Direct gaze refreshes the glare; looking away leaves this afterimage.
       minimum-view-dot: 0.72
       view-falloff-exponent: 0.6
-      maximum-duration-ticks: 80
-      strength-percent: 135
+      maximum-duration-ticks: 50
+      strength-percent: 85
       require-looking-at-light: true
 
 limits:
