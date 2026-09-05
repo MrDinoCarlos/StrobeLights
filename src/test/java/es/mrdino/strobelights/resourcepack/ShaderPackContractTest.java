@@ -17,6 +17,16 @@ class ShaderPackContractTest {
     private static final Path PACK = Path.of("resource-pack");
 
     @Test
+    void carriesAnIntegrationRevisionThatInvalidatesMergedPackCaches() throws IOException {
+        Path integration = PACK.resolve(
+            "assets/strobelights/strobelights-integration.json"
+        );
+        assertTrue(Files.isRegularFile(integration));
+        assertContains(integration, "\"version\": \"0.10.10\"");
+        assertContains(integration, "\"render_pipeline\": \"light_painter_rgb\"");
+    }
+
+    @Test
     void targetsMinecraft262AndContainsTheLightPipeline() throws IOException {
         assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 88");
         assertContains(
