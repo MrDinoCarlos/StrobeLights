@@ -646,7 +646,15 @@ public final class StrobeCommand implements CommandExecutor, TabCompleter {
     }
 
     private Placement placement(Player player) {
-        RayTraceResult hit = player.rayTraceBlocks(8.0, FluidCollisionMode.NEVER);
+        Location eye = player.getEyeLocation();
+        RayTraceResult hit = StrobeManager.rayTraceBlocksIgnoringTechnicalBlocks(
+            player.getWorld(),
+            eye,
+            eye.getDirection(),
+            8.0,
+            FluidCollisionMode.NEVER,
+            false
+        );
         Location location;
         BlockFace face;
         if (hit != null && hit.getHitBlock() != null && hit.getHitBlockFace() != null) {
