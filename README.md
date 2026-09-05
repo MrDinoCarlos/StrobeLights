@@ -179,12 +179,16 @@ language:
 Permission: `strobelights.admin` (operators by default).
 
 The flare command gives a reusable launcher. Left click it to open the menu of
-16 colored cartridges. Selecting one plays the configurable loading animation;
-right click then launches that color into the sky. It explodes at the configured
-height with a matching firework, RGB scene light and short camera flash. A new
-cartridge must be selected before every shot. The launcher uses a neutral blaze
-rod carrier with its own resource-pack model, so creative mode cannot load or
-shoot vanilla arrows. Launchers created by 0.10.0 upgrade on their next click.
+16 colored cartridges. Selecting one plays a three-stage mechanical reload;
+right click then launches that color into the sky. The projectile and burning
+core form one smooth emissive flare with a white-hot center and custom halo,
+without Minecraft particle clouds. At the apex it expands into a 40-second flare whose
+level-15 RGB light uses the maximum `4.00x` expansion. Looking directly at the
+core continuously refreshes an intense glare; looking away leaves an afterimage
+that can fade for up to four seconds. A new cartridge must be selected before
+every shot. The launcher uses a neutral blaze rod carrier with its own
+resource-pack model, so creative mode cannot load or shoot vanilla arrows.
+Launchers created by 0.10.0 upgrade on their next click.
 
 ## Resource-pack delivery
 
@@ -252,33 +256,34 @@ throwable-flashbang:
 
 flare:
   reload-required: true
-  load-duration-ticks: 24
-  launch-speed: 1.15
-  vertical-bias: 1.0
-  launch-height: 32.0
+  load-duration-ticks: 34
+  launch-speed: 1.7
+  vertical-bias: 0.65
+  launch-height: 28.0
   maximum-flight-ticks: 200
-  trail-points-per-block: 6
-  trail-particle-count: 2
-  trail-flame-count: 1
-  trail-smoke-count: 1
+  flight-light-level: 15
+  flight-light-expansion: 2.0
+  visual:
+    flight-size: 0.8
+    burn-size: 3.2
+    view-range: 192.0
   explosion:
-    burst-particle-count: 14
-    burst-duration-ticks: 8
-    burn-duration-ticks: 600
-    burn-particle-count: 12
-    fall-speed: 0.012
-    drift-speed: 0.006
-    scene-light-duration-ticks: 600
+    burn-duration-ticks: 800
+    fall-speed: 0.035
+    drift-speed: 0.012
+    scene-light-duration-ticks: 800
     scene-light-level: 15
-    scene-light-expansion: 2.0
+    scene-light-expansion: 4.0
     screen-flash:
       enabled: true
-      radius: 64.0
-      strength-percent: 55
+      radius: 96.0
+      minimum-view-dot: 0.72
+      maximum-duration-ticks: 80
+      strength-percent: 135
 ```
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.3 prints a red translated setup warning in the console and shows a
+0.10.4 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -334,7 +339,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.3+mc.1.21.4.jar`.
+For this build: `StrobeLights-v.0.10.4+mc.1.21.4.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -483,6 +483,10 @@ class ShaderPackContractTest {
         assertContains(launcherDefinition, "strobelights:item/flare_launcher");
         assertContains(cartridgeDefinition, "\"threshold\": 6911");
         assertContains(cartridgeDefinition, "strobelights:item/flare_cartridge");
+        assertContains(cartridgeDefinition, "\"threshold\": 6912");
+        assertContains(cartridgeDefinition, "strobelights:item/flare_core");
+        assertContains(cartridgeDefinition, "\"threshold\": 6913");
+        assertContains(cartridgeDefinition, "strobelights:item/flare_hot_core");
         assertContains(cartridgeDefinition, "minecraft:custom_model_data");
 
         for (String asset : new String[] {"flare_launcher", "flare_cartridge"}) {
@@ -498,6 +502,35 @@ class ShaderPackContractTest {
             assertEquals(64, image.getHeight());
             assertEquals(0, image.getRGB(0, 0) >>> 24);
         }
+        Path coreTexture = PACK.resolve(
+            "assets/strobelights/textures/item/flare_core.png"
+        );
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/models/item/flare_core.json"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/models/item/flare_hot_core.json"
+        )));
+        var coreImage = ImageIO.read(coreTexture.toFile());
+        assertEquals(256, coreImage.getWidth());
+        assertEquals(256, coreImage.getHeight());
+        assertEquals(0, coreImage.getRGB(0, 0) >>> 24);
+        assertTrue((coreImage.getRGB(128, 128) >>> 24) > 240);
+        Path soundDefinition = PACK.resolve("assets/strobelights/sounds.json");
+        for (String sound : new String[] {
+            "flare_reload_open",
+            "flare_reload_insert",
+            "flare_reload_close",
+            "flare_fire",
+            "flare_flight",
+            "flare_ignite",
+            "flare_burn"
+        }) {
+            assertContains(soundDefinition, "\"" + sound + "\"");
+            assertTrue(Files.isRegularFile(PACK.resolve(
+                "assets/strobelights/sounds/" + sound + ".ogg"
+            )));
+        }
 
         Path service = Path.of(
             "src/main/java/es/mrdino/strobelights/service/FlareService.java"
@@ -510,24 +543,34 @@ class ShaderPackContractTest {
         assertContains(service, "new ItemStack(Material.LEATHER_HORSE_ARMOR)");
         assertContains(service, "setColors(List.of(tint))");
         assertContains(service, "event.setCancelled(true)");
-        assertContains(service, "Particle.CAMPFIRE_COSY_SMOKE");
-        assertContains(service, "tickBurstSparks(burn)");
+        assertContains(service, "world.spawn(location, ItemDisplay.class");
+        assertContains(service, "strobelights:flare_reload_open");
+        assertContains(service, "strobelights:flare_fire");
+        assertNotContains(service, "Particle.");
+        assertNotContains(service, "tickBurstSparks(burn)");
         assertContains(service, "flare.reload-required");
         assertNotContains(service, "Material.CROSSBOW");
         assertNotContains(service, "Firework");
         assertContains(config, "reload-required: true");
-        assertContains(config, "burn-duration-ticks: 600");
-        assertContains(config, "burst-particle-count: 14");
-        assertContains(config, "fall-speed: 0.012");
-        assertContains(config, "config-version: 2");
-        assertContains(service, "flare.trail-points-per-block");
+        assertContains(config, "burn-duration-ticks: 800");
+        assertContains(config, "burn-size: 3.2");
+        assertContains(config, "fall-speed: 0.035");
+        assertContains(config, "scene-light-expansion: 4.0");
+        assertContains(config, "flight-light-expansion: 2.0");
+        assertContains(config, "maximum-duration-ticks: 80");
+        assertContains(config, "config-version: 3");
+        assertNotContains(config, "particle-count");
+        assertNotContains(service, "flare.trail-points-per-block");
         assertContains(service, "moveFlareLight(burn.lightId, burn.location)");
+        assertContains(service, "refreshFlareCameraGlare(burn.location, burn.color.rgb)");
         assertContains(manager, "public void moveFlareLight(UUID id, Location location)");
+        assertContains(manager, "public UUID beginFlareFlightLight(Location location, int rgb)");
+        assertContains(manager, "public void refreshFlareCameraGlare(Location explosion, int rgb)");
         Path plugin = Path.of(
             "src/main/java/es/mrdino/strobelights/StrobeLightsPlugin.java"
         );
         assertContains(plugin, "migrateConfiguration();");
-        assertContains(plugin, "burn-duration-ticks\", 160, 600");
+        assertContains(plugin, "burn-duration-ticks\", 600, 800");
         assertFalse(Pattern.compile(
             "Particle\\.FLASH,[\\s\\S]{0,180}Color\\."
         ).matcher(Files.readString(manager, StandardCharsets.UTF_8)).find());

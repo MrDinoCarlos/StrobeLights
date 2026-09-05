@@ -30,6 +30,53 @@
             }
           ]
         }
+      },
+      {
+        "threshold": 6912,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/flare_core",
+          "tints": [
+            {
+              "type": "minecraft:custom_model_data",
+              "index": 0,
+              "default": 16777215
+            }
+          ]
+        }
+      },
+      {
+        "threshold": 6912.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/leather_horse_armor",
+          "tints": [
+            {
+              "type": "minecraft:dye",
+              "default": -6265536
+            }
+          ]
+        }
+      },
+      {
+        "threshold": 6913,
+        "model": {
+          "type": "minecraft:model",
+          "model": "strobelights:item/flare_hot_core"
+        }
+      },
+      {
+        "threshold": 6913.5,
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/leather_horse_armor",
+          "tints": [
+            {
+              "type": "minecraft:dye",
+              "default": -6265536
+            }
+          ]
+        }
       }
     ],
     "fallback": {

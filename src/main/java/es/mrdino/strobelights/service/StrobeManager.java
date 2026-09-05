@@ -496,7 +496,7 @@ public final class StrobeManager {
         triggerThrowableCameraFlash(impact);
     }
 
-    /** Creates the colored sky light and mild camera flash at a flare explosion. */
+    /** Creates the wide colored sky light and gaze-driven camera glare. */
     public UUID detonateFlare(Location location, int rgb) {
         if (location == null || location.getWorld() == null) {
             return null;
@@ -516,7 +516,7 @@ public final class StrobeManager {
         ));
         double expansion = plugin.getConfig().getDouble(
             "flare.explosion.scene-light-expansion",
-            2.0
+            4.0
         );
         UUID id = UUID.randomUUID();
         SceneFlash scene = new SceneFlash(
@@ -531,8 +531,41 @@ public final class StrobeManager {
         placeSceneVanillaLight(scene);
         sceneFlashes.put(id, scene);
         updateSceneFlash(scene);
-        emitFlareFlash(explosion, rgb);
-        triggerFlareCameraFlash(explosion, rgb);
+        emitFlareFlash(explosion);
+        refreshFlareCameraGlare(explosion, rgb);
+        return id;
+    }
+
+    /** Starts a smaller scene light that follows the flare projectile in flight. */
+    public UUID beginFlareFlightLight(Location location, int rgb) {
+        if (location == null || location.getWorld() == null) {
+            return null;
+        }
+        int maximumFlightTicks = Math.max(10, Math.min(
+            1_200,
+            plugin.getConfig().getInt("flare.maximum-flight-ticks", 200)
+        ));
+        int lightLevel = Math.max(0, Math.min(
+            15,
+            plugin.getConfig().getInt("flare.flight-light-level", 15)
+        ));
+        double expansion = plugin.getConfig().getDouble(
+            "flare.flight-light-expansion",
+            2.0
+        );
+        UUID id = UUID.randomUUID();
+        SceneFlash scene = new SceneFlash(
+            sceneLightLocation(location),
+            maximumFlightTicks + 2,
+            rgb & 0xFFFFFF,
+            lightLevel,
+            expansionCode(expansion),
+            configuredSceneViewRange("flare.explosion.scene-view-range")
+        );
+        scene.source = spawnSceneFlashSource(id, scene);
+        placeSceneVanillaLight(scene);
+        sceneFlashes.put(id, scene);
+        updateSceneFlash(scene);
         return id;
     }
 
@@ -571,22 +604,11 @@ public final class StrobeManager {
         }
     }
 
-    private void emitFlareFlash(Location location, int rgb) {
+    private void emitFlareFlash(Location location) {
         World world = location.getWorld();
         if (world == null) {
             return;
         }
-        world.spawnParticle(
-            Particle.FLASH,
-            location,
-            1,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            null,
-            true
-        );
         float volume = (float) Math.max(0.0, Math.min(
             16.0,
             plugin.getConfig().getDouble("flare.explosion.sound-volume", 4.0)
@@ -595,18 +617,32 @@ public final class StrobeManager {
             2.0,
             plugin.getConfig().getDouble("flare.explosion.sound-pitch", 1.0)
         ));
-        if (volume > 0.0f) {
-            world.playSound(
-                location,
-                Sound.ENTITY_GENERIC_EXPLODE,
-                SoundCategory.PLAYERS,
-                volume,
-                pitch
-            );
+        for (Player player : world.getPlayers()) {
+            if (volume <= 0.0f) {
+                break;
+            }
+            if (plugin.resourcePack() == null || plugin.resourcePack().isLoaded(player)) {
+                player.playSound(
+                    location,
+                    "strobelights:flare_ignite",
+                    SoundCategory.PLAYERS,
+                    volume,
+                    pitch
+                );
+            } else {
+                player.playSound(
+                    location,
+                    Sound.ENTITY_FIREWORK_ROCKET_BLAST,
+                    SoundCategory.PLAYERS,
+                    volume,
+                    pitch
+                );
+            }
         }
     }
 
-    private void triggerFlareCameraFlash(Location explosion, int rgb) {
+    /** Refreshes the intense glare while a player keeps the burning flare in view. */
+    public void refreshFlareCameraGlare(Location explosion, int rgb) {
         if (!plugin.getConfig().getBoolean(
             "flare.explosion.screen-flash.enabled",
             true
@@ -621,35 +657,49 @@ public final class StrobeManager {
             256.0,
             plugin.getConfig().getDouble(
                 "flare.explosion.screen-flash.radius",
-                64.0
+                96.0
             )
         ));
         double fullEffectDistance = Math.max(0.0, Math.min(
             radius,
             plugin.getConfig().getDouble(
                 "flare.explosion.screen-flash.full-effect-distance",
-                8.0
+                12.0
             )
         ));
         double exponent = Math.max(0.1, Math.min(
             4.0,
             plugin.getConfig().getDouble(
                 "flare.explosion.screen-flash.falloff-exponent",
-                1.1
+                0.85
+            )
+        ));
+        double minimumViewDot = Math.max(-1.0, Math.min(
+            0.999,
+            plugin.getConfig().getDouble(
+                "flare.explosion.screen-flash.minimum-view-dot",
+                0.72
+            )
+        ));
+        double viewExponent = Math.max(0.1, Math.min(
+            4.0,
+            plugin.getConfig().getDouble(
+                "flare.explosion.screen-flash.view-falloff-exponent",
+                0.6
             )
         ));
         int duration = Math.max(1, Math.min(
             1_200,
             plugin.getConfig().getInt(
                 "flare.explosion.screen-flash.maximum-duration-ticks",
-                16
+                80
             )
         ));
         int strength = Math.max(0, Math.min(
             200,
             plugin.getConfig().getInt(
                 "flare.explosion.screen-flash.strength-percent",
-                55
+                135
             )
         ));
         boolean requireLooking = plugin.getConfig().getBoolean(
@@ -663,35 +713,53 @@ public final class StrobeManager {
             Location eye = player.getEyeLocation();
             Vector toLight = explosion.toVector().subtract(eye.toVector());
             double distance = toLight.length();
-            double scale = flashbangDistanceScale(
+            double distanceScale = flashbangDistanceScale(
                 distance,
                 fullEffectDistance,
                 radius,
                 exponent
             );
-            if (scale <= 0.0) {
+            if (distanceScale <= 0.0) {
                 continue;
             }
+            double viewScale = 1.0;
             if (distance > 1.0e-8) {
                 Vector direction = toLight.multiply(1.0 / distance);
-                double viewDot = eye.getDirection().normalize().dot(direction);
-                if (requireLooking
-                    && !meetsFlashViewRequirement(viewDot, BlindnessLevel.EXTREME)) {
+                viewScale = flareGlareViewScale(
+                    eye.getDirection().normalize().dot(direction),
+                    minimumViewDot,
+                    viewExponent
+                );
+                if (requireLooking && viewScale <= 0.0) {
                     continue;
                 }
                 if (blockedByGeometry(eye, direction, distance)) {
                     continue;
                 }
             }
+            double glareScale = distanceScale * (requireLooking ? viewScale : 1.0);
             startCameraFlash(
                 player,
                 rgb & 0xFFFFFF,
                 BlindnessLevel.EXTREME,
                 strength,
-                scale,
-                flashbangDurationTicks(scale, duration)
+                glareScale,
+                flashbangDurationTicks(glareScale, duration)
             );
         }
+    }
+
+    static double flareGlareViewScale(
+        double viewDot,
+        double minimumViewDot,
+        double exponent
+    ) {
+        double threshold = Math.max(-1.0, Math.min(0.999, minimumViewDot));
+        if (!Double.isFinite(viewDot) || viewDot <= threshold) {
+            return 0.0;
+        }
+        double normalized = Math.min(1.0, (viewDot - threshold) / (1.0 - threshold));
+        return Math.pow(normalized, Math.max(0.1, exponent));
     }
 
     private void emitThrowableDetonation(Location location) {

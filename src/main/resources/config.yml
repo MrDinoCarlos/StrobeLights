@@ -4,7 +4,7 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.10.3
+# Version:     0.10.4
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
@@ -16,7 +16,7 @@
 
 # Internal schema used to migrate defaults from older releases without deleting
 # administrator customizations.
-config-version: 2
+config-version: 3
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
@@ -142,62 +142,53 @@ flare:
   # true: one cartridge is consumed by every shot (default single-shot mode).
   # false: the selected color remains loaded and can be fired repeatedly.
   reload-required: true
-  load-duration-ticks: 24
-  fire-cooldown-ticks: 10
+  load-duration-ticks: 34
+  fire-cooldown-ticks: 12
   # The view direction is tilted upward by vertical-bias and then clamped to
   # minimum-upward-direction so every shot reaches the sky.
-  launch-speed: 1.15
-  vertical-bias: 1.0
-  minimum-upward-direction: 0.35
+  launch-speed: 1.7
+  vertical-bias: 0.65
+  minimum-upward-direction: 0.25
   # Vertical blocks above the launch point where the flare explodes.
-  launch-height: 32.0
+  launch-height: 28.0
   maximum-flight-ticks: 200
-  flight-drag: 0.995
-  flight-gravity: 0.006
+  flight-drag: 0.99
+  flight-gravity: 0.012
   explode-on-collision: true
-  launch-sound-volume: 1.5
-  launch-sound-pitch: 0.9
-  # Dense interpolation makes the rising projectile look like a continuous flare.
-  trail-points-per-block: 6
-  trail-particle-count: 2
-  trail-particle-size: 1.6
-  trail-hot-core-count: 1
-  trail-flame-count: 1
-  trail-smoke-count: 1
+  # The projectile already lights nearby terrain before the main flare ignites.
+  flight-light-level: 15
+  flight-light-expansion: 2.0
+  launch-sound-volume: 4.0
+  launch-sound-pitch: 1.0
+  # A smooth halo and white-hot core follow the shot and replace vanilla particles.
+  visual:
+    flight-size: 0.8
+    burn-size: 3.2
+    view-range: 192.0
   explosion:
-    # A short ignition pop, followed by a long-lived aerial illumination flare.
-    # No vanilla firework entity or spherical firework effect is spawned.
-    burst-particle-count: 14
-    burst-particle-size: 1.1
-    burst-duration-ticks: 8
-    burst-speed: 0.12
-    spark-drag: 0.94
-    spark-gravity: 0.012
-    # 600 ticks = 30 seconds. The light follows the drifting burning core.
-    burn-duration-ticks: 600
-    burn-particle-count: 12
-    burn-particle-size: 3.5
-    hot-core-particle-count: 2
-    flame-particle-count: 2
-    smoke-particle-count: 1
-    fall-speed: 0.012
-    drift-speed: 0.006
-    sway-strength: 0.0025
-    sway-frequency: 0.08
-    sound-volume: 4.0
+    # 800 ticks = 40 seconds. The light follows the slowly descending core.
+    burn-duration-ticks: 800
+    fall-speed: 0.035
+    drift-speed: 0.012
+    sway-strength: 0.005
+    sway-frequency: 0.09
+    sound-volume: 6.0
     sound-pitch: 1.0
     # Colored 3D light from the resource pack plus the vanilla white fallback.
-    scene-light-duration-ticks: 600
+    scene-light-duration-ticks: 800
     scene-light-level: 15
-    scene-light-expansion: 2.0
+    scene-light-expansion: 4.0
     scene-view-range: 128.0
     screen-flash:
       enabled: true
-      radius: 64.0
-      full-effect-distance: 8.0
-      falloff-exponent: 1.1
-      maximum-duration-ticks: 16
-      strength-percent: 55
+      radius: 96.0
+      full-effect-distance: 12.0
+      falloff-exponent: 0.85
+      # Direct gaze refreshes the glare; looking away leaves this afterimage.
+      minimum-view-dot: 0.72
+      view-falloff-exponent: 0.6
+      maximum-duration-ticks: 80
+      strength-percent: 135
       require-looking-at-light: true
 
 limits:
