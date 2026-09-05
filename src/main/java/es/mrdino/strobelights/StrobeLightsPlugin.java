@@ -16,7 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class StrobeLightsPlugin extends JavaPlugin {
 
-    private static final int CONFIG_VERSION = 6;
+    private static final int CONFIG_VERSION = 7;
 
     private StrobeRepository repository;
     private Messages messages;
