@@ -4,7 +4,7 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.10.1
+# Version:     0.10.3
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
@@ -13,6 +13,10 @@
 # Vanilla or OptiFine with Fabulous: full 3D RGB lighting and camera flash.
 # OptiFine shaderpacks must be OFF; Fast/Fancy or replaced render pipelines use
 # the invisible vanilla white LIGHT fallback.
+
+# Internal schema used to migrate defaults from older releases without deleting
+# administrator customizations.
+config-version: 2
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
