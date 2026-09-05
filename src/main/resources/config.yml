@@ -137,7 +137,9 @@ throwable-flashbang:
 flare:
   # /strobe flare give <player>. Left click opens the cartridge menu; choosing
   # a color plays the loading animation. Right click launches the loaded flare.
-  # The launcher is reusable, but one cartridge must be loaded before each shot.
+  # true: one cartridge is consumed by every shot (default single-shot mode).
+  # false: the selected color remains loaded and can be fired repeatedly.
+  reload-required: true
   load-duration-ticks: 24
   fire-cooldown-ticks: 10
   # The view direction is tilted upward by vertical-bias and then clamped to
@@ -148,22 +150,34 @@ flare:
   # Vertical blocks above the launch point where the flare explodes.
   launch-height: 32.0
   maximum-flight-ticks: 200
+  flight-drag: 0.995
+  flight-gravity: 0.006
+  explode-on-collision: true
   launch-sound-volume: 1.5
   launch-sound-pitch: 0.9
   trail-particle-count: 3
   trail-particle-size: 1.25
-  # Vanilla firework damage is disabled by default; the flare is a visual tool.
-  damage-enabled: false
+  trail-flame-count: 1
+  trail-smoke-count: 1
   explosion:
-    # BALL, BALL_LARGE, STAR, BURST or CREEPER.
-    type: 'BALL_LARGE'
-    trail: true
-    flicker: true
-    fade-to-white: true
+    # Custom simulated flare burst; no vanilla firework entity is spawned.
+    burst-particle-count: 48
+    burst-particle-size: 1.25
+    burst-duration-ticks: 18
+    burst-speed: 0.32
+    spark-drag: 0.94
+    spark-gravity: 0.012
+    # Bright burning core that hangs in the sky and slowly descends.
+    burn-duration-ticks: 160
+    burn-particle-count: 7
+    burn-particle-size: 2.4
+    flame-particle-count: 2
+    smoke-particle-count: 1
+    fall-speed: 0.035
     sound-volume: 4.0
     sound-pitch: 1.0
     # Colored 3D light from the resource pack plus the vanilla white fallback.
-    scene-light-duration-ticks: 40
+    scene-light-duration-ticks: 160
     scene-light-level: 15
     scene-light-expansion: 2.0
     scene-view-range: 128.0

@@ -2,6 +2,7 @@ package es.mrdino.strobelights.service;
 
 import es.mrdino.strobelights.StrobeLightsPlugin;
 import es.mrdino.strobelights.util.StrobeColors;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,8 +13,6 @@ import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
-import org.bukkit.FireworkEffect;
-import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -21,13 +20,10 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
-import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.FireworkExplodeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -35,7 +31,6 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -74,16 +69,16 @@ public final class FlareService implements Listener {
     private final StrobeLightsPlugin plugin;
     private final NamespacedKey launcherKey;
     private final NamespacedKey loadedColorKey;
-    private final NamespacedKey flareEntityKey;
     private final Map<UUID, LoadingCartridge> loading = new HashMap<>();
     private final Map<UUID, FlareFlight> flights = new HashMap<>();
+    private final Map<UUID, FlareBurn> burns = new HashMap<>();
+    private final Map<UUID, Long> menuBlockedUntilNanos = new HashMap<>();
     private final BukkitTask ticker;
 
     public FlareService(StrobeLightsPlugin plugin) {
         this.plugin = plugin;
         this.launcherKey = new NamespacedKey(plugin, "flare_launcher");
         this.loadedColorKey = new NamespacedKey(plugin, "flare_loaded_color");
-        this.flareEntityKey = new NamespacedKey(plugin, "flare_projectile");
         this.ticker = plugin.getServer().getScheduler().runTaskTimer(
             plugin,
             this::tick,
@@ -167,38 +162,22 @@ public final class FlareService implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onFlareExplode(FireworkExplodeEvent event) {
-        FlareFlight flight = flights.remove(event.getEntity().getUniqueId());
-        if (flight != null) {
-            plugin.manager().detonateFlare(event.getEntity().getLocation(), flight.color.rgb);
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onFlareDamage(EntityDamageByEntityEvent event) {
-        if (event.getDamager() instanceof Firework firework
-            && firework.getPersistentDataContainer().has(
-                flareEntityKey,
-                PersistentDataType.INTEGER
-            )
-            && !plugin.getConfig().getBoolean("flare.damage-enabled", false)) {
-            event.setCancelled(true);
-        }
-    }
-
     public void shutdown() {
         ticker.cancel();
         loading.clear();
-        flights.values().forEach(flight -> {
-            if (flight.firework.isValid()) {
-                flight.firework.remove();
-            }
-        });
         flights.clear();
+        burns.clear();
+        menuBlockedUntilNanos.clear();
     }
 
     private void openMenu(Player player, EquipmentSlot hand) {
+        Long blockedUntil = menuBlockedUntilNanos.get(player.getUniqueId());
+        if (blockedUntil != null) {
+            if (System.nanoTime() < blockedUntil) {
+                return;
+            }
+            menuBlockedUntilNanos.remove(player.getUniqueId());
+        }
         if (loading.containsKey(player.getUniqueId())) {
             actionBar(player, "item.flare-launcher.loading");
             return;
@@ -254,6 +233,10 @@ public final class FlareService implements Listener {
             200,
             plugin.getConfig().getInt("flare.load-duration-ticks", 24)
         ));
+        menuBlockedUntilNanos.put(
+            player.getUniqueId(),
+            System.nanoTime() + (duration + 10L) * 50_000_000L
+        );
         loading.put(player.getUniqueId(), new LoadingCartridge(hand, color, duration));
         player.setCooldown(Material.BLAZE_ROD, duration);
         swing(player, hand);
@@ -270,6 +253,7 @@ public final class FlareService implements Listener {
     private void tick() {
         tickLoading();
         tickFlights();
+        tickBurns();
     }
 
     private void tickLoading() {
@@ -332,14 +316,16 @@ public final class FlareService implements Listener {
         }
         FlareColor color = nearestColor(rgb);
         launch(player, rgb, color);
-        clearLoadedColor(launcher);
+        if (plugin.getConfig().getBoolean("flare.reload-required", true)) {
+            clearLoadedColor(launcher);
+        }
         refreshLauncher(launcher, player);
         setItemInHand(player, hand, launcher);
         int cooldown = Math.max(0, Math.min(
             200,
             plugin.getConfig().getInt("flare.fire-cooldown-ticks", 10)
         ));
-        if (cooldown > 0 && player.getGameMode() != GameMode.CREATIVE) {
+        if (cooldown > 0) {
             player.setCooldown(Material.BLAZE_ROD, cooldown);
         }
     }
@@ -371,28 +357,6 @@ public final class FlareService implements Listener {
         }
         Location origin = player.getEyeLocation().add(direction.clone().multiply(0.65));
         World world = player.getWorld();
-        Firework firework = world.spawn(origin, Firework.class);
-        firework.setPersistent(false);
-        firework.setSilent(true);
-        FireworkMeta meta = firework.getFireworkMeta();
-        FireworkEffect.Builder effect = FireworkEffect.builder()
-            .withColor(Color.fromRGB(rgb))
-            .with(explosionType())
-            .trail(plugin.getConfig().getBoolean("flare.explosion.trail", true))
-            .flicker(plugin.getConfig().getBoolean("flare.explosion.flicker", true));
-        if (plugin.getConfig().getBoolean("flare.explosion.fade-to-white", true)) {
-            effect.withFade(Color.WHITE);
-        }
-        meta.addEffect(effect.build());
-        meta.setPower(127);
-        firework.setFireworkMeta(meta);
-        firework.setShotAtAngle(true);
-        firework.setVelocity(direction.multiply(speed));
-        firework.getPersistentDataContainer().set(
-            flareEntityKey,
-            PersistentDataType.INTEGER,
-            rgb & 0xFFFFFF
-        );
         double configuredHeight = Math.max(2.0, Math.min(
             256.0,
             plugin.getConfig().getDouble("flare.launch-height", 32.0)
@@ -403,8 +367,14 @@ public final class FlareService implements Listener {
             plugin.getConfig().getInt("flare.maximum-flight-ticks", 200)
         ));
         flights.put(
-            firework.getUniqueId(),
-            new FlareFlight(firework, color, targetY, maximumTicks)
+            UUID.randomUUID(),
+            new FlareFlight(
+                origin.clone(),
+                direction.multiply(speed),
+                color,
+                targetY,
+                maximumTicks
+            )
         );
         float volume = (float) Math.max(0.0, Math.min(
             16.0,
@@ -416,7 +386,7 @@ public final class FlareService implements Listener {
         ));
         world.playSound(
             origin,
-            Sound.ENTITY_FIREWORK_ROCKET_LAUNCH,
+            Sound.ITEM_FIRECHARGE_USE,
             SoundCategory.PLAYERS,
             volume,
             pitch
@@ -427,19 +397,35 @@ public final class FlareService implements Listener {
         var iterator = flights.entrySet().iterator();
         while (iterator.hasNext()) {
             FlareFlight flight = iterator.next().getValue();
-            if (!flight.firework.isValid() || flight.firework.isDead()) {
+            World world = flight.location.getWorld();
+            if (world == null) {
                 iterator.remove();
                 continue;
             }
-            Location location = flight.firework.getLocation();
-            emitTrail(location, flight.color.rgb);
+            flight.location.add(flight.velocity);
+            emitTrail(flight.location, flight.color.rgb);
             flight.elapsed++;
-            if (location.getY() < flight.targetY && flight.elapsed < flight.maximumTicks) {
+            double drag = Math.max(0.8, Math.min(
+                1.0,
+                plugin.getConfig().getDouble("flare.flight-drag", 0.995)
+            ));
+            double gravity = Math.max(0.0, Math.min(
+                0.1,
+                plugin.getConfig().getDouble("flare.flight-gravity", 0.006)
+            ));
+            flight.velocity.multiply(drag);
+            flight.velocity.setY(flight.velocity.getY() - gravity);
+            boolean reachedApex = flight.elapsed > 5 && flight.velocity.getY() <= 0.0;
+            boolean hitBlock = plugin.getConfig().getBoolean("flare.explode-on-collision", true)
+                && flight.location.getBlock().getType().isSolid();
+            if (flight.location.getY() < flight.targetY
+                && !reachedApex
+                && !hitBlock
+                && flight.elapsed < flight.maximumTicks) {
                 continue;
             }
             iterator.remove();
-            flight.firework.detonate();
-            plugin.manager().detonateFlare(location, flight.color.rgb);
+            igniteFlare(flight.location, flight.color);
         }
     }
 
@@ -466,17 +452,225 @@ public final class FlareService implements Listener {
             new Particle.DustOptions(Color.fromRGB(rgb), size),
             true
         );
+        int flameCount = Math.max(0, Math.min(
+            8,
+            plugin.getConfig().getInt("flare.trail-flame-count", 1)
+        ));
+        if (flameCount > 0) {
+            location.getWorld().spawnParticle(
+                Particle.FLAME,
+                location,
+                flameCount,
+                0.04,
+                0.04,
+                0.04,
+                0.005,
+                null,
+                true
+            );
+        }
+        int smokeCount = Math.max(0, Math.min(
+            8,
+            plugin.getConfig().getInt("flare.trail-smoke-count", 1)
+        ));
+        if (smokeCount > 0) {
+            location.getWorld().spawnParticle(
+                Particle.CAMPFIRE_COSY_SMOKE,
+                location,
+                smokeCount,
+                0.03,
+                0.03,
+                0.03,
+                0.005,
+                null,
+                true
+            );
+        }
     }
 
-    private FireworkEffect.Type explosionType() {
-        String configured = plugin.getConfig().getString(
-            "flare.explosion.type",
-            "BALL_LARGE"
+    private void igniteFlare(Location location, FlareColor color) {
+        if (location.getWorld() == null) {
+            return;
+        }
+        plugin.manager().detonateFlare(location, color.rgb);
+        int burnDuration = Math.max(1, Math.min(
+            1_200,
+            plugin.getConfig().getInt("flare.explosion.burn-duration-ticks", 160)
+        ));
+        int burstDuration = Math.max(1, Math.min(
+            100,
+            plugin.getConfig().getInt("flare.explosion.burst-duration-ticks", 18)
+        ));
+        int sparkCount = Math.max(0, Math.min(
+            200,
+            plugin.getConfig().getInt("flare.explosion.burst-particle-count", 48)
+        ));
+        double sparkSpeed = Math.max(0.01, Math.min(
+            2.0,
+            plugin.getConfig().getDouble("flare.explosion.burst-speed", 0.32)
+        ));
+        burns.put(
+            UUID.randomUUID(),
+            new FlareBurn(
+                location.clone(),
+                color,
+                burnDuration,
+                burstDuration,
+                createBurstSparks(location, sparkCount, sparkSpeed)
+            )
         );
-        try {
-            return FireworkEffect.Type.valueOf(configured.toUpperCase(java.util.Locale.ROOT));
-        } catch (IllegalArgumentException ignored) {
-            return FireworkEffect.Type.BALL_LARGE;
+    }
+
+    private List<FlareSpark> createBurstSparks(
+        Location center,
+        int count,
+        double speed
+    ) {
+        List<FlareSpark> sparks = new ArrayList<>(count);
+        double goldenAngle = Math.PI * (3.0 - Math.sqrt(5.0));
+        for (int index = 0; index < count; index++) {
+            double y = 1.0 - 2.0 * (index + 0.5) / Math.max(1, count);
+            double horizontal = Math.sqrt(Math.max(0.0, 1.0 - y * y));
+            double angle = goldenAngle * index;
+            double variation = 0.8 + 0.2 * ((index * 37) % 11) / 10.0;
+            Vector velocity = new Vector(
+                Math.cos(angle) * horizontal,
+                y,
+                Math.sin(angle) * horizontal
+            ).multiply(speed * variation);
+            sparks.add(new FlareSpark(center.clone(), velocity));
+        }
+        return sparks;
+    }
+
+    private void tickBurns() {
+        var iterator = burns.entrySet().iterator();
+        while (iterator.hasNext()) {
+            FlareBurn burn = iterator.next().getValue();
+            World world = burn.location.getWorld();
+            if (world == null || burn.elapsed >= burn.duration) {
+                iterator.remove();
+                continue;
+            }
+            tickBurnPosition(burn);
+            emitBurnCore(burn);
+            if (burn.elapsed < burn.burstDuration) {
+                tickBurstSparks(burn);
+            }
+            burn.elapsed++;
+        }
+    }
+
+    private void tickBurnPosition(FlareBurn burn) {
+        double configuredFallSpeed = Math.max(0.0, Math.min(
+            0.3,
+            plugin.getConfig().getDouble("flare.explosion.fall-speed", 0.035)
+        ));
+        burn.fallSpeed = Math.min(configuredFallSpeed, burn.fallSpeed + 0.0015);
+        Location next = burn.location.clone().subtract(0.0, burn.fallSpeed, 0.0);
+        if (!next.getBlock().getType().isSolid()) {
+            burn.location = next;
+        }
+    }
+
+    private void emitBurnCore(FlareBurn burn) {
+        World world = burn.location.getWorld();
+        if (world == null) {
+            return;
+        }
+        int count = Math.max(0, Math.min(
+            40,
+            plugin.getConfig().getInt("flare.explosion.burn-particle-count", 7)
+        ));
+        float size = (float) Math.max(0.1, Math.min(
+            8.0,
+            plugin.getConfig().getDouble("flare.explosion.burn-particle-size", 2.4)
+        ));
+        if (count > 0) {
+            world.spawnParticle(
+                Particle.REDSTONE,
+                burn.location,
+                count,
+                0.13,
+                0.13,
+                0.13,
+                0.0,
+                new Particle.DustOptions(Color.fromRGB(burn.color.rgb), size),
+                true
+            );
+        }
+        int flameCount = Math.max(0, Math.min(
+            20,
+            plugin.getConfig().getInt("flare.explosion.flame-particle-count", 2)
+        ));
+        if (flameCount > 0) {
+            world.spawnParticle(
+                Particle.FLAME,
+                burn.location,
+                flameCount,
+                0.1,
+                0.1,
+                0.1,
+                0.01,
+                null,
+                true
+            );
+        }
+        int smokeCount = Math.max(0, Math.min(
+            20,
+            plugin.getConfig().getInt("flare.explosion.smoke-particle-count", 1)
+        ));
+        if (smokeCount > 0 && burn.elapsed % 2 == 0) {
+            world.spawnParticle(
+                Particle.CAMPFIRE_COSY_SMOKE,
+                burn.location,
+                smokeCount,
+                0.12,
+                0.08,
+                0.12,
+                0.01,
+                null,
+                true
+            );
+        }
+    }
+
+    private void tickBurstSparks(FlareBurn burn) {
+        World world = burn.location.getWorld();
+        if (world == null) {
+            return;
+        }
+        float size = (float) Math.max(0.1, Math.min(
+            4.0,
+            plugin.getConfig().getDouble("flare.explosion.burst-particle-size", 1.25)
+        ));
+        Particle.DustOptions dust = new Particle.DustOptions(
+            Color.fromRGB(burn.color.rgb),
+            size
+        );
+        double gravity = Math.max(0.0, Math.min(
+            0.1,
+            plugin.getConfig().getDouble("flare.explosion.spark-gravity", 0.012)
+        ));
+        double drag = Math.max(0.5, Math.min(
+            1.0,
+            plugin.getConfig().getDouble("flare.explosion.spark-drag", 0.94)
+        ));
+        for (FlareSpark spark : burn.sparks) {
+            spark.location.add(spark.velocity);
+            spark.velocity.multiply(drag);
+            spark.velocity.setY(spark.velocity.getY() - gravity);
+            world.spawnParticle(
+                Particle.REDSTONE,
+                spark.location,
+                1,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                dust,
+                true
+            );
         }
     }
 
@@ -675,22 +869,59 @@ public final class FlareService implements Listener {
     }
 
     private static final class FlareFlight {
-        private final Firework firework;
+        private final Location location;
+        private final Vector velocity;
         private final FlareColor color;
         private final double targetY;
         private final int maximumTicks;
         private int elapsed;
 
         private FlareFlight(
-            Firework firework,
+            Location location,
+            Vector velocity,
             FlareColor color,
             double targetY,
             int maximumTicks
         ) {
-            this.firework = firework;
+            this.location = location;
+            this.velocity = velocity;
             this.color = color;
             this.targetY = targetY;
             this.maximumTicks = maximumTicks;
+        }
+    }
+
+    private static final class FlareBurn {
+        private Location location;
+        private final FlareColor color;
+        private final int duration;
+        private final int burstDuration;
+        private final List<FlareSpark> sparks;
+        private double fallSpeed;
+        private int elapsed;
+
+        private FlareBurn(
+            Location location,
+            FlareColor color,
+            int duration,
+            int burstDuration,
+            List<FlareSpark> sparks
+        ) {
+            this.location = location;
+            this.color = color;
+            this.duration = duration;
+            this.burstDuration = burstDuration;
+            this.sparks = sparks;
+        }
+    }
+
+    private static final class FlareSpark {
+        private final Location location;
+        private final Vector velocity;
+
+        private FlareSpark(Location location, Vector velocity) {
+            this.location = location;
+            this.velocity = velocity;
         }
     }
 

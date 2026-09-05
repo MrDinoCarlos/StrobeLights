@@ -561,7 +561,7 @@ public final class StrobeManager {
         if (volume > 0.0f) {
             world.playSound(
                 location,
-                Sound.ENTITY_FIREWORK_ROCKET_LARGE_BLAST,
+                Sound.ENTITY_GENERIC_EXPLODE,
                 SoundCategory.PLAYERS,
                 volume,
                 pitch
