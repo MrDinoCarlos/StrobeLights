@@ -517,7 +517,7 @@ class ShaderPackContractTest {
         assertContains(config, "burst-particle-count: 48");
         assertFalse(Pattern.compile(
             "Particle\\.FLASH,[\\s\\S]{0,180}Color\\."
-        ).matcher(read(manager)).find());
+        ).matcher(Files.readString(manager, StandardCharsets.UTF_8)).find());
 
         Path launcherModel = PACK.resolve(
             "assets/strobelights/models/item/flare_launcher.json"
