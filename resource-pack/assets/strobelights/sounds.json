@@ -6,5 +6,61 @@
         "stream": false
       }
     ]
+  },
+  "flare_reload_open": {
+    "sounds": [
+      {
+        "name": "strobelights:flare_reload_open",
+        "stream": false
+      }
+    ]
+  },
+  "flare_reload_insert": {
+    "sounds": [
+      {
+        "name": "strobelights:flare_reload_insert",
+        "stream": false
+      }
+    ]
+  },
+  "flare_reload_close": {
+    "sounds": [
+      {
+        "name": "strobelights:flare_reload_close",
+        "stream": false
+      }
+    ]
+  },
+  "flare_fire": {
+    "sounds": [
+      {
+        "name": "strobelights:flare_fire",
+        "stream": false
+      }
+    ]
+  },
+  "flare_flight": {
+    "sounds": [
+      {
+        "name": "strobelights:flare_flight",
+        "stream": false
+      }
+    ]
+  },
+  "flare_ignite": {
+    "sounds": [
+      {
+        "name": "strobelights:flare_ignite",
+        "stream": false
+      }
+    ]
+  },
+  "flare_burn": {
+    "sounds": [
+      {
+        "name": "strobelights:flare_burn",
+        "stream": false
+      }
+    ]
   }
 }
