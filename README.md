@@ -187,8 +187,10 @@ right click then launches that color with a short flare-pistol report. The proje
 core form one smooth emissive flare with a white-hot center and custom halo,
 without Minecraft particle clouds. At the apex it expands into a 40-second flare that
 keeps its horizontal momentum, curves under gravity and wind, and continues lighting
-nearby terrain while descending or resting on the ground. Its level-15 RGB light uses
-the maximum `4.00x` expansion. Looking directly at the core refreshes a controlled
+nearby terrain while descending or resting on the ground. Its aerial level-15 RGB
+source is accompanied by a moving light pool projected onto the first solid surface
+below it. The launcher model itself is excluded from the technical light signature,
+so holding the pistol cannot illuminate the world. Looking directly at the core refreshes a controlled
 glare; looking away leaves an afterimage that can fade for up to 2.5 seconds. A new cartridge must be selected before
 every shot. The launcher uses a neutral blaze rod carrier with its own
 resource-pack model, so creative mode cannot load or shoot vanilla arrows.
@@ -212,7 +214,7 @@ resource-pack:
     port: 8250
 
 render:
-  display-view-range: 128.0
+  display-view-range: 192.0
 
 timing:
   maximum-refresh-ticks: 1200
@@ -282,6 +284,12 @@ flare:
     scene-light-duration-ticks: 800
     scene-light-level: 15
     scene-light-expansion: 4.0
+    scene-view-range: 192.0
+    ground-projection:
+      enabled: true
+      maximum-drop-distance: 128.0
+      light-level: 15
+      expansion: 2.5
     screen-flash:
       enabled: true
       radius: 72.0
@@ -291,7 +299,7 @@ flare:
 ```
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.6 prints a red translated setup warning in the console and shows a
+0.10.7 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -355,7 +363,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.6+mc.1.20.1.jar`.
+For this build: `StrobeLights-v.0.10.7+mc.1.20.1.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

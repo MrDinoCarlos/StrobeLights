@@ -88,6 +88,10 @@ class ShaderPackContractTest {
         assertContains(coreVertex, "in vec2 UV1");
         assertContains(coreVertex, "in ivec2 UV2");
         assertContains(coreVertex, "in vec3 Normal");
+        assertContains(coreVertex, "bool technicalCarrierGeometry");
+        assertContains(coreVertex, "abs(Position.y - 8.0) < 0.01");
+        assertContains(coreVertex, "abs(abs(Normal.y) - 1.0) < 0.01");
+        assertContains(coreVertex, "&& technicalCarrierGeometry");
     }
 
     @Test
@@ -744,7 +748,10 @@ class ShaderPackContractTest {
         assertContains(config, "flight-light-expansion: 2.0");
         assertContains(config, "maximum-duration-ticks: 50");
         assertContains(config, "strength-percent: 85");
-        assertContains(config, "config-version: 4");
+        assertContains(config, "config-version: 5");
+        assertContains(config, "ground-projection:");
+        assertContains(config, "maximum-drop-distance: 128.0");
+        assertContains(config, "scene-view-range: 192.0");
         assertNotContains(config, "particle-count");
         assertNotContains(config, "\n    fall-speed:");
         assertNotContains(config, "\n    drift-speed:");
@@ -752,8 +759,12 @@ class ShaderPackContractTest {
         assertContains(service, "nextBurnVelocity(");
         assertContains(service, "burn.grounded = true");
         assertContains(service, "moveFlareLight(burn.lightId, burn.location)");
+        assertContains(service, "moveFlareGroundLight(burn.groundLightId, burn.location)");
         assertContains(service, "refreshFlareCameraGlare(burn.location, burn.color.rgb)");
         assertContains(manager, "public void moveFlareLight(UUID id, Location location)");
+        assertContains(manager, "public UUID beginFlareGroundLight(Location flareLocation, int rgb)");
+        assertContains(manager, "public void moveFlareGroundLight(UUID id, Location flareLocation)");
+        assertContains(manager, "new Vector(0.0, -1.0, 0.0)");
         assertContains(manager, "public UUID beginFlareFlightLight(Location location, int rgb)");
         assertContains(manager, "public void refreshFlareCameraGlare(Location explosion, int rgb)");
         Path plugin = Path.of(
@@ -761,6 +772,7 @@ class ShaderPackContractTest {
         );
         assertContains(plugin, "migrateConfiguration();");
         assertContains(plugin, "burn-duration-ticks\", 600, 800");
+        assertContains(plugin, "render.display-view-range\", 128.0, 192.0");
         assertFalse(Pattern.compile(
             "Particle\\.FLASH,[\\s\\S]{0,180}Color\\."
         ).matcher(Files.readString(manager, StandardCharsets.UTF_8)).find());

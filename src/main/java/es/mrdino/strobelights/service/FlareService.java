@@ -182,6 +182,7 @@ public final class FlareService implements Listener {
         burns.values().forEach(burn -> {
             burn.visual.remove();
             plugin.manager().finishFlareLight(burn.lightId);
+            plugin.manager().finishFlareLight(burn.groundLightId);
         });
         burns.clear();
         menuBlockedUntilNanos.clear();
@@ -539,6 +540,7 @@ public final class FlareService implements Listener {
         }
         plugin.manager().finishFlareLight(flightLightId);
         UUID lightId = plugin.manager().detonateFlare(location, color.rgb);
+        UUID groundLightId = plugin.manager().beginFlareGroundLight(location, color.rgb);
         burns.put(
             burnId,
             new FlareBurn(
@@ -548,6 +550,7 @@ public final class FlareService implements Listener {
                 burnVelocity,
                 swayPhase,
                 lightId,
+                groundLightId,
                 visual
             )
         );
@@ -561,11 +564,13 @@ public final class FlareService implements Listener {
             if (world == null || burn.elapsed >= burn.duration) {
                 burn.visual.remove();
                 plugin.manager().finishFlareLight(burn.lightId);
+                plugin.manager().finishFlareLight(burn.groundLightId);
                 iterator.remove();
                 continue;
             }
             tickBurnPosition(burn);
             plugin.manager().moveFlareLight(burn.lightId, burn.location);
+            plugin.manager().moveFlareGroundLight(burn.groundLightId, burn.location);
             plugin.manager().refreshFlareCameraGlare(burn.location, burn.color.rgb);
             double remainingScale = Math.min(
                 1.0,
@@ -1058,6 +1063,7 @@ public final class FlareService implements Listener {
         private Vector velocity;
         private final double swayPhase;
         private final UUID lightId;
+        private final UUID groundLightId;
         private final FlareVisual visual;
         private boolean grounded;
         private int elapsed;
@@ -1069,6 +1075,7 @@ public final class FlareService implements Listener {
             Vector velocity,
             double swayPhase,
             UUID lightId,
+            UUID groundLightId,
             FlareVisual visual
         ) {
             this.location = location;
@@ -1077,6 +1084,7 @@ public final class FlareService implements Listener {
             this.velocity = velocity;
             this.swayPhase = swayPhase;
             this.lightId = lightId;
+            this.groundLightId = groundLightId;
             this.visual = visual;
         }
     }

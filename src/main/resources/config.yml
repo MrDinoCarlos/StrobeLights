@@ -4,7 +4,7 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.10.6
+# Version:     0.10.7
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
@@ -17,7 +17,7 @@
 
 # Internal schema used to migrate defaults from older releases without deleting
 # administrator customizations.
-config-version: 4
+config-version: 5
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
@@ -50,10 +50,10 @@ client-compatibility-notices:
   delay-ticks: 20
 
 render:
-  # 128 blocks, like Light Painter Universal. The technical display remains at
+  # 192 blocks, matching the flare visual. The technical display remains at
   # the exact saved source and disables client frustum culling, so it can be
   # rendered from above, below and every side without following the camera.
-  display-view-range: 128.0
+  display-view-range: 192.0
   # RGB sources stay active above, below, on every side and outside the frame.
   # The RGB pass softly accumulates opaque geometry between each visible
   # surface and its source, stopping wall leaks without hiding the source.
@@ -185,7 +185,15 @@ flare:
     scene-light-duration-ticks: 800
     scene-light-level: 15
     scene-light-expansion: 4.0
-    scene-view-range: 128.0
+    scene-view-range: 192.0
+    # A second RGB source follows the first solid surface below the flare. It
+    # gives the falling flare a visible pool of light on terrain and also moves
+    # the invisible vanilla LIGHT fallback along that surface.
+    ground-projection:
+      enabled: true
+      maximum-drop-distance: 128.0
+      light-level: 15
+      expansion: 2.5
     screen-flash:
       enabled: true
       radius: 72.0

@@ -210,7 +210,6 @@ void main() {
     vec4 tmpcol = textureLod(Sampler0, UV0, 0.0);
     vec4 tmp = ModelViewMat * vec4(Position, 1.0);
     bool gui = isGUI(ProjMat);
-
     int encodedValue = decodeTechnicalPayload(tmpcol, UV2);
     bool encodedTechnicalCarrier = isCameraFlash(encodedValue)
         || isSourceLight(encodedValue);
@@ -228,11 +227,16 @@ void main() {
     // OFF mode supplies NO_FOG with equal start/end values for world entities,
     // which made every ItemDisplay look like a hand item and removed all
     // StrobeLights markers before the Fabulous post chain.
+    // The dedicated carrier is the only item model with a horizontal face at
+    // local Y=8, which also prevents ordinary held items from matching it.
+    bool technicalCarrierGeometry = abs(Position.y - 8.0) < 0.01
+        && abs(abs(Normal.y) - 1.0) < 0.01;
     marker = float(
         !gui
         && encodedTechnicalCarrier
         && markerAlpha
         && markerTextureCarrier
+        && technicalCarrierGeometry
     );
 
     if (marker > 0.0) {
