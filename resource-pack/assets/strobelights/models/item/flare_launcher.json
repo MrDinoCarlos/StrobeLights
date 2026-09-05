@@ -2,5 +2,40 @@
   "parent": "minecraft:item/generated",
   "textures": {
     "layer0": "strobelights:item/flare_launcher"
+  },
+  "display": {
+    "thirdperson_righthand": {
+      "rotation": [0, 90, -35],
+      "translation": [0, 1.5, -2.5],
+      "scale": [0.55, 0.55, 0.55]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [0, -90, 35],
+      "translation": [0, 1.5, -2.5],
+      "scale": [0.55, 0.55, 0.55]
+    },
+    "firstperson_righthand": {
+      "rotation": [0, -90, 25],
+      "translation": [1.0, 2.5, 0.5],
+      "scale": [0.42, 0.42, 0.42]
+    },
+    "firstperson_lefthand": {
+      "rotation": [0, 90, -25],
+      "translation": [1.0, 2.5, 0.5],
+      "scale": [0.42, 0.42, 0.42]
+    },
+    "gui": {
+      "rotation": [0, 0, 0],
+      "translation": [0, 0, 0],
+      "scale": [0.72, 0.72, 0.72]
+    },
+    "ground": {
+      "translation": [0, 2, 0],
+      "scale": [0.35, 0.35, 0.35]
+    },
+    "fixed": {
+      "rotation": [0, 0, 0],
+      "scale": [0.7, 0.7, 0.7]
+    }
   }
 }
