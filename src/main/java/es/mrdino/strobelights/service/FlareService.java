@@ -435,7 +435,8 @@ public final class FlareService implements Listener {
             RayTraceResult collision = null;
             if (plugin.getConfig().getBoolean("flare.explode-on-collision", true)
                 && step.lengthSquared() > 1.0e-8) {
-                collision = world.rayTraceBlocks(
+                collision = StrobeManager.rayTraceBlocksIgnoringTechnicalBlocks(
+                    world,
                     previous,
                     step.clone().normalize(),
                     step.length(),

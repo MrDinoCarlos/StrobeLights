@@ -286,7 +286,7 @@ flare:
 ```
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.4 prints a red translated setup warning in the console and shows a
+0.10.5 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -350,7 +350,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.4+mc.1.20.1.jar`.
+For this build: `StrobeLights-v.0.10.5+mc.1.20.1.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

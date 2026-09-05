@@ -748,6 +748,16 @@ class ShaderPackContractTest {
         assertNotContains(manager, "sourceBlockedForPlayer(player, scene.location)");
         assertContains(manager, "if (blockedByGeometry(eye, direction, distance))");
         assertContains(manager, "blocksLight(world.getBlockAt(blockX, blockY, blockZ).getType())");
+        assertContains(manager, "material == Material.BARRIER || material == Material.LIGHT");
+        assertContains(manager, "rayTraceBlocksIgnoringTechnicalBlocks(");
+        assertContains(
+            Path.of("src/main/java/es/mrdino/strobelights/service/FlareService.java"),
+            "StrobeManager.rayTraceBlocksIgnoringTechnicalBlocks("
+        );
+        assertContains(
+            Path.of("src/main/java/es/mrdino/strobelights/command/StrobeCommand.java"),
+            "StrobeManager.rayTraceBlocksIgnoringTechnicalBlocks("
+        );
         assertNotContains(manager, "requireLineOfSight");
         assertNotContains(config, "require-line-of-sight");
     }

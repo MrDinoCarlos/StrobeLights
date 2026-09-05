@@ -176,18 +176,22 @@ class CameraFlashCodecTest {
     }
 
     @Test
-    void glassIsTransparentToServerSideLightOcclusion() {
+    void glassAndInvisibleTechnicalBlocksAreTransparentToServerSideLightOcclusion() {
         assertTrue(StrobeManager.letsLightThrough(Material.GLASS));
         assertTrue(StrobeManager.letsLightThrough(Material.RED_STAINED_GLASS));
         assertTrue(StrobeManager.letsLightThrough(Material.GLASS_PANE));
         assertTrue(StrobeManager.letsLightThrough(Material.BLUE_STAINED_GLASS_PANE));
         assertTrue(StrobeManager.letsLightThrough(Material.TINTED_GLASS));
+        assertTrue(StrobeManager.letsLightThrough(Material.BARRIER));
+        assertTrue(StrobeManager.letsLightThrough(Material.LIGHT));
+        assertTrue(StrobeManager.ignoresTechnicalBlock(Material.BARRIER));
+        assertTrue(StrobeManager.ignoresTechnicalBlock(Material.LIGHT));
         assertEquals(false, StrobeManager.letsLightThrough(Material.STONE));
         assertEquals(false, StrobeManager.letsLightThrough(Material.OAK_LEAVES));
     }
 
     @Test
-    void everyNonAirBlockExceptGlassOccludesEveryLightSize() {
+    void everyNonAirBlockExceptGlassAndTechnicalBlocksOccludesEveryLightSize() {
         for (Material material : Material.values()) {
             boolean glass = material.name().equals("GLASS")
                 || material.name().endsWith("_GLASS")
@@ -198,6 +202,7 @@ class CameraFlashCodecTest {
                 || material.name().equals("VOID_AIR")
                 || material.name().equals("LEGACY_AIR");
             boolean expected = !air
+                && material != Material.BARRIER
                 && material != Material.LIGHT
                 && !glass;
             assertEquals(expected, StrobeManager.blocksLight(material), material.name());

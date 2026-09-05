@@ -19,6 +19,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -36,6 +37,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
 
@@ -1797,6 +1799,9 @@ public final class StrobeManager {
     }
 
     private static Location sceneLightLocation(Location impact) {
+        if (ignoresTechnicalBlock(impact.getBlock().getType())) {
+            return impact.clone();
+        }
         Block air = nearestAirBlock(impact);
         return air == null
             ? impact.clone()
@@ -2110,10 +2115,15 @@ public final class StrobeManager {
 
     static boolean letsLightThrough(Material material) {
         String name = material.name();
-        return name.equals("GLASS")
+        return ignoresTechnicalBlock(material)
+            || name.equals("GLASS")
             || name.endsWith("_GLASS")
             || name.equals("GLASS_PANE")
             || name.endsWith("_GLASS_PANE");
+    }
+
+    public static boolean ignoresTechnicalBlock(Material material) {
+        return material == Material.BARRIER || material == Material.LIGHT;
     }
 
     static boolean blocksLight(Material material) {
@@ -2122,9 +2132,93 @@ public final class StrobeManager {
             || name.equals("CAVE_AIR")
             || name.equals("VOID_AIR")
             || name.equals("LEGACY_AIR");
-        return !air
-            && material != Material.LIGHT
-            && !letsLightThrough(material);
+        return !air && !letsLightThrough(material);
+    }
+
+    public static RayTraceResult rayTraceBlocksIgnoringTechnicalBlocks(
+        World world,
+        Location start,
+        Vector direction,
+        double maximumDistance,
+        FluidCollisionMode fluidCollisionMode,
+        boolean ignorePassableBlocks
+    ) {
+        if (world == null
+            || start == null
+            || start.getWorld() != world
+            || direction == null
+            || !Double.isFinite(maximumDistance)
+            || maximumDistance <= 0.0
+            || !Double.isFinite(direction.lengthSquared())
+            || direction.lengthSquared() <= 1.0e-12) {
+            return null;
+        }
+
+        Vector rayDirection = direction.clone().normalize();
+        Location cursor = start.clone();
+        double remaining = maximumDistance;
+        int maximumSkippedBlocks = Math.max(
+            16,
+            Math.min(4_096, (int) Math.ceil(maximumDistance * 4.0) + 16)
+        );
+        for (int skipped = 0; skipped < maximumSkippedBlocks && remaining > 1.0e-6; skipped++) {
+            RayTraceResult hit = world.rayTraceBlocks(
+                cursor,
+                rayDirection,
+                remaining,
+                fluidCollisionMode,
+                ignorePassableBlocks
+            );
+            if (hit == null
+                || hit.getHitBlock() == null
+                || !ignoresTechnicalBlock(hit.getHitBlock().getType())) {
+                return hit;
+            }
+            Vector hitPosition = hit.getHitPosition();
+            if (hitPosition == null) {
+                return null;
+            }
+            double distanceToHit = hitPosition.distance(cursor.toVector());
+            double distanceToExit = distanceToBlockExit(
+                hit.getHitBlock(),
+                hitPosition,
+                rayDirection
+            );
+            double advance = Math.max(0.002, distanceToExit + 0.002);
+            double consumed = Math.max(0.0, distanceToHit) + advance;
+            if (!Double.isFinite(consumed) || consumed >= remaining) {
+                return null;
+            }
+            cursor = hitPosition.toLocation(world).add(rayDirection.clone().multiply(advance));
+            remaining -= consumed;
+        }
+        return null;
+    }
+
+    private static double distanceToBlockExit(
+        Block block,
+        Vector position,
+        Vector direction
+    ) {
+        double x = axisExitDistance(block.getX(), position.getX(), direction.getX());
+        double y = axisExitDistance(block.getY(), position.getY(), direction.getY());
+        double z = axisExitDistance(block.getZ(), position.getZ(), direction.getZ());
+        double distance = Math.min(x, Math.min(y, z));
+        return Double.isFinite(distance) ? Math.max(0.0, distance) : 0.0;
+    }
+
+    private static double axisExitDistance(
+        int blockCoordinate,
+        double position,
+        double direction
+    ) {
+        if (direction > 1.0e-12) {
+            return (blockCoordinate + 1.0 - position) / direction;
+        }
+        if (direction < -1.0e-12) {
+            return (blockCoordinate - position) / direction;
+        }
+        return Double.POSITIVE_INFINITY;
     }
 
     private static double axisTraversalDistance(double direction) {
