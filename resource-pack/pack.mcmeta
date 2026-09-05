@@ -3,6 +3,6 @@
     "pack_format": 75,
     "min_format": 75,
     "max_format": 75,
-    "description": "StrobeLights 0.10.9 - safe Nexo pack merge - Paper 1.21.11"
+    "description": "StrobeLights 0.10.10 - resilient RGB render delivery - Paper 1.21.11"
   }
 }

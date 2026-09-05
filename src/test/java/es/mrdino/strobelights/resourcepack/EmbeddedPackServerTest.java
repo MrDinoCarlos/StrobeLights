@@ -51,6 +51,35 @@ class EmbeddedPackServerTest {
     }
 
     @Test
+    void keepsRgbRenderingEligibleAcrossStandaloneAndExternalPackDelivery() {
+        assertFalse(ResourcePackService.canRender(true, false, false, false));
+        assertTrue(ResourcePackService.canRender(true, false, true, false));
+        assertTrue(ResourcePackService.canRender(true, false, false, true));
+        assertTrue(ResourcePackService.canRender(true, true, false, false));
+        assertTrue(ResourcePackService.canRender(false, false, false, false));
+    }
+
+    @Test
+    void identifiesEveryCriticalFileThatMustSurviveTheNexoMerge() {
+        assertTrue(ResourcePackService.isNexoRenderPipelineEntry(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        ));
+        assertTrue(ResourcePackService.isNexoRenderPipelineEntry(
+            "assets/minecraft/shaders/post/light.fsh"
+        ));
+        assertTrue(ResourcePackService.isNexoRenderPipelineEntry(
+            "assets/minecraft/post_effect/transparency.json"
+        ));
+        assertTrue(ResourcePackService.isNexoRenderPipelineEntry(
+            "assets/strobelights/strobelights-integration.json"
+        ));
+        assertFalse(ResourcePackService.isNexoRenderPipelineEntry(
+            "assets/strobelights/models/item/flare_launcher.json"
+        ));
+        assertFalse(ResourcePackService.isNexoRenderPipelineEntry("pack.mcmeta"));
+    }
+
+    @Test
     void restoresNexoMetadataAfterImportingTheStrobeLightsZip() throws Exception {
         FakeResourcePack resourcePack = new FakeResourcePack("nexo-metadata");
         Object original = resourcePack.packMeta();
