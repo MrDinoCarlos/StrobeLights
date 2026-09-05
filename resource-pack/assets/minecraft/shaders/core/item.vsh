@@ -126,22 +126,22 @@ void main() {
     float markerTextureBase = min(min(tmpcol.r, tmpcol.g), tmpcol.b);
     bool markerTextureCarrier = markerTexturePeak >= markerTextureFloor
         && markerTextureBase >= markerTexturePeak * 0.75;
-    // The dedicated carrier is the only item model with a horizontal face at
-    // local Y=8. Texture filtering can produce alpha 24 on the translucent
-    // outline of an ordinary held item, so texture color alone is not a safe
-    // marker signature (the flare launcher used to become a fake white light).
-    bool technicalCarrierGeometry = abs(Position.y - 8.0) < 0.01
-        && abs(abs(Normal.y) - 1.0) < 0.01;
+    // Position is already expressed in Minecraft's baked render coordinates;
+    // comparing it with raw JSON model units (Y=8) rejects every carrier. The
+    // encoded tint is a stronger signature: only StrobeLights emits source-light
+    // and camera-flash payloads, while an ordinary held item remains excluded.
+    int encodedValue = markerValue(Color.rgb);
+    bool encodedTechnicalCarrier = isCameraFlash(encodedValue)
+        || isSourceLight(encodedValue);
     marker = float(
         !gui
         && markerAlpha
         && markerTextureCarrier
-        && technicalCarrierGeometry
+        && encodedTechnicalCarrier
     );
 
     if (marker > 0.0) {
         vertexColor = vec4(Color.rgb, 1.0);
-        int encodedValue = markerValue(vertexColor.rgb);
         if (!isCameraFlash(encodedValue)) {
             int lightExpansionCode = 3;
             if (isSourceLight(encodedValue)) {
