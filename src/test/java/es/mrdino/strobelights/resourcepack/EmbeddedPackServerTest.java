@@ -40,6 +40,28 @@ class EmbeddedPackServerTest {
     }
 
     @Test
+    void expandsTheTokenBeforeValidatingAnExternalPackUrl() {
+        assertEquals(
+            "http://108.181.58.76:8250/strobelights/01ab.zip",
+            ResourcePackService.expandPublicUrl(
+                "http://108.181.58.76:8250/strobelights/{token}.zip",
+                new byte[] {0x01, (byte) 0xAB}
+            )
+        );
+    }
+
+    @Test
+    void restoresNexoMetadataAfterImportingTheStrobeLightsZip() throws Exception {
+        FakeResourcePack resourcePack = new FakeResourcePack("nexo-metadata");
+        Object original = resourcePack.packMeta();
+        resourcePack.packMeta("strobelights-metadata");
+
+        ResourcePackService.restoreNexoPackMeta(resourcePack, original);
+
+        assertEquals("nexo-metadata", resourcePack.packMeta());
+    }
+
+    @Test
     void servesOnlyTheConfiguredImmutableZip() throws Exception {
         byte[] pack = {0x50, 0x4B, 0x03, 0x04};
         try (EmbeddedPackServer server = new EmbeddedPackServer(
@@ -66,6 +88,23 @@ class EmbeddedPackServerTest {
                 HttpResponse.BodyHandlers.ofByteArray()
             );
             assertEquals(404, missing.statusCode());
+        }
+    }
+
+    static final class FakeResourcePack {
+
+        private Object metadata;
+
+        FakeResourcePack(Object metadata) {
+            this.metadata = metadata;
+        }
+
+        public Object packMeta() {
+            return metadata;
+        }
+
+        public void packMeta(Object metadata) {
+            this.metadata = metadata;
         }
     }
 }

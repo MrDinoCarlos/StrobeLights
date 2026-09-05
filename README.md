@@ -209,6 +209,7 @@ resource-pack:
   nexo-integration:
     enabled: true
     regeneration-delay-ticks: 40
+    fallback-delay-ticks: 600
   public-url: 'http://serverip.com:8250/strobelights/{token}.zip'
   embedded:
     port: 8250
@@ -298,23 +299,26 @@ flare:
       strength-percent: 85
 ```
 
-When Nexo is enabled, StrobeLights automatically adds this ZIP during Nexo's
-post-generation event and leaves all pack delivery to Nexo. The standalone URL
-and embedded HTTP server are then unused, preventing the two plugins from
-replacing each other's packs. `/strobe pack` asks Nexo to resend the combined
-pack.
+When Nexo is enabled, StrobeLights adds this ZIP during Nexo's post-generation
+event, restores Nexo's original pack metadata and leaves delivery to Nexo. An
+active Nexo generation is never cancelled. If Nexo does not confirm the merge
+within the configured timeout, StrobeLights restores standalone delivery.
+`/strobe pack` asks Nexo to resend the combined pack after a successful merge.
 
-On a proxy network, configure every backend to use the same generated Nexo pack.
-If Nexo obfuscation is enabled, share Nexo's `.deobfCacheResourcepack` between
-servers so the resulting pack identity remains stable. See Nexo's
-[resource-pack configuration](https://docs.nexomc.com/configuration/resourcepack).
+On a proxy network, configure every backend to generate the same combined pack.
+For Velocity, Nexo recommends NexoProxy so changing backend does not dispatch a
+duplicate pack. See Nexo's
+[resource-pack configuration](https://github.com/Nexo-MC/Nexo-Documentation/blob/master/configuration/resourcepack/README.md).
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.8 prints a red translated setup warning in the console and shows a
+0.10.9 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
 The HTTP port must be open over TCP and differ from the Minecraft port.
+`{token}` is replaced with the ZIP's SHA-1 in both embedded and external modes.
+Backends running the same StrobeLights build therefore resolve the same immutable
+URL; when `embedded.enabled` is `false`, the external host must serve that path.
 
 ## Notes
 
@@ -366,7 +370,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.8+mc.1.21.11.jar`.
+For this build: `StrobeLights-v.0.10.9+mc.1.21.11.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
