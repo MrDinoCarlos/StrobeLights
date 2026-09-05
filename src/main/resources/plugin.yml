@@ -5,7 +5,7 @@ api-version: '1.21.4'
 authors: [MrDino]
 website: https://mrdino.es/wiki/category/strobelights/
 description: 3D RGB strobe lights using the Light Painter shader for Paper 1.21.4.
-softdepend: [EasyArmorStands]
+softdepend: [EasyArmorStands, Nexo]
 commands:
   strobe:
     description: Create and control strobe lights.

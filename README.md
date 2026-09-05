@@ -206,6 +206,9 @@ port over TCP:
 
 ```yaml
 resource-pack:
+  nexo-integration:
+    enabled: true
+    regeneration-delay-ticks: 40
   public-url: 'http://serverip.com:8250/strobelights/{token}.zip'
   embedded:
     port: 8250
@@ -295,8 +298,19 @@ flare:
       strength-percent: 85
 ```
 
+When Nexo is enabled, StrobeLights automatically adds this ZIP during Nexo's
+post-generation event and leaves all pack delivery to Nexo. The standalone URL
+and embedded HTTP server are then unused, preventing the two plugins from
+replacing each other's packs. `/strobe pack` asks Nexo to resend the combined
+pack.
+
+On a proxy network, configure every backend to use the same generated Nexo pack.
+If Nexo obfuscation is enabled, share Nexo's `.deobfCacheResourcepack` between
+servers so the resulting pack identity remains stable. See Nexo's
+[resource-pack configuration](https://docs.nexomc.com/configuration/resourcepack).
+
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.7 prints a red translated setup warning in the console and shows a
+0.10.8 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -352,7 +366,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.7+mc.1.21.4.jar`.
+For this build: `StrobeLights-v.0.10.8+mc.1.21.4.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
