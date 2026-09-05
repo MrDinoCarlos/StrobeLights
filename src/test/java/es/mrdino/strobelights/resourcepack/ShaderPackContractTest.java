@@ -591,7 +591,7 @@ class ShaderPackContractTest {
         assertContains(config, "flight-light-expansion: 2.0");
         assertContains(config, "maximum-duration-ticks: 50");
         assertContains(config, "strength-percent: 85");
-        assertContains(config, "config-version: 6");
+        assertContains(config, "config-version: 7");
         assertContains(config, "ground-projection:");
         assertContains(config, "maximum-drop-distance: 128.0");
         assertContains(config, "scene-view-range: 192.0");
