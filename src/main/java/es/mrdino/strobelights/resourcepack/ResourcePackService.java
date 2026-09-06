@@ -1,10 +1,15 @@
 package es.mrdino.strobelights.resourcepack;
 
 import es.mrdino.strobelights.StrobeLightsPlugin;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.net.BindException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -19,14 +24,17 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -44,7 +52,7 @@ import org.bukkit.plugin.Plugin;
 /** Loads, hosts and sends the Light Painter shader and GUI icon resource pack. */
 public final class ResourcePackService implements Listener {
 
-    private static final String PACK_REVISION = "0.10.11";
+    private static final String PACK_REVISION = "0.10.12";
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
     private static final String EMBEDDED_PACK =
@@ -69,6 +77,9 @@ public final class ResourcePackService implements Listener {
     private boolean nexoRegenerationRequested;
     private Plugin nexoPlugin;
     private Path nexoPackPath;
+    private byte[] nexoSourcePackBytes;
+    private Object nexoPackServerDelegate;
+    private Object nexoPackServerProxy;
 
     public ResourcePackService(StrobeLightsPlugin plugin) {
         this.plugin = plugin;
@@ -79,6 +90,7 @@ public final class ResourcePackService implements Listener {
         nexoManaged = false;
         nexoMerged = false;
         nexoRegenerationRequested = false;
+        nexoSourcePackBytes = null;
         if (!plugin.getConfig().getBoolean("resource-pack.enabled", true)) {
             plugin.getLogger().warning(
                 "Automatic shader delivery is disabled; an external installation is assumed."
@@ -172,12 +184,16 @@ public final class ResourcePackService implements Listener {
 
     public void stop() {
         active = false;
+        restoreNexoPackServer();
         defaultUrlConfigured = false;
         nexoManaged = false;
         nexoMerged = false;
         nexoRegenerationRequested = false;
         nexoPlugin = null;
         nexoPackPath = null;
+        nexoSourcePackBytes = null;
+        nexoPackServerDelegate = null;
+        nexoPackServerProxy = null;
         loadedPlayers.clear();
         deliveryAttemptedPlayers.clear();
         closeEmbeddedServer();
@@ -463,12 +479,14 @@ public final class ResourcePackService implements Listener {
 
             nexoPlugin = detected;
             nexoPackPath = exportedPack;
+            nexoSourcePackBytes = packBytes.clone();
             nexoManaged = true;
+            installNexoPackServerInterceptor(detected, loader);
             if (!nexoListenerRegistered) {
                 plugin.getServer().getPluginManager().registerEvent(
                     eventType,
                     nexoPackListener,
-                    EventPriority.HIGHEST,
+                    EventPriority.MONITOR,
                     (listener, event) -> mergeIntoNexo(event),
                     plugin,
                     true
@@ -478,9 +496,13 @@ public final class ResourcePackService implements Listener {
             scheduleNexoRecovery(packBytes);
             return true;
         } catch (ReflectiveOperationException | LinkageError exception) {
+            restoreNexoPackServer();
             nexoManaged = false;
             nexoPlugin = null;
             nexoPackPath = null;
+            nexoSourcePackBytes = null;
+            nexoPackServerDelegate = null;
+            nexoPackServerProxy = null;
             plugin.getLogger().warning(
                 "Nexo was detected but its pack integration API is unavailable ("
                     + exception.getClass().getSimpleName() + ": " + exception.getMessage()
@@ -488,6 +510,228 @@ public final class ResourcePackService implements Listener {
             );
             return false;
         }
+    }
+
+    private synchronized void installNexoPackServerInterceptor(
+        Plugin detected,
+        ClassLoader loader
+    ) throws ReflectiveOperationException {
+        Method getter = detected.getClass().getMethod("packServer");
+        Object currentServer = getter.invoke(detected);
+        if (currentServer == null) {
+            throw new ReflectiveOperationException("Nexo has no active resource-pack server");
+        }
+        if (currentServer == nexoPackServerProxy) {
+            return;
+        }
+
+        Class<?> serverType = Class.forName(
+            "com.nexomc.nexo.pack.server.NexoPackServer",
+            true,
+            loader
+        );
+        Object delegate = currentServer;
+        Object interceptor = Proxy.newProxyInstance(
+            loader,
+            new Class<?>[] {serverType},
+            (proxy, method, arguments) -> {
+                if (method.getName().equals("uploadPack")
+                    && method.getParameterCount() == 0) {
+                    finalizeNexoBuiltPack(delegate, loader);
+                }
+                try {
+                    return method.invoke(delegate, arguments);
+                } catch (InvocationTargetException exception) {
+                    throw exception.getCause();
+                }
+            }
+        );
+        detected.getClass().getMethod("packServer", serverType).invoke(detected, interceptor);
+        nexoPackServerDelegate = delegate;
+        nexoPackServerProxy = interceptor;
+    }
+
+    private synchronized void restoreNexoPackServer() {
+        Plugin detected = nexoPlugin;
+        Object delegate = nexoPackServerDelegate;
+        Object interceptor = nexoPackServerProxy;
+        if (detected == null || delegate == null || interceptor == null) {
+            return;
+        }
+        try {
+            Method getter = detected.getClass().getMethod("packServer");
+            if (getter.invoke(detected) != interceptor) {
+                return;
+            }
+            detected.getClass()
+                .getMethod("packServer", interceptor.getClass().getInterfaces()[0])
+                .invoke(detected, delegate);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().warning(
+                "Could not restore Nexo's original pack server: " + exception.getMessage()
+            );
+        }
+    }
+
+    private void finalizeNexoBuiltPack(Object packServer, ClassLoader loader) {
+        byte[] sourcePack = nexoSourcePackBytes;
+        Plugin detected = nexoPlugin;
+        if (sourcePack == null || detected == null) {
+            return;
+        }
+        try {
+            Object generator = detected.getClass().getMethod("packGenerator").invoke(detected);
+            Object builtPack = generator.getClass().getMethod("builtPack").invoke(generator);
+            if (builtPack == null) {
+                throw new IllegalStateException("Nexo has not built a resource pack");
+            }
+            Class<?> builtPackType = Class.forName(
+                "team.unnamed.creative.BuiltResourcePack",
+                true,
+                loader
+            );
+            Object writable = builtPackType.getMethod("data").invoke(builtPack);
+            Class<?> writableType = Class.forName(
+                "team.unnamed.creative.base.Writable",
+                true,
+                loader
+            );
+            byte[] generatedPack = (byte[]) writableType
+                .getMethod("toByteArray")
+                .invoke(writable);
+
+            boolean alreadyExact = containsExactNexoRenderPipeline(generatedPack, sourcePack);
+            byte[] verifiedPack = alreadyExact
+                ? generatedPack
+                : overlayNexoRenderPipeline(generatedPack, sourcePack);
+            if (!containsExactNexoRenderPipeline(verifiedPack, sourcePack)) {
+                throw new IOException("the final ZIP still does not contain the RGB pipeline");
+            }
+            if (!alreadyExact) {
+                replaceNexoBuiltPack(generator, verifiedPack, loader);
+            }
+            clearNexoPackServerCache(packServer);
+            exportVerifiedNexoPack(verifiedPack);
+            scheduleNexoOutputRepair(verifiedPack, loader);
+
+            nexoMerged = true;
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                if (!active || !nexoManaged) {
+                    return;
+                }
+                plugin.getServer().getOnlinePlayers().forEach(
+                    player -> plugin.manager().setMarkersVisible(player, true)
+                );
+            });
+            String action = alreadyExact ? "verified" : "repaired after Nexo processing";
+            plugin.getLogger().info(
+                "Nexo's final client ZIP was " + action + "; all StrobeLights RGB "
+                    + "shader files match revision " + PACK_REVISION + "."
+            );
+        } catch (IOException | ReflectiveOperationException | LinkageError exception) {
+            nexoMerged = false;
+            plugin.getLogger().severe(
+                "Could not verify Nexo's final client ZIP ("
+                    + exception.getClass().getSimpleName() + ": " + exception.getMessage()
+                    + "). Standalone recovery remains armed."
+            );
+        }
+    }
+
+    private static void replaceNexoBuiltPack(
+        Object generator,
+        byte[] packBytes,
+        ClassLoader loader
+    ) throws ReflectiveOperationException {
+        Class<?> writableType = Class.forName(
+            "team.unnamed.creative.base.Writable",
+            true,
+            loader
+        );
+        Object writable = writableType.getMethod("bytes", byte[].class)
+            .invoke(null, (Object) packBytes);
+        Class<?> builtPackType = Class.forName(
+            "team.unnamed.creative.BuiltResourcePack",
+            true,
+            loader
+        );
+        String hash = HexFormat.of().formatHex(sha1(packBytes));
+        Object replacement = builtPackType
+            .getMethod("of", writableType, String.class)
+            .invoke(null, writable, hash);
+        Field builtPackField = generator.getClass().getDeclaredField("builtPack");
+        builtPackField.setAccessible(true);
+        builtPackField.set(generator, replacement);
+    }
+
+    static void clearNexoPackServerCache(Object packServer)
+        throws ReflectiveOperationException {
+        Class<?> type = packServer.getClass();
+        while (type != null) {
+            try {
+                Field cache = type.getDeclaredField("builtPackArray");
+                if (cache.getType() == byte[].class) {
+                    cache.setAccessible(true);
+                    cache.set(packServer, null);
+                }
+                return;
+            } catch (NoSuchFieldException ignored) {
+                type = type.getSuperclass();
+            }
+        }
+    }
+
+    private void exportVerifiedNexoPack(byte[] packBytes) throws IOException {
+        Path directory = plugin.getDataFolder().toPath().resolve("resource-pack");
+        Files.createDirectories(directory);
+        String sourceName = nexoPackPath == null
+            ? "StrobeLights-Nexo-Combined.zip"
+            : nexoPackPath.getFileName().toString().replace(
+                "StrobeLights-ResourcePack",
+                "StrobeLights-Nexo-Combined"
+            );
+        Files.write(directory.resolve(sourceName), packBytes);
+    }
+
+    private void scheduleNexoOutputRepair(byte[] packBytes, ClassLoader loader) {
+        byte[] verifiedPack = packBytes.clone();
+        plugin.getServer().getScheduler().runTaskLaterAsynchronously(plugin, () -> {
+            if (!active || !nexoManaged) {
+                return;
+            }
+            try {
+                Class<?> settings = Class.forName(
+                    "com.nexomc.nexo.configs.Settings",
+                    true,
+                    loader
+                );
+                Object outputSetting = settings.getField("PACK_OUTPUT_PATH").get(null);
+                Object configured = outputSetting.getClass()
+                    .getMethod("toStringListOrSingle")
+                    .invoke(outputSetting);
+                if (!(configured instanceof Iterable<?> paths)) {
+                    return;
+                }
+                for (Object value : paths) {
+                    if (!(value instanceof String pathValue)
+                        || pathValue.isBlank()
+                        || !pathValue.toLowerCase(Locale.ROOT).endsWith(".zip")) {
+                        continue;
+                    }
+                    Path output = Path.of(pathValue);
+                    if (!output.isAbsolute()) {
+                        output = Path.of(System.getProperty("user.dir")).resolve(output);
+                    }
+                    Files.createDirectories(output.toAbsolutePath().normalize().getParent());
+                    Files.write(output, verifiedPack);
+                }
+            } catch (IOException | ReflectiveOperationException | LinkageError exception) {
+                plugin.getLogger().warning(
+                    "Could not update Nexo's configured external ZIP with the verified "
+                        + "RGB pack: " + exception.getMessage()
+                );
+            }
+        }, 20L);
     }
 
     private void mergeIntoNexo(Event event) {
@@ -510,16 +754,17 @@ public final class ResourcePackService implements Listener {
                 return;
             }
             int rawPipelineFiles = injectNexoRenderPipeline(event, packPath);
-            nexoMerged = true;
+            installNexoPackServerInterceptor(
+                nexoPlugin,
+                nexoPlugin.getClass().getClassLoader()
+            );
             nexoManaged = true;
             closeEmbeddedServer();
-            plugin.getServer().getOnlinePlayers().forEach(
-                player -> plugin.manager().setMarkersVisible(player, true)
-            );
             plugin.getLogger().info(
-                "StrobeLights shaders and models were added to Nexo's generated pack "
-                    + "without replacing Nexo's pack metadata; " + rawPipelineFiles
-                    + " critical render files were preserved byte-for-byte."
+                "StrobeLights shaders and models were added at the end of Nexo's "
+                    + "post-generation event without replacing Nexo's pack metadata; "
+                    + rawPipelineFiles + " critical render files are awaiting final ZIP "
+                    + "verification."
             );
         } catch (IOException | ReflectiveOperationException | LinkageError exception) {
             if (resourcePack != null && originalPackMeta != null) {
@@ -565,6 +810,65 @@ public final class ResourcePackService implements Listener {
             throw new IOException("The StrobeLights ZIP contains no Nexo render pipeline files");
         }
         return imported;
+    }
+
+    static boolean containsExactNexoRenderPipeline(byte[] generatedPack, byte[] sourcePack)
+        throws IOException {
+        Map<String, byte[]> generated = readZipEntries(generatedPack, false);
+        Map<String, byte[]> expected = readZipEntries(sourcePack, true);
+        if (expected.isEmpty()) {
+            return false;
+        }
+        for (Map.Entry<String, byte[]> entry : expected.entrySet()) {
+            byte[] actual = generated.get(entry.getKey());
+            if (actual == null || !MessageDigest.isEqual(entry.getValue(), actual)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static byte[] overlayNexoRenderPipeline(byte[] generatedPack, byte[] sourcePack)
+        throws IOException {
+        Map<String, byte[]> merged = readZipEntries(generatedPack, false);
+        Map<String, byte[]> pipeline = readZipEntries(sourcePack, true);
+        if (pipeline.isEmpty()) {
+            throw new IOException("The StrobeLights ZIP contains no RGB render pipeline");
+        }
+        pipeline.forEach((path, bytes) -> {
+            merged.remove(path);
+            merged.put(path, bytes);
+        });
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream output = new ZipOutputStream(bytes)) {
+            for (Map.Entry<String, byte[]> entry : merged.entrySet()) {
+                ZipEntry zipEntry = new ZipEntry(entry.getKey());
+                zipEntry.setTime(0L);
+                output.putNextEntry(zipEntry);
+                output.write(entry.getValue());
+                output.closeEntry();
+            }
+        }
+        return bytes.toByteArray();
+    }
+
+    private static Map<String, byte[]> readZipEntries(byte[] zip, boolean pipelineOnly)
+        throws IOException {
+        Map<String, byte[]> entries = new LinkedHashMap<>();
+        try (ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip))) {
+            ZipEntry entry;
+            while ((entry = input.getNextEntry()) != null) {
+                String path = entry.getName().replace('\\', '/');
+                if (!entry.isDirectory()
+                    && (!pipelineOnly || isNexoRenderPipelineEntry(path))) {
+                    entries.remove(path);
+                    entries.put(path, input.readAllBytes());
+                }
+                input.closeEntry();
+            }
+        }
+        return entries;
     }
 
     static boolean isNexoRenderPipelineEntry(String path) {
