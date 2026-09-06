@@ -299,11 +299,14 @@ flare:
       strength-percent: 85
 ```
 
-When Nexo is enabled, StrobeLights adds this ZIP during Nexo's post-generation
-event, restores Nexo's original pack metadata and leaves delivery to Nexo. An
-active Nexo generation is never cancelled. If Nexo does not confirm the merge
-within the configured timeout, StrobeLights restores standalone delivery.
-`/strobe pack` asks Nexo to resend the combined pack after a successful merge.
+When Nexo is enabled, StrobeLights adds this ZIP at the final priority of Nexo's
+post-generation event and restores Nexo's original pack metadata. Immediately
+before Nexo uploads or hosts the result, StrobeLights checks every RGB shader in
+the actual client ZIP and restores any file changed by another pack,
+obfuscation or PackSquash. It also invalidates Nexo SELFHOST's in-memory ZIP
+cache after regeneration. The verified combined ZIP is exported beside the
+standalone pack. Nexo remains responsible for delivery, and `/strobe pack` asks
+Nexo to resend that verified pack.
 
 On a proxy network, configure every backend to generate the same combined pack.
 For Velocity, Nexo recommends NexoProxy so changing backend does not dispatch a
@@ -311,7 +314,7 @@ duplicate pack. See Nexo's
 [resource-pack configuration](https://github.com/Nexo-MC/Nexo-Documentation/blob/master/configuration/resourcepack/README.md).
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.11 prints a red translated setup warning in the console and shows a
+0.10.12 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
@@ -370,7 +373,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.11+mc.26.2.jar`.
+For this build: `StrobeLights-v.0.10.12+mc.26.2.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
