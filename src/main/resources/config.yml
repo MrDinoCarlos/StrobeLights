@@ -32,9 +32,10 @@ resource-pack:
   enabled: true
   required: true
   send-delay-ticks: 10
-  # When Nexo is installed, this ZIP is merged into Nexo's final generated pack
-  # and Nexo remains the only plugin that sends a pack to players. This prevents
-  # one pack from replacing the other during proxy/server switches.
+  # When Nexo is installed, this ZIP is merged into Nexo's generated pack. The
+  # final ZIP is checked immediately before Nexo uploads it, and any shader file
+  # changed by another pack, obfuscation or PackSquash is restored byte-for-byte.
+  # Nexo remains the only plugin that sends the combined pack to players.
   nexo-integration:
     enabled: true
     # Check Nexo after startup. An active Nexo generation is never interrupted.

@@ -3,15 +3,25 @@ package es.mrdino.strobelights.resourcepack;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.logging.Logger;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 
 class EmbeddedPackServerTest {
@@ -91,6 +101,45 @@ class EmbeddedPackServerTest {
     }
 
     @Test
+    void repairsTheFinalNexoZipWithoutReplacingNexoMetadataOrAssets() throws Exception {
+        byte[] source = zip(Map.of(
+            "pack.mcmeta", utf8("strobelights-meta"),
+            "assets/minecraft/post_effect/transparency.json", utf8("strobe-pipeline"),
+            "assets/minecraft/shaders/post/light.fsh", utf8("strobe-light"),
+            "assets/strobelights/strobelights-integration.json", utf8("0.10.12"),
+            "assets/strobelights/models/item/flare_launcher.json", utf8("flare-model")
+        ));
+        byte[] generated = zip(Map.of(
+            "pack.mcmeta", utf8("nexo-meta"),
+            "assets/minecraft/post_effect/transparency.json", utf8("other-pipeline"),
+            "assets/nexo/textures/item/example.png", new byte[] {1, 2, 3}
+        ));
+
+        assertFalse(ResourcePackService.containsExactNexoRenderPipeline(generated, source));
+        byte[] repaired = ResourcePackService.overlayNexoRenderPipeline(generated, source);
+        assertTrue(ResourcePackService.containsExactNexoRenderPipeline(repaired, source));
+
+        Map<String, byte[]> entries = unzip(repaired);
+        assertArrayEquals(utf8("nexo-meta"), entries.get("pack.mcmeta"));
+        assertArrayEquals(
+            new byte[] {1, 2, 3},
+            entries.get("assets/nexo/textures/item/example.png")
+        );
+        assertFalse(entries.containsKey(
+            "assets/strobelights/models/item/flare_launcher.json"
+        ));
+    }
+
+    @Test
+    void invalidatesNexoSelfHostBytesAfterPackRegeneration() throws Exception {
+        FakeNexoSelfHost server = new FakeNexoSelfHost(new byte[] {9, 8, 7});
+
+        ResourcePackService.clearNexoPackServerCache(server);
+
+        assertNull(server.cachedBytes());
+    }
+
+    @Test
     void servesOnlyTheConfiguredImmutableZip() throws Exception {
         byte[] pack = {0x50, 0x4B, 0x03, 0x04};
         try (EmbeddedPackServer server = new EmbeddedPackServer(
@@ -135,5 +184,49 @@ class EmbeddedPackServerTest {
         public void packMeta(Object metadata) {
             this.metadata = metadata;
         }
+    }
+
+    static final class FakeNexoSelfHost {
+
+        @SuppressWarnings("unused")
+        private byte[] builtPackArray;
+
+        FakeNexoSelfHost(byte[] builtPackArray) {
+            this.builtPackArray = builtPackArray;
+        }
+
+        byte[] cachedBytes() {
+            return builtPackArray;
+        }
+    }
+
+    private static byte[] utf8(String value) {
+        return value.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] zip(Map<String, byte[]> entries) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream output = new ZipOutputStream(bytes)) {
+            for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+                output.putNextEntry(new ZipEntry(entry.getKey()));
+                output.write(entry.getValue());
+                output.closeEntry();
+            }
+        }
+        return bytes.toByteArray();
+    }
+
+    private static Map<String, byte[]> unzip(byte[] zip) throws IOException {
+        Map<String, byte[]> entries = new LinkedHashMap<>();
+        try (ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip))) {
+            ZipEntry entry;
+            while ((entry = input.getNextEntry()) != null) {
+                if (!entry.isDirectory()) {
+                    entries.put(entry.getName(), input.readAllBytes());
+                }
+                input.closeEntry();
+            }
+        }
+        return entries;
     }
 }
