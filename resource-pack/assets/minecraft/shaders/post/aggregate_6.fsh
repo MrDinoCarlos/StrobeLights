@@ -3,11 +3,13 @@
 #moj_import <minecraft:utils.glsl>
 
 uniform sampler2D DiffuseSampler;
+uniform sampler2D ItemEntitySampler;
 uniform sampler2D ItemEntityDepthSampler;
 uniform sampler2D ColoredCentersSampler;
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
     vec2 DiffuseSize;
+    vec2 ItemEntitySize;
     vec2 ItemEntityDepthSize;
     vec2 ColoredCentersSize;
 };
@@ -135,12 +137,12 @@ void main() {
     }
 
     if (status == 5.0) {
-        vec4 sampleColor;
+        vec4 sampleColor = vec4(0.0);
         px *= int(Step);
         samplepos = vec2(float(px), float(py));
         for (int iter = 0; iter < int(Step); iter += 1) {
             sampleColor = texture(ColoredCentersSampler, (vec2(samplepos.x + float(iter), samplepos.y) + 0.5) / DiffuseSize);
-            float isLight = sampleColor.a;
+            float isLight = step(0.5 / 255.0, sampleColor.a);
             if (tmpCounter + isLight == targetNum) {
                 px += iter;
                 iter = BIG;
@@ -154,6 +156,18 @@ void main() {
         float lightDepth = LinearizeDepth(
             texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH
         );
+        int projectionCode16 = 0;
+        int payloadIndex = 0;
+        for (int y = -1; y <= 0; y += 1) {
+            for (int x = -1; x <= 1; x += 1) {
+                if (payloadIndex >= 4) break;
+                int alphaByte = int(floor(texture(ItemEntitySampler,
+                    samplepos + vec2(float(x), float(y)) / vec2(textureSize(ItemEntitySampler, 0))).a * 255.0 + 0.5));
+                projectionCode16 |= clamp(alphaByte - 2, 0, 15) << (payloadIndex * 4);
+                payloadIndex += 1;
+            }
+        }
+        vec2 sourceNdc = samplepos * 2.0 - 1.0;
         samplepos = (samplepos - vec2(0.5)) * vec2(inAspectRatio, 1.0);
         int encodedValue = markerValue(sampleColor.rgb);
         float markerConversionK = conversionK;
@@ -167,6 +181,12 @@ void main() {
             samplepos * markerConversionK * lightDepth,
             lightDepth
         );
+        if (isOffscreenLight(encodedValue)) {
+            bool trpLight = sampleColor.a > 0.0 && sampleColor.a < 0.5;
+            float lane = trpLight ? 0.45 : -0.45;
+            lightWorldCoord = vec3((sourceNdc.x - lane) / 0.75,
+                sourceNdc.y / 1.5, 1.0) * lightDepth;
+        }
 
         if (pos.y == 0.0) {
             outColor = encodeInt(int(lightWorldCoord.x * FIXEDPOINT));
@@ -176,8 +196,15 @@ void main() {
             outColor = encodeInt(int(lightWorldCoord.z * FIXEDPOINT));
         } else if (pos.y == 3.0) {
             outColor = sampleColor;
-        } else {
+        } else if (pos.y == 4.0) {
             outColor = vec4(float(expansionCode) / 15.0, 0.0, 0.0, 1.0);
+        } else if (pos.y == 5.0) {
+            // 1.0 identifies a native StrobeLights emitter. TRP stores
+            // (radiusLowNibble + 1) / 255 here.
+            outColor = vec4(sampleColor.a, 0.0, 0.0, 1.0);
+        } else {
+            outColor = vec4(float((projectionCode16 >> 8) & 255),
+                float(projectionCode16 & 255), 0.0, 255.0) / 255.0;
         }
 
         if (Test > 0.5 && outColor.a == 0.0) {
