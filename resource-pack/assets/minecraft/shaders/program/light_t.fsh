@@ -19,6 +19,10 @@ float decodeExpansionScale(int code) {
     return float(clamp(code, 0, 15) + 1) * 0.25;
 }
 
+float decodeExactProjectionK(int code) {
+    return 0.0000152587890625 * exp2(24.0 * float(clamp(code, 0, 65535)) / 65535.0);
+}
+
 float decodeProjectionK(int code) {
     if (code <= 0) return 0.125;
     if (code == 1) return 0.160;
@@ -47,7 +51,6 @@ in vec2 texCoord;
 flat in vec2 oneTexel;
 flat in vec2 oneTexelAux1;
 flat in float aspectRatio;
-flat in float conversionK;
 flat in float count;
 
 out vec4 outColor;
@@ -92,6 +95,7 @@ vec3 offscreenLightColor(int encodedValue) {
 }
 
 vec3 reconstructOffscreenLight(vec3 proxyCoord, int encodedValue) {
+    proxyCoord.z = max(0.0, proxyCoord.z - 0.25);
     int mode = (encodedValue >> 20) & 7;
     float axisInverse = 16.0;
     float depthInverse = 4.0;
@@ -140,47 +144,12 @@ vec3 reconstructOffscreenLight(vec3 proxyCoord, int encodedValue) {
     );
 }
 
-float lightTransmission(
-    vec3 surfaceCoord,
-    vec3 lightCoord,
-    float lightDistance,
-    float projectionK
-) {
-    int rayCount = int(clamp(ceil(lightDistance * 3.0), 8.0, 96.0));
-    float blockedWeight = 0.0;
-    for (int rayIndex = 1; rayIndex < 96; rayIndex += 1) {
-        if (rayIndex >= rayCount) {
-            break;
-        }
-        float progress = float(rayIndex) / float(rayCount);
-        vec3 rayPoint = mix(surfaceCoord, lightCoord, progress);
-        if (rayPoint.z <= NEAR) {
-            break;
-        }
-        vec2 rayUv = rayPoint.xy / (projectionK * rayPoint.z);
-        rayUv = rayUv / vec2(aspectRatio, 1.0) + vec2(0.5);
-        if (rayUv.x <= 0.0 || rayUv.x >= 1.0
-            || rayUv.y <= 0.0 || rayUv.y >= 1.0) {
-            break;
-        }
-        float geometryDepth = LinearizeDepth(texture(CompareDepthSampler, rayUv).r);
-        float depthBias = max(0.08, rayPoint.z * 0.0025);
-        float depthGap = rayPoint.z - geometryDepth;
-        float stepOcclusion = smoothstep(depthBias, depthBias + 0.35, depthGap);
-        blockedWeight += stepOcclusion;
-        if (blockedWeight >= 1.25) {
-            return 0.0;
-        }
-    }
-    return 1.0 - smoothstep(0.15, 1.25, blockedWeight);
-}
-
 void main() {
     outColor = vec4(0.0);
     float oDepth = texture(DiffuseDepthSampler, texCoord).r;
     float compDepth = texture(CompareDepthSampler, texCoord).r;
     float depth = LinearizeDepth(oDepth);
-    if (oDepth < compDepth && depth < Range + LIGHTR) {
+    if (oDepth < compDepth && depth < Range + 64.0) {
         vec4 aggColor = vec4(0.0, 0.0, 0.0, 1.0);
 
         vec2 pixCoord = texCoord;
@@ -196,17 +165,23 @@ void main() {
                 LightsSampler,
                 (vec2(float(i), 4.0) + 0.5) * oneTexelAux1
             ).r * 15.0 + 0.5));
+            float sourceMetadata = texture(
+                LightsSampler,
+                (vec2(float(i), 5.0) + 0.5) * oneTexelAux1
+            ).r;
+            bool trpLight = sourceMetadata > 0.0 && sourceMetadata < 0.5;
             int encodedValue = markerValue(lightColor);
             if (isCameraFlash(encodedValue)) {
                 continue;
             }
             bool offscreenLight = isOffscreenLight(encodedValue);
-            float markerConversionK = conversionK;
+            ivec2 projectionBytes = ivec2(floor(texture(LightsSampler,
+                (vec2(float(i), 6.0) + 0.5) * oneTexelAux1).rg * 255.0 + 0.5));
+            float markerConversionK = decodeExactProjectionK(
+                (projectionBytes.r << 8) | projectionBytes.g);
             if (offscreenLight) {
                 lightWorldCoord = reconstructOffscreenLight(lightWorldCoord, encodedValue);
                 lightColor = offscreenLightColor(encodedValue);
-                int projectionCode = (encodedValue >> 16) & 15;
-                markerConversionK = decodeProjectionK(projectionCode);
             }
             vec3 worldCoord = vec3(
                 screenCoord * markerConversionK * depth,
@@ -217,28 +192,44 @@ void main() {
                 0.0,
                 1.0
             );
-            float lightRadius = mix(
-                MIN_LIGHTR,
-                LIGHTR,
-                pow(encodedIntensity, RADIUS_CURVE)
-            ) * decodeExpansionScale(expansionCode);
+            float lightRadius;
+            float falloffPower;
+            float lightBoost;
+            vec3 emittedColor;
+            if (trpLight) {
+                int radiusLowCode = int(clamp(
+                    floor(sourceMetadata * 255.0 + 0.5) - 1.0,
+                    0.0,
+                    15.0
+                ));
+                int radiusBand = expansionCode * 16 + radiusLowCode;
+                lightRadius = 0.01 * pow(6400.0, float(radiusBand) / 255.0);
+                float intensityBand = floor(encodedIntensity * 15.0 + 0.5);
+                float trpIntensity = intensityBand <= 0.0 ? 0.0
+                    : exp2((intensityBand - 15.0) * (16.0 / 14.0));
+                emittedColor = encodedIntensity > 0.0001
+                    ? lightColor / encodedIntensity * trpIntensity : vec3(0.0);
+                falloffPower = 2.0;
+                lightBoost = 1.0;
+            } else {
+                lightRadius = mix(
+                    MIN_LIGHTR,
+                    LIGHTR,
+                    pow(encodedIntensity, RADIUS_CURVE)
+                ) * decodeExpansionScale(expansionCode);
+                emittedColor = lightColor;
+                falloffPower = FALLOFF_POWER;
+                lightBoost = LIGHT_BOOST;
+            }
             float lightDist = length(worldCoord - lightWorldCoord);
             if (lightDist < lightRadius) {
-                float transmission = lightTransmission(
-                    worldCoord,
-                    lightWorldCoord,
-                    lightDist,
-                    markerConversionK
+                float rangeFade = clamp(Range - length(lightWorldCoord), 0.0, 6.0) / 6.0;
+                float radialFalloff = pow(
+                    clamp(1.0 - lightDist / lightRadius, 0.0, 1.0),
+                    falloffPower
                 );
-                if (transmission > 0.001) {
-                    float rangeFade = clamp(Range - length(lightWorldCoord), 0.0, 6.0) / 6.0;
-                    float radialFalloff = pow(
-                        clamp(1.0 - lightDist / lightRadius, 0.0, 1.0),
-                        FALLOFF_POWER
-                    );
-                    aggColor.rgb += radialFalloff * lightColor * LIGHT_BOOST
-                        * rangeFade * transmission;
-                }
+                aggColor.rgb += radialFalloff * emittedColor * lightBoost
+                    * rangeFade;
             }
         }
         outColor.rgb = aggColor.rgb;

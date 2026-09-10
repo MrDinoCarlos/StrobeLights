@@ -6,7 +6,8 @@
         "passthrough": {},
         "lightmap1": {},
         "lightmap2": {},
-        "lights": {"width": 1024, "height": 5, "bilinear": false }
+        "lightmap3": {},
+        "lights": {"width": 1024, "height": 7, "bilinear": false }
     },
     "passes": [
         {
@@ -148,6 +149,10 @@
                     "target": "swap1"
                 },
                 {
+                    "sampler_name": "ItemEntity",
+                    "target": "minecraft:item_entity"
+                },
+                {
                     "sampler_name": "ItemEntityDepth",
                     "target": "minecraft:item_entity",
                     "use_depth_buffer": true
@@ -189,10 +194,6 @@
             "output": "lightmap1",
             "uniforms": [
                 {
-                    "name":"FOV",
-                    "values": [ 70.0 ]
-                },
-                {
                     "name":"Range",
                     "values": [ 128.0 ]
                 }
@@ -219,9 +220,26 @@
             "output": "lightmap2",
             "uniforms": [
                 {
-                    "name":"FOV",
-                    "values": [ 70.0 ]
+                    "name":"Range",
+                    "values": [ 128.0 ]
+                }
+            ]
+        },
+        {
+            "program": "minecraft:post/light",
+            "inputs": [
+                {
+                    "sampler_name": "DiffuseDepth",
+                    "target": "minecraft:item_entity",
+                    "use_depth_buffer": true
                 },
+                {
+                    "sampler_name": "Lights",
+                    "target": "lights"
+                }
+            ],
+            "output": "lightmap3",
+            "uniforms": [
                 {
                     "name":"Range",
                     "values": [ 128.0 ]
@@ -297,6 +315,10 @@
                     "sampler_name": "ItemEntityDepth",
                     "target": "minecraft:item_entity",
                     "use_depth_buffer": true
+                },
+                {
+                    "sampler_name": "ItemEntityLight",
+                    "target": "lightmap3"
                 },
                 {
                     "sampler_name": "Particles",

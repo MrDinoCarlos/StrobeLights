@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "es.mrdino"
-version = "0.10.12"
+version = "0.10.23"
 
 val minecraftVersion = "1.20.1"
 val paperApiVersion = "1.20.1-R0.1-SNAPSHOT"
@@ -46,16 +46,16 @@ val generatedLegacyCarrierPack = layout.buildDirectory.dir(
 )
 
 val generateLegacyCarrierPack = tasks.register("generateLegacyCarrierPack") {
-    inputs.property("carrierEncodingVersion", 2)
+    inputs.property("carrierEncodingVersion", 4)
     outputs.dir(generatedLegacyCarrierPack)
 
     doLast {
         val packRoot = generatedLegacyCarrierPack.get().asFile
         val itemModelDirectory = packRoot.resolve(
-            "assets/minecraft/models/item/lp_payload"
+            "assets/strobelights/models/item/carrier"
         )
         val textureDirectory = packRoot.resolve(
-            "assets/minecraft/textures/misc/lp_payload"
+            "assets/strobelights/textures/item/carrier"
         )
         itemModelDirectory.mkdirs()
         textureDirectory.mkdirs()
@@ -64,21 +64,24 @@ val generateLegacyCarrierPack = tasks.register("generateLegacyCarrierPack") {
         for (highByte in 0..255) {
             val suffix = highByte.toString(16).padStart(2, '0')
             val sourceTexture = BufferedImage(
-                16,
-                16,
+                64,
+                64,
                 BufferedImage.TYPE_INT_ARGB
             )
             val flashTexture = BufferedImage(
-                16,
-                16,
+                64,
+                64,
                 BufferedImage.TYPE_INT_ARGB
             )
-            val sourcePixel = (255 shl 24) or (highByte shl 16) or
+            val sourcePixel = (253 shl 24) or (highByte shl 16) or
                 (32 shl 8) or 224
-            val flashPixel = (255 shl 24) or (highByte shl 16) or
+            val flashPixel = (253 shl 24) or (highByte shl 16) or
                 (224 shl 8) or 32
-            for (y in 0 until 16) {
-                for (x in 0 until 16) {
+            // OptiFine rescales small atlas sprites through AWT SRC_OVER.
+            // At alpha 253 that changes payload bytes 64->63 and 191->192.
+            // Native 64px sprites avoid that rescale while preserving RGBA.
+            for (y in 0 until 64) {
+                for (x in 0 until 64) {
                     sourceTexture.setRGB(x, y, sourcePixel)
                     flashTexture.setRGB(x, y, flashPixel)
                 }
@@ -97,26 +100,26 @@ val generateLegacyCarrierPack = tasks.register("generateLegacyCarrierPack") {
             itemModelDirectory.resolve("source_$suffix.json").writeText(
                 """
                 {
-                  "parent": "minecraft:item/lp_payload_source_base",
-                  "textures": { "0": "minecraft:misc/lp_payload/source_$suffix" }
+                  "parent": "strobelights:item/carrier_source_base",
+                  "textures": { "0": "strobelights:item/carrier/source_$suffix" }
                 }
                 """.trimIndent() + "\n"
             )
             itemModelDirectory.resolve("flash_$suffix.json").writeText(
                 """
                 {
-                  "parent": "minecraft:item/lp_payload_flash_base",
-                  "textures": { "0": "minecraft:misc/lp_payload/flash_$suffix" }
+                  "parent": "strobelights:item/carrier_flash_base",
+                  "textures": { "0": "strobelights:item/carrier/flash_$suffix" }
                 }
                 """.trimIndent() + "\n"
             )
             overrides +=
-                """    { "predicate": { "custom_model_data": ${6_700 + highByte} }, "model": "minecraft:item/lp_payload/source_$suffix" }"""
+                """    { "predicate": { "custom_model_data": ${4_000_000 + highByte} }, "model": "strobelights:item/carrier/source_$suffix" }"""
         }
         for (highByte in 0..255) {
             val suffix = highByte.toString(16).padStart(2, '0')
             overrides +=
-                """    { "predicate": { "custom_model_data": ${7_200 + highByte} }, "model": "minecraft:item/lp_payload/flash_$suffix" }"""
+                """    { "predicate": { "custom_model_data": ${4_001_000 + highByte} }, "model": "strobelights:item/carrier/flash_$suffix" }"""
         }
 
         val rootModelDirectory = packRoot.resolve(
@@ -166,7 +169,7 @@ val exportResourcePack = tasks.register<Copy>("exportResourcePack") {
 }
 
 tasks.jar {
-    archiveFileName = "StrobeLights-v.${project.version}+mc.$minecraftVersion.jar"
+    archiveFileName = "StrobeLights-${project.version}+mc.v.$minecraftVersion.jar"
     manifest {
         attributes(
             "Implementation-Title" to "StrobeLights",

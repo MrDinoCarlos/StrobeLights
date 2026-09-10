@@ -63,9 +63,9 @@ class EmbeddedPackServerTest {
     @Test
     void keepsRgbRenderingEligibleAcrossStandaloneAndExternalPackDelivery() {
         assertFalse(ResourcePackService.canRender(true, false, false, false));
-        assertTrue(ResourcePackService.canRender(true, false, true, false));
+        assertFalse(ResourcePackService.canRender(true, false, true, false));
         assertTrue(ResourcePackService.canRender(true, false, false, true));
-        assertTrue(ResourcePackService.canRender(true, true, false, false));
+        assertFalse(ResourcePackService.canRender(true, true, false, false));
         assertTrue(ResourcePackService.canRender(false, false, false, false));
     }
 
@@ -106,12 +106,15 @@ class EmbeddedPackServerTest {
             "pack.mcmeta", utf8("strobelights-meta"),
             "assets/minecraft/post_effect/transparency.json", utf8("strobe-pipeline"),
             "assets/minecraft/shaders/post/light.fsh", utf8("strobe-light"),
-            "assets/strobelights/strobelights-integration.json", utf8("0.10.12"),
+            "assets/minecraft/shaders/core/item.vsh",
+            utf8("trpMarkerFlag trpStrobeMarker hybrid-core"),
+            "assets/strobelights/strobelights-integration.json", utf8("0.10.19"),
             "assets/strobelights/models/item/flare_launcher.json", utf8("flare-model")
         ));
         byte[] generated = zip(Map.of(
             "pack.mcmeta", utf8("nexo-meta"),
             "assets/minecraft/post_effect/transparency.json", utf8("other-pipeline"),
+            "assets/minecraft/shaders/core/item.vsh", utf8("strobe-only-core"),
             "assets/nexo/textures/item/example.png", new byte[] {1, 2, 3}
         ));
 
@@ -124,6 +127,10 @@ class EmbeddedPackServerTest {
         assertArrayEquals(
             new byte[] {1, 2, 3},
             entries.get("assets/nexo/textures/item/example.png")
+        );
+        assertArrayEquals(
+            utf8("trpMarkerFlag trpStrobeMarker hybrid-core"),
+            entries.get("assets/minecraft/shaders/core/item.vsh")
         );
         assertFalse(entries.containsKey(
             "assets/strobelights/models/item/flare_launcher.json"
@@ -160,6 +167,20 @@ class EmbeddedPackServerTest {
             assertArrayEquals(pack, response.body());
             assertEquals("application/zip", response.headers()
                 .firstValue("Content-Type").orElseThrow());
+            assertEquals("bytes", response.headers()
+                .firstValue("Accept-Ranges").orElseThrow());
+
+            HttpResponse<byte[]> range = client.send(
+                HttpRequest.newBuilder(base.resolve("/strobelights/test.zip"))
+                    .header("Range", "bytes=1-2")
+                    .GET()
+                    .build(),
+                HttpResponse.BodyHandlers.ofByteArray()
+            );
+            assertEquals(206, range.statusCode());
+            assertArrayEquals(new byte[] {0x4B, 0x03}, range.body());
+            assertEquals("bytes 1-2/4", range.headers()
+                .firstValue("Content-Range").orElseThrow());
 
             HttpResponse<byte[]> missing = client.send(
                 HttpRequest.newBuilder(base.resolve("/wrong.zip")).GET().build(),

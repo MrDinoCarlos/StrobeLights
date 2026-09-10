@@ -18,6 +18,17 @@ float decodeExpansionScale(int code) {
     return float(clamp(code, 0, 15) + 1) * 0.25;
 }
 
+// v5 transports the actual projection in the two guarded sidecar bytes.
+int encodeExactProjectionK(float value) {
+    float normalized = log2(clamp(value, 0.0000152587890625, 256.0)
+        / 0.0000152587890625) / 24.0;
+    return int(floor(normalized * 65535.0 + 0.5));
+}
+
+float decodeExactProjectionK(int code) {
+    return 0.0000152587890625 * exp2(24.0 * float(clamp(code, 0, 65535)) / 65535.0);
+}
+
 // The Fabulous post chain does not expose the camera projection matrix. Carry
 // its vertical conversion in the OptiFine-safe 24-bit color marker.
 int encodeProjectionK(float value) {

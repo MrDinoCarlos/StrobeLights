@@ -11,7 +11,8 @@
     "swap3",
     "lightmap1",
     "lightmap2",
-    "lights",
+    "lightmap3",
+    { "name": "lights", "width": 1024, "height": 7 },
     "final"
   ],
   "passes": [
@@ -58,6 +59,7 @@
       "intarget": "swap1",
       "outtarget": "lights",
       "auxtargets": [
+        { "name": "ItemEntitySampler", "id": "itemEntity" },
         { "name": "ItemEntityDepthSampler", "id": "itemEntity:depth" },
         { "name": "ColoredCentersSampler", "id": "swap3" }
       ]
@@ -79,6 +81,15 @@
         { "name": "DiffuseDepthSampler", "id": "translucent:depth" },
         { "name": "LightsSampler", "id": "lights" },
         { "name": "CompareDepthSampler", "id": "minecraft:main:depth" }
+      ]
+    },
+    {
+      "name": "light",
+      "intarget": "itemEntity",
+      "outtarget": "lightmap3",
+      "auxtargets": [
+        { "name": "DiffuseDepthSampler", "id": "itemEntity:depth" },
+        { "name": "LightsSampler", "id": "lights" }
       ]
     },
     {
@@ -107,6 +118,7 @@
         { "name": "TranslucentDepthSampler", "id": "translucent:depth" },
         { "name": "ItemEntitySampler", "id": "itemEntity" },
         { "name": "ItemEntityDepthSampler", "id": "itemEntity:depth" },
+        { "name": "ItemEntityLightSampler", "id": "lightmap3" },
         { "name": "ParticlesSampler", "id": "particles" },
         { "name": "ParticlesDepthSampler", "id": "particles:depth" },
         { "name": "CloudsSampler", "id": "clouds" },

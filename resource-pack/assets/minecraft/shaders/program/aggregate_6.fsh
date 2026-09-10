@@ -33,6 +33,7 @@ float decodeProjectionK(int code) {
 }
 
 uniform sampler2D DiffuseSampler;
+uniform sampler2D ItemEntitySampler;
 uniform sampler2D ItemEntityDepthSampler;
 uniform sampler2D ColoredCentersSampler;
 uniform vec2 InSize;
@@ -158,12 +159,12 @@ void main() {
     }
 
     if (status == 5.0) {
-        vec4 sampleColor;
+        vec4 sampleColor = vec4(0.0);
         px *= int(Step);
         samplepos = vec2(float(px), float(py));
         for (int iter = 0; iter < int(Step); iter += 1) {
             sampleColor = texture(ColoredCentersSampler, (vec2(samplepos.x + float(iter), samplepos.y) + 0.5) / InSize);
-            float isLight = sampleColor.a;
+            float isLight = step(0.5 / 255.0, sampleColor.a);
             if (tmpCounter + isLight == targetNum) {
                 px += iter;
                 iter = BIG;
@@ -177,6 +178,12 @@ void main() {
         float lightDepth = LinearizeDepth(
             texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH
         );
+        int projectionHigh = int(floor(texture(ItemEntitySampler,
+            samplepos - vec2(2.0 * inOneTexel.x, 0.0)).r * 255.0 + 0.5));
+        int projectionLow = int(floor(texture(ItemEntitySampler,
+            samplepos + vec2(2.0 * inOneTexel.x, 0.0)).r * 255.0 + 0.5));
+        int projectionCode16 = (projectionHigh << 8) | projectionLow;
+        vec2 sourceNdc = samplepos * 2.0 - 1.0;
         samplepos = (samplepos - vec2(0.5)) * vec2(inAspectRatio, 1.0);
         int encodedValue = markerValue(sampleColor.rgb);
         float markerConversionK = conversionK;
@@ -190,6 +197,12 @@ void main() {
             samplepos * markerConversionK * lightDepth,
             lightDepth
         );
+        if (isOffscreenLight(encodedValue)) {
+            bool trpLight = sampleColor.a > 0.0 && sampleColor.a < 0.5;
+            float lane = trpLight ? 0.45 : -0.45;
+            lightWorldCoord = vec3((sourceNdc.x - lane) / 0.75,
+                sourceNdc.y / 1.5, 1.0) * lightDepth;
+        }
 
         if (pos.y == 0.0) {
             outColor = encodeInt(int(lightWorldCoord.x * FIXEDPOINT));
@@ -199,8 +212,13 @@ void main() {
             outColor = encodeInt(int(lightWorldCoord.z * FIXEDPOINT));
         } else if (pos.y == 3.0) {
             outColor = sampleColor;
-        } else {
+        } else if (pos.y == 4.0) {
             outColor = vec4(float(expansionCode) / 15.0, 0.0, 0.0, 1.0);
+        } else if (pos.y == 5.0) {
+            outColor = vec4(sampleColor.a, 0.0, 0.0, 1.0);
+        } else {
+            outColor = vec4(float((projectionCode16 >> 8) & 255),
+                float(projectionCode16 & 255), 0.0, 255.0) / 255.0;
         }
 
         if (Test > 0.5 && outColor.a == 0.0) {

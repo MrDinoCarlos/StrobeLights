@@ -3,6 +3,7 @@
     "fragment": "aggregate_6",
     "samplers": [
         { "name": "DiffuseSampler" },
+        { "name": "ItemEntitySampler" },
         { "name": "ItemEntityDepthSampler" },
         { "name": "ColoredCentersSampler" }
     ],

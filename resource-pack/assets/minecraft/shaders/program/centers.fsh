@@ -7,25 +7,25 @@ flat in vec2 oneTexel;
 
 out vec4 outColor;
 
-bool sameEncodedMarker(vec3 reference, vec3 candidate) {
+bool sameEncodedMarker(vec4 reference, vec4 candidate) {
     return all(lessThanEqual(
         abs(reference - candidate),
-        vec3(1.5 / 255.0)
+        vec4(1.5 / 255.0)
     ));
 }
 
 void main() {
     outColor = texture(DiffuseSampler, texCoord);
-    vec3 c1 = texture(DiffuseSampler, texCoord + vec2(oneTexel.x, 0.0)).rgb;
-    vec3 c2 = texture(DiffuseSampler, texCoord + vec2(0.0, oneTexel.y)).rgb;
-    vec3 c3 = texture(DiffuseSampler, texCoord + vec2(oneTexel.x, -oneTexel.y)).rgb;
-    vec3 c4 = texture(DiffuseSampler, texCoord + vec2(oneTexel.x, oneTexel.y)).rgb;
+    vec4 c1 = texture(DiffuseSampler, texCoord + vec2(oneTexel.x, 0.0));
+    vec4 c2 = texture(DiffuseSampler, texCoord + vec2(0.0, oneTexel.y));
+    vec4 c3 = texture(DiffuseSampler, texCoord + vec2(oneTexel.x, -oneTexel.y));
+    vec4 c4 = texture(DiffuseSampler, texCoord + vec2(oneTexel.x, oneTexel.y));
     // Collapse extra framebuffer texels only when they belong to the exact
     // same payload. Neighboring strobes with different colors stay separate.
-    if (sameEncodedMarker(outColor.rgb, c1)
-        || sameEncodedMarker(outColor.rgb, c2)
-        || sameEncodedMarker(outColor.rgb, c3)
-        || sameEncodedMarker(outColor.rgb, c4)) {
+    if (sameEncodedMarker(outColor, c1)
+        || sameEncodedMarker(outColor, c2)
+        || sameEncodedMarker(outColor, c3)
+        || sameEncodedMarker(outColor, c4)) {
         outColor = vec4(0.0);
     }
 }

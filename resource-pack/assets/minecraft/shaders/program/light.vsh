@@ -6,13 +6,11 @@ uniform sampler2D LightsSampler;
 uniform mat4 ProjMat;
 uniform vec2 InSize;
 uniform vec2 AuxSize1;
-uniform float FOV;
 
 out vec2 texCoord;
 flat out vec2 oneTexel;
 flat out vec2 oneTexelAux1;
 flat out float aspectRatio;
-flat out float conversionK;
 flat out float count;
 
 int decodeInt(vec4 ivec) {
@@ -30,7 +28,6 @@ void main(){
     oneTexelAux1 = 1.0 / AuxSize1;
     aspectRatio = InSize.x / InSize.y;
     texCoord = outPos.xy * 0.5 + 0.5;
-    conversionK = tan(FOV / 360.0 * 3.14159265358979) * 2.0;
 
     vec4 tmpCount = texture(LightsSampler, vec2(1.0, 0.0) - oneTexelAux1 * 0.5);
     count = 0.0;

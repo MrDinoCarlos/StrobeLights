@@ -37,10 +37,11 @@ flat out float marker;
 flat out vec4 markerPayload;
 out float scale;
 
-// The invisible item model anchors a three-pixel guarded carrier. The core
+// The invisible item model anchors a five-pixel guarded carrier. The core
 // fragment shader writes opaque technical bytes after this vertex shader
 // recognizes the opaque, uniform source texture.
-#define HALFMARKER tmp.z / 64.0
+// Five guarded pixels must fit even in a 320-pixel-wide client window.
+#define HALFMARKER tmp.z / 32.0
 
 float opz(vec4 pos, float factor, float bias) {
     return (((pos.z / pos.w + 1.0) * 0.5 * factor + bias) * 2.0 - 1.0) * pos.w;
@@ -110,9 +111,6 @@ vec3 sourceLightColor(int encodedValue) {
 }
 
 int offscreenMode(vec3 source) {
-    if (length(source) < 0.20) {
-        return 0;
-    }
     vec3 absolute = abs(source);
     if (absolute.z >= absolute.x && absolute.z >= absolute.y) {
         return source.z >= 0.0 ? 6 : 1;
@@ -213,16 +211,14 @@ void main() {
     int encodedValue = decodeTechnicalPayload(tmpcol, UV2);
     bool encodedTechnicalCarrier = isCameraFlash(encodedValue)
         || isSourceLight(encodedValue);
-    // Keep the atlas source opaque, like Light Painter's proven 1.20.1 carrier.
-    // The core fragment shader, not the item texture, creates the guarded
-    // technical pixels consumed by the Fabulous transparency pipeline.
-    bool markerAlpha = tmpcol.a >= 254.5 / 255.0;
-    // Blue-dominant textures carry source lights and green-dominant textures
-    // carry camera flashes. Each generated texture is uniform and independent.
-    float markerTexturePeak = max(tmpcol.g, tmpcol.b);
-    float markerTextureBase = min(tmpcol.g, tmpcol.b);
-    bool markerTextureCarrier = markerTexturePeak >= tmpcol.a * 0.5
-        && markerTexturePeak > markerTextureBase * 2.0;
+    // Alpha 253 plus the exact green/blue pair is exclusive to StrobeLights.
+    // TRP's opaque RGB lights and alpha-coded beam atlas cannot enter this path.
+    vec4 markerTextureBytes = floor(tmpcol * 255.0 + 0.5);
+    bool sourceTextureCarrier = markerTextureBytes.a == 253.0
+        && markerTextureBytes.g == 32.0 && markerTextureBytes.b == 224.0;
+    bool flashTextureCarrier = markerTextureBytes.a == 253.0
+        && markerTextureBytes.g == 224.0 && markerTextureBytes.b == 32.0;
+    bool markerTextureCarrier = sourceTextureCarrier || flashTextureCarrier;
     // Do not infer a first-person render from fog distances. OptiFine's Fog:
     // OFF mode supplies NO_FOG with equal start/end values for world entities,
     // which made every ItemDisplay look like a hand item and removed all
@@ -232,7 +228,6 @@ void main() {
     marker = float(
         !gui
         && encodedTechnicalCarrier
-        && markerAlpha
         && markerTextureCarrier
     );
 
@@ -258,6 +253,7 @@ void main() {
             vec3 fixedSource = vec3(tmp.x, tmp.y, -tmp.z);
             int mode = offscreenMode(fixedSource);
             vec3 proxy = offscreenProxy(fixedSource, mode);
+            proxy.z += 0.25;
             float projectionK = 2.0 / max(abs(ProjMat[1][1]), 0.0001);
             int projectionCode = encodeProjectionK(projectionK);
             tmp.xyz = vec3(proxy.x, proxy.y, -proxy.z);
@@ -290,7 +286,13 @@ void main() {
         scale = abs(HALFMARKER * ProjMat[1][1] / tmp.z);
     }
 
+    vec2 carrierNdc = vec2(tmp.x / max(-tmp.z, 0.0001) * 0.75 - 0.45,
+        tmp.y / max(-tmp.z, 0.0001) * 1.5);
     tmp = ProjMat * tmp;
+    if (marker > 0.0 && !isCameraFlash(encodedValue)) {
+        // Fixed lanes survive zoom and keep native sources apart from TRP.
+        tmp.xy = carrierNdc * tmp.w;
+    }
     glpos = tmp;
     gl_Position = tmp;
 

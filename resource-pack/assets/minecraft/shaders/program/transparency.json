@@ -8,6 +8,7 @@
         { "name": "TranslucentDepthSampler" },
         { "name": "ItemEntitySampler" },
         { "name": "ItemEntityDepthSampler" },
+        { "name": "ItemEntityLightSampler" },
         { "name": "ParticlesSampler" },
         { "name": "ParticlesDepthSampler" },
         { "name": "CloudsSampler" },

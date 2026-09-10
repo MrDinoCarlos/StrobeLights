@@ -10,6 +10,7 @@ uniform sampler2D TranslucentSampler;
 uniform sampler2D TranslucentDepthSampler;
 uniform sampler2D ItemEntitySampler;
 uniform sampler2D ItemEntityDepthSampler;
+uniform sampler2D ItemEntityLightSampler;
 uniform sampler2D ParticlesSampler;
 uniform sampler2D ParticlesDepthSampler;
 uniform sampler2D WeatherSampler;
@@ -32,6 +33,41 @@ int active_layers = 0;
 
 out vec4 fragColor;
 
+ivec4 markerBytes(sampler2D sampler, vec2 coord) {
+    return ivec4(floor(texture(sampler, coord) * 255.0 + 0.5));
+}
+
+bool legacyLeftGuard(ivec4 bytes) {
+    return bytes.r == 194 && bytes.g >= 69 && bytes.g <= 85
+        && bytes.b == 253 && bytes.a == 255;
+}
+
+bool legacyRightGuard(ivec4 bytes) {
+    return all(equal(bytes, ivec4(61, 186, 2, 255)));
+}
+
+bool projectionGuard(ivec4 bytes, ivec2 signature) {
+    return all(equal(bytes.gb, signature)) && bytes.a == 255;
+}
+
+bool technicalMarkerPixel(sampler2D sampler, vec2 coord) {
+    for (int pixelIndex = 0; pixelIndex < 5; pixelIndex += 1) {
+        vec2 left = coord - vec2(float(pixelIndex) * oneTexel.x, 0.0);
+        ivec4 highBytes = markerBytes(sampler, left);
+        ivec4 leftBytes = markerBytes(sampler, left + vec2(oneTexel.x, 0.0));
+        ivec4 centerBytes = markerBytes(sampler, left + vec2(2.0 * oneTexel.x, 0.0));
+        ivec4 rightBytes = markerBytes(sampler, left + vec2(3.0 * oneTexel.x, 0.0));
+        ivec4 lowBytes = markerBytes(sampler, left + vec2(4.0 * oneTexel.x, 0.0));
+        if (projectionGuard(highBytes, ivec2(17, 91))
+            && legacyLeftGuard(leftBytes) && centerBytes.a == 255
+            && legacyRightGuard(rightBytes)
+            && projectionGuard(lowBytes, ivec2(203, 47))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int try_insert( sampler2D cSampler, sampler2D dSampler, vec2 coord, int ie ) {
     vec4 color = texture(cSampler, coord);
     if ( color.a == 0.0 ) {
@@ -40,7 +76,7 @@ int try_insert( sampler2D cSampler, sampler2D dSampler, vec2 coord, int ie ) {
 
     float depth = texture( dSampler, coord ).r;
     if (ie > 0) {
-        if (depth < LIGHTDEPTH) {
+        if (depth < LIGHTDEPTH && technicalMarkerPixel(cSampler, coord)) {
             if (Test > 0.0) {
                 color.rgb = vec3(0.0, 1.0, 0.0);
                 depth = 0.0;
@@ -49,6 +85,13 @@ int try_insert( sampler2D cSampler, sampler2D dSampler, vec2 coord, int ie ) {
                 return 1;
             }
         }
+        // The item layer is composed after the world. Light it with the same
+        // RGB map so an opaque TRP beam cannot erase an overlapping strobe.
+        vec4 encodedLight = texture(ItemEntityLightSampler, coord);
+        vec3 itemLight = encodedLight.rgb * (1.0 + clamp(
+            encodedLight.a - 26.0 / 255.0, 0.0, 1.0
+        ) * 3.0 * 255.0 / 224.0);
+        color.rgb += itemLight * color.a * 0.55;
     }
     color_layers[active_layers] = color;
     depth_layers[active_layers] = depth;

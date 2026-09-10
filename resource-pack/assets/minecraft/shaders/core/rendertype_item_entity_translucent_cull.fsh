@@ -38,12 +38,7 @@ void main() {
         fragColor = linear_fog(color, vertexDistance, FogStart, FogEnd, FogColor);
         fragColor.a = fragColor.a < 0.1 ? 0.1 : fragColor.a;
 
-        if (!gui && gl_FragCoord.z <= LIGHTDEPTH) {
-            gl_FragDepth = LIGHTDEPTH + 10e-7;
-        }
-        else {
-            gl_FragDepth = gl_FragCoord.z;
-        }
+        gl_FragDepth = gl_FragCoord.z;
     } else {
         vec2 uvDx = dFdx(texCoord2);
         vec2 uvDy = dFdy(texCoord2);
@@ -53,26 +48,37 @@ void main() {
         }
 
         vec2 pixelOffset = inverse(uvPerPixel) * (texCoord2 - vec2(0.5));
-        ivec2 cell = ivec2(floor(pixelOffset + vec2(0.5)));
-        // Transport one payload pixel between two opaque guards. Minecraft's
+        // Bias ties consistently so adjacent fragments cannot both claim the
+        // centre when interpolation lands either side of a half-pixel edge.
+        ivec2 cell = ivec2(floor(pixelOffset + vec2(0.501)));
+        // Transport one payload between two guards and two FOV sidecars. Minecraft's
         // item-entity render type multiplies RGB by source alpha, so the old
         // 2/255 carrier was quantized away on real 1.20.1 framebuffers even
         // though an isolated probe could recover it. Opaque bytes survive the
         // vanilla and OptiFine paths exactly; the transparency compositor
         // removes every carrier pixel through the reserved depth route below.
-        if (abs(cell.x) > 1 || cell.y != 0) {
+        if (abs(cell.x) > 2 || cell.y != 0) {
             discard;
         }
 
         float centerDepth = gl_FragCoord.z
             - pixelOffset.x * dFdx(gl_FragCoord.z)
             - pixelOffset.y * dFdy(gl_FragCoord.z);
-        if (cell.x < 0) {
+        int projectionCode16 = encodeExactProjectionK(
+            2.0 / max(abs(ProjMat[1][1]), 0.0001)
+        );
+        if (cell.x == -2) {
+            fragColor = vec4(float((projectionCode16 >> 8) & 255),
+                17.0, 91.0, 255.0) / 255.0;
+        } else if (cell.x == -1) {
             fragColor = vec4(194.0, 69.0, 253.0, 255.0) / 255.0;
         } else if (cell.x == 0) {
             fragColor = vec4(markerPayload.rgb, 1.0);
-        } else {
+        } else if (cell.x == 1) {
             fragColor = vec4(61.0, 186.0, 2.0, 255.0) / 255.0;
+        } else {
+            fragColor = vec4(float(projectionCode16 & 255),
+                203.0, 47.0, 255.0) / 255.0;
         }
         gl_FragDepth = centerDepth * LIGHTDEPTH;
     }
