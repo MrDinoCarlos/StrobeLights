@@ -20,8 +20,15 @@ void main() {
             ivec4 anchorBytes = ivec4(floor(
                 texture(DiffuseSampler, texCoord) * 255.0 + 0.5
             ));
-            bool validCarrier = abs(anchorBytes.a - 5) <= 1
+            bool strobeCarrier = abs(anchorBytes.a - 5) <= 1
                 && all(lessThanEqual(abs(anchorBytes.rgb - ivec3(2)), ivec3(1)));
+            bool trpCarrier = anchorBytes.a >= 7 && anchorBytes.a <= 22;
+            int expectedTrpRgb = int(floor(float(anchorBytes.a) * 0.4 + 0.5));
+            trpCarrier = trpCarrier && all(lessThanEqual(
+                abs(anchorBytes.rgb - ivec3(expectedTrpRgb)),
+                ivec3(1)
+            ));
+            bool validCarrier = strobeCarrier || trpCarrier;
             int encodedValue = 0;
             int payloadIndex = 0;
             for (int y = -1; y <= 1; y += 1) {
@@ -36,23 +43,31 @@ void main() {
                             0
                         ))
                     ) * 255.0 + 0.5));
-                    validCarrier = validCarrier
-                        && abs(cellBytes.a - 2) <= 1
-                        && all(greaterThanEqual(cellBytes.rgb, ivec3(0)))
-                        && all(lessThanEqual(cellBytes.rgb, ivec3(2)));
-                    int triplet = (cellBytes.r >= 1 ? 1 : 0)
-                        | (cellBytes.g >= 1 ? 2 : 0)
-                        | (cellBytes.b >= 1 ? 4 : 0);
+                    bool validAlpha = payloadIndex < 4
+                        ? cellBytes.a >= 2 && cellBytes.a <= 17
+                        : cellBytes.a == 2;
+                    vec3 expectedBits = step(vec3(float(cellBytes.a) * 0.25),
+                        vec3(cellBytes.rgb));
+                    vec3 expectedRgb = expectedBits * float(cellBytes.a) * 0.5;
+                    validCarrier = validCarrier && validAlpha
+                        && all(lessThanEqual(abs(vec3(cellBytes.rgb) - expectedRgb), vec3(0.51)));
+                    int triplet = int(expectedBits.r)
+                        | (int(expectedBits.g) << 1)
+                        | (int(expectedBits.b) << 2);
                     encodedValue |= triplet << (payloadIndex * 3);
                     payloadIndex += 1;
                 }
             }
             if (validCarrier) {
+                // Alpha 1 is a native StrobeLights source. TRP uses the sixteen
+                // non-zero byte values to transport the low radius nibble.
+                float sourceMetadata = strobeCarrier
+                    ? 1.0 : float(anchorBytes.a - 6) / 255.0;
                 outColor = vec4(
                     float((encodedValue >> 16) & 255),
                     float((encodedValue >> 8) & 255),
                     float(encodedValue & 255),
-                    255.0
+                    sourceMetadata * 255.0
                 ) / 255.0;
             }
         }

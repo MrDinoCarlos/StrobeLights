@@ -19,7 +19,8 @@ in vec2 texCoord1;
 in vec2 texCoord2;
 in vec4 normal;
 in vec4 glpos;
-in float marker;
+flat in float marker;
+flat in vec4 markerPayload;
 in float scale;
 
 out vec4 fragColor;
@@ -42,12 +43,7 @@ void main() {
         fragColor = linear_fog(color, vertexDistance, FogStart, FogEnd, FogColor);
         fragColor.a = fragColor.a < 0.1 ? 0.1 : fragColor.a;
 
-        if (!gui && gl_FragCoord.z <= LIGHTDEPTH) {
-            gl_FragDepth = LIGHTDEPTH + 10e-7;
-        }
-        else {
-            gl_FragDepth = gl_FragCoord.z;
-        }
+        gl_FragDepth = gl_FragCoord.z;
     } else {
         vec2 uvDx = dFdx(texCoord2);
         vec2 uvDy = dFdy(texCoord2);
@@ -57,7 +53,8 @@ void main() {
         }
 
         vec2 pixelOffset = inverse(uvPerPixel) * (texCoord2 - vec2(0.5));
-        ivec2 cell = ivec2(floor(pixelOffset + vec2(0.5)));
+        // Resolve exact half-pixel boundaries consistently across both triangles.
+        ivec2 cell = ivec2(floor(pixelOffset + vec2(0.501)));
         if (abs(cell.x) > 1 || abs(cell.y) > 1) {
             discard;
         }
@@ -66,9 +63,8 @@ void main() {
             - pixelOffset.x * dFdx(gl_FragCoord.z)
             - pixelOffset.y * dFdy(gl_FragCoord.z);
         int cellIndex = (cell.y + 1) * 3 + cell.x + 1;
-        int encodedValue = markerValue(vertexColor.rgb);
+        int encodedValue = markerValue(markerPayload.rgb);
         if (cellIndex == 4) {
-            // The anchor changes a normal scene pixel by roughly one percent.
             fragColor = vec4(vec3(0.4), 5.0 / 255.0);
         } else {
             int payloadIndex = cellIndex < 4 ? cellIndex : cellIndex - 1;
@@ -78,9 +74,12 @@ void main() {
                 float((triplet >> 1) & 1),
                 float((triplet >> 2) & 1)
             );
-            // Premultiplied RGBA8 stores each channel as exactly zero or one,
-            // while direct Fast/Fancy rendering remains visually negligible.
-            fragColor = vec4(bitColor * 0.5, 2.0 / 255.0);
+            int projectionCode16 = encodeExactProjectionK(
+                2.0 / max(abs(ProjMat[1][1]), 0.0001)
+            );
+            int alphaByte = payloadIndex < 4
+                ? 2 + ((projectionCode16 >> (payloadIndex * 4)) & 15) : 2;
+            fragColor = vec4(bitColor * 0.5, float(alphaByte) / 255.0);
         }
         gl_FragDepth = centerDepth * LIGHTDEPTH;
     }

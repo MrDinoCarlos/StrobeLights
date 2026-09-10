@@ -52,7 +52,7 @@ import org.bukkit.util.Vector;
  */
 public final class StrobeManager {
 
-    private static final float LIGHT_PAINTER_MODEL_DATA = 6_700.0f;
+    private static final float LIGHT_PAINTER_MODEL_DATA = 4_000_000.0f;
     private static final float EDITOR_HANDLE_MODEL_DATA = 6_813.0f;
     private static final double MARKER_SURFACE_OFFSET = 0.125;
     private static final int OFFSCREEN_LIGHT_SIGNATURE = 0b110;
@@ -60,6 +60,7 @@ public final class StrobeManager {
     private static final int SOURCE_LIGHT_SIGNATURE = 0xA;
     private static final int SOURCE_LIGHT_TRAILER = 0x5;
     private static final int DEFAULT_PROJECTION_CODE = 11;
+    private static final int SCENE_FLASH_TELEPORT_DURATION_TICKS = 2;
     private static final double CAMERA_FLASH_MARKER_DISTANCE = 0.75;
     private static final double CAMERA_FLASH_MARKER_SIDE = 0.22;
 
@@ -450,7 +451,7 @@ public final class StrobeManager {
             return false;
         }
         Location source = fixedSourceLocation(strobe);
-        if (source == null || sourceBlockedForPlayer(player, source)) {
+        if (source == null) {
             return false;
         }
         startCameraFlash(player, strobe);
@@ -791,9 +792,6 @@ public final class StrobeManager {
                 if (requireLooking && viewScale <= 0.0) {
                     continue;
                 }
-                if (blockedByGeometry(eye, direction, distance)) {
-                    continue;
-                }
             }
             double glareScale = distanceScale * (requireLooking ? viewScale : 1.0);
             startCameraFlash(
@@ -987,9 +985,6 @@ public final class StrobeManager {
                 double viewDot = eye.getDirection().normalize().dot(direction);
                 if (requireLooking
                     && !meetsFlashViewRequirement(viewDot, BlindnessLevel.EXTREME)) {
-                    continue;
-                }
-                if (blockedByGeometry(eye, direction, distance)) {
                     continue;
                 }
             }
@@ -1546,8 +1541,7 @@ public final class StrobeManager {
                 continue;
             }
             if (discoveryApplies(player, source)
-                || source.distanceSquared(player.getEyeLocation()) > maximumDistanceSquared
-                || sourceBlockedForPlayer(player, source)) {
+                || source.distanceSquared(player.getEyeLocation()) > maximumDistanceSquared) {
                 hideSourceMarker(player, state);
                 continue;
             }
@@ -1568,7 +1562,7 @@ public final class StrobeManager {
                 ensureEditorHandle(strobe, state);
                 Location source = fixedSourceLocation(strobe);
                 boolean nearby = active && source != null && discoveryApplies(player, source);
-                boolean visible = nearby && !sourceBlockedForPlayer(player, source);
+                boolean visible = nearby;
                 setEditorHandleVisible(player, state, visible);
                 if (visible && packLoaded) {
                     updateDiscoveryLight(player, strobe, state, source);
@@ -1746,10 +1740,6 @@ public final class StrobeManager {
                 scene.hideSource(plugin, player);
                 continue;
             }
-            if (sourceBlockedForPlayer(player, scene.location)) {
-                scene.hideSource(plugin, player);
-                continue;
-            }
             eligibleViewers.add(playerId);
             scene.showSource(plugin, player);
         }
@@ -1758,6 +1748,7 @@ public final class StrobeManager {
 
     private ItemDisplay spawnSceneFlashSource(UUID id, SceneFlash scene) {
         return spawnFixedLightDisplay(scene.location, display -> {
+            display.setTeleportDuration(SCENE_FLASH_TELEPORT_DURATION_TICKS);
             display.setItemStack(lightPainterMarker(
                 scene.rgb,
                 scene.lightLevel,
@@ -1933,10 +1924,6 @@ public final class StrobeManager {
             if (requireLooking && !meetsFlashViewRequirement(viewDot, level)) {
                 continue;
             }
-            if (blockedByGeometry(eye, direction, distance)) {
-                continue;
-            }
-
             startCameraFlash(player, rgb, level, flashPower);
         }
     }
@@ -2093,87 +2080,8 @@ public final class StrobeManager {
         return viewDot >= level.viewCosine();
     }
 
-    private boolean sourceBlockedForPlayer(Player player, Location source) {
-        Location eye = player.getEyeLocation();
-        if (source.getWorld() == null || eye.getWorld() != source.getWorld()) {
-            return true;
-        }
-        Vector toLight = source.toVector().subtract(eye.toVector());
-        double distance = toLight.length();
-        return distance > 1.0e-8 && blockedByGeometry(
-            eye,
-            toLight.multiply(1.0 / distance),
-            distance
-        );
-    }
-
-    private boolean blockedByGeometry(Location eye, Vector direction, double distance) {
-        World world = eye.getWorld();
-        Vector rayDirection = direction.clone().normalize();
-        double maximumDistance = Math.max(0.0, distance - 0.05);
-        if (maximumDistance <= 1.0e-8) {
-            return false;
-        }
-
-        double startX = eye.getX();
-        double startY = eye.getY();
-        double startZ = eye.getZ();
-        int blockX = (int) Math.floor(startX);
-        int blockY = (int) Math.floor(startY);
-        int blockZ = (int) Math.floor(startZ);
-        int stepX = rayDirection.getX() > 0.0 ? 1 : rayDirection.getX() < 0.0 ? -1 : 0;
-        int stepY = rayDirection.getY() > 0.0 ? 1 : rayDirection.getY() < 0.0 ? -1 : 0;
-        int stepZ = rayDirection.getZ() > 0.0 ? 1 : rayDirection.getZ() < 0.0 ? -1 : 0;
-        double deltaX = axisTraversalDistance(rayDirection.getX());
-        double deltaY = axisTraversalDistance(rayDirection.getY());
-        double deltaZ = axisTraversalDistance(rayDirection.getZ());
-        double nextX = firstBoundaryDistance(startX, rayDirection.getX(), blockX);
-        double nextY = firstBoundaryDistance(startY, rayDirection.getY(), blockY);
-        double nextZ = firstBoundaryDistance(startZ, rayDirection.getZ(), blockZ);
-
-        while (true) {
-            double nextBoundary = Math.min(nextX, Math.min(nextY, nextZ));
-            if (!Double.isFinite(nextBoundary) || nextBoundary > maximumDistance) {
-                return false;
-            }
-            if (nextX <= nextBoundary + 1.0e-9) {
-                blockX += stepX;
-                nextX += deltaX;
-            }
-            if (nextY <= nextBoundary + 1.0e-9) {
-                blockY += stepY;
-                nextY += deltaY;
-            }
-            if (nextZ <= nextBoundary + 1.0e-9) {
-                blockZ += stepZ;
-                nextZ += deltaZ;
-            }
-            if (blocksLight(world.getBlockAt(blockX, blockY, blockZ).getType())) {
-                return true;
-            }
-        }
-    }
-
-    static boolean letsLightThrough(Material material) {
-        String name = material.name();
-        return ignoresTechnicalBlock(material)
-            || name.equals("GLASS")
-            || name.endsWith("_GLASS")
-            || name.equals("GLASS_PANE")
-            || name.endsWith("_GLASS_PANE");
-    }
-
     public static boolean ignoresTechnicalBlock(Material material) {
         return material == Material.BARRIER || material == Material.LIGHT;
-    }
-
-    static boolean blocksLight(Material material) {
-        String name = material.name();
-        boolean air = name.equals("AIR")
-            || name.equals("CAVE_AIR")
-            || name.equals("VOID_AIR")
-            || name.equals("LEGACY_AIR");
-        return !air && !letsLightThrough(material);
     }
 
     public static RayTraceResult rayTraceBlocksIgnoringTechnicalBlocks(
@@ -2252,26 +2160,6 @@ public final class StrobeManager {
         int blockCoordinate,
         double position,
         double direction
-    ) {
-        if (direction > 1.0e-12) {
-            return (blockCoordinate + 1.0 - position) / direction;
-        }
-        if (direction < -1.0e-12) {
-            return (blockCoordinate - position) / direction;
-        }
-        return Double.POSITIVE_INFINITY;
-    }
-
-    private static double axisTraversalDistance(double direction) {
-        return Math.abs(direction) > 1.0e-12
-            ? Math.abs(1.0 / direction)
-            : Double.POSITIVE_INFINITY;
-    }
-
-    private static double firstBoundaryDistance(
-        double position,
-        double direction,
-        int blockCoordinate
     ) {
         if (direction > 1.0e-12) {
             return (blockCoordinate + 1.0 - position) / direction;

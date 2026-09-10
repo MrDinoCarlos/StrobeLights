@@ -1,0 +1,39 @@
+{
+	"credit": "thebradqq's light painter",
+	"ambientocclusion": false,
+	"textures":
+	{
+		"0":"strobelights:item/internal/strobe_rgb_carrier",
+		"particle":"strobelights:item/internal/strobe_rgb_carrier"
+	},
+	"elements":
+		[
+			{
+				"from": [7.5,8,7.5],
+				"to": [8.5,8,8.5],
+				"rotation":
+					{
+						"angle": 0,
+						"axis": "y",
+						"origin": [10,10,10]
+					},
+				"faces":
+					{
+						"up":
+						{
+							"uv": [0.5,0.5,0.5,0.5],
+							"rotation": 90,
+							"texture": "#0",
+							"tintindex": 0
+						}
+					}
+			}
+		],
+	"display":
+	{
+		"head":
+		{
+			"scale":[0.002,0.002,0.002]
+		}
+	}
+}

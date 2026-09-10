@@ -32,7 +32,8 @@ out vec2 texCoord1;
 out vec2 texCoord2;
 out vec4 normal;
 out vec4 glpos;
-out float marker;
+flat out float marker;
+flat out vec4 markerPayload;
 out float scale;
 
 // The quad only supplies a 3x3 micro-carrier. Each cell is nearly transparent
@@ -65,9 +66,6 @@ vec3 sourceLightColor(int encodedValue) {
 }
 
 int offscreenMode(vec3 source) {
-    if (length(source) < 0.20) {
-        return 0;
-    }
     vec3 absolute = abs(source);
     if (absolute.z >= absolute.x && absolute.z >= absolute.y) {
         return source.z >= 0.0 ? 6 : 1;
@@ -162,23 +160,12 @@ void main() {
     vec4 tmpcol = texture(Sampler0, UV0);
     vec4 tmp = ModelViewMat * vec4(Position, 1.0);
     bool gui = isGUI(ProjMat);
-
-    // OptiFine can quantize the atlas alpha by one or two 8-bit steps while
-    // rebuilding the item model. Exact float equality then loses the carrier
-    // before the Fabulous aggregation passes even though the pack is enabled.
-    bool markerAlpha = abs(tmpcol.a - LIGHTALPHA) <= LIGHTALPHATOLERANCE;
-    // The dedicated carrier texture is neutral white. Compare its chroma and
-    // brightness relative to alpha so OptiFine premultiplication is accepted,
-    // while the black translucent edge pixels of held items are rejected.
-    float markerTextureFloor = tmpcol.a * 0.5;
-    float markerTexturePeak = max(max(tmpcol.r, tmpcol.g), tmpcol.b);
-    float markerTextureBase = min(min(tmpcol.r, tmpcol.g), tmpcol.b);
-    bool markerTextureCarrier = markerTexturePeak >= markerTextureFloor
-        && markerTextureBase >= markerTexturePeak * 0.75;
-    // Do not infer a first-person render from fog distances. OptiFine's Fog:
-    // OFF mode supplies NO_FOG with equal start/end values for world entities,
-    // which made every ItemDisplay look like a hand item and removed all
-    // StrobeLights markers before the Fabulous post chain.
+    vec4 markerTextureBytes = floor(tmpcol * 255.0 + 0.5);
+    bool markerTextureCarrier = all(equal(
+        markerTextureBytes,
+        vec4(37.0, 211.0, 83.0, 5.0)
+    )) || all(equal(markerTextureBytes,
+        vec4(51.0, 204.0, 102.0, 5.0)));
     // Position is already expressed in Minecraft's baked render coordinates;
     // comparing it with raw JSON model units (Y=8) rejects every carrier. The
     // encoded tint is a stronger signature: only StrobeLights emits source-light
@@ -188,14 +175,17 @@ void main() {
         || isSourceLight(encodedValue);
     marker = float(
         !gui
-        && markerAlpha
         && markerTextureCarrier
         && encodedTechnicalCarrier
     );
 
     if (marker > 0.0) {
-        // Do not multiply the payload by the atlas RGB. OptiFine may
-        // premultiply that texel, but the custom tint still owns the marker.
+        // Minecraft bakes the ItemDisplay pose (including its world position)
+        // into Position before uploading this vertex. A model-space constant
+        // loses that position and makes every light follow the camera. Keep
+        // the microscopic carrier's uploaded position; its sub-millimetre
+        // vertex offsets are smaller than the transport's position precision.
+        tmp = ModelViewMat * vec4(Position, 1.0);
         vertexColor = vec4(Color.rgb, 1.0);
         if (!isCameraFlash(encodedValue)) {
             int lightExpansionCode = 3;
@@ -206,6 +196,7 @@ void main() {
             vec3 fixedSource = vec3(tmp.x, tmp.y, -tmp.z);
             int mode = offscreenMode(fixedSource);
             vec3 proxy = offscreenProxy(fixedSource, mode);
+            proxy.z += 0.25;
             float projectionK = 2.0 / max(abs(ProjMat[1][1]), 0.0001);
             int projectionCode = encodeProjectionK(projectionK);
             tmp.xyz = vec3(proxy.x, proxy.y, -proxy.z);
@@ -216,29 +207,31 @@ void main() {
                 lightExpansionCode
             );
         }
-        
+        markerPayload = vertexColor;
+
         if (gl_VertexID % 4 == 0) {
             tmp.xy += vec2(-HALFMARKER, HALFMARKER);
             texCoord2 = vec2(0.0, 0.0);
-        }
-        else if (gl_VertexID % 4 == 1) {
+        } else if (gl_VertexID % 4 == 1) {
             tmp.xy += vec2(-HALFMARKER, -HALFMARKER);
             texCoord2 = vec2(0.0, 1.0);
-        }
-        else if (gl_VertexID % 4 == 2) {
+        } else if (gl_VertexID % 4 == 2) {
             tmp.xy += vec2(HALFMARKER, -HALFMARKER);
             texCoord2 = vec2(1.0, 1.0);
-        }
-        else {
+        } else {
             tmp.xy += vec2(HALFMARKER, HALFMARKER);
             texCoord2 = vec2(1.0, 0.0);
         }
-        
-        scale = abs(HALFMARKER * ProjMat[1][1] / tmp.z);
     }
 
+    vec2 carrierNdc = vec2(tmp.x / max(-tmp.z, 0.0001) * 0.75 - 0.45,
+        tmp.y / max(-tmp.z, 0.0001) * 1.5);
     tmp = ProjMat * tmp;
+    if (marker > 0.0 && !isCameraFlash(encodedValue)) {
+        // Fixed screen-space lanes keep offscreen lights inside the viewport
+        // even with strong zoom and prevent TRP sources from overwriting them.
+        tmp.xy = carrierNdc * tmp.w;
+    }
     glpos = tmp;
     gl_Position = tmp;
-
 }

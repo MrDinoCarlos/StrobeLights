@@ -4,7 +4,6 @@ import es.mrdino.strobelights.model.BlindnessLevel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.bukkit.Material;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
@@ -161,37 +160,4 @@ class CameraFlashCodecTest {
         assertTrue(Math.hypot(next.getX(), next.getZ()) > 0.01);
     }
 
-    @Test
-    void glassAndInvisibleTechnicalBlocksAreTransparentToServerSideLightOcclusion() {
-        assertTrue(StrobeManager.letsLightThrough(Material.GLASS));
-        assertTrue(StrobeManager.letsLightThrough(Material.RED_STAINED_GLASS));
-        assertTrue(StrobeManager.letsLightThrough(Material.GLASS_PANE));
-        assertTrue(StrobeManager.letsLightThrough(Material.BLUE_STAINED_GLASS_PANE));
-        assertTrue(StrobeManager.letsLightThrough(Material.TINTED_GLASS));
-        assertTrue(StrobeManager.letsLightThrough(Material.BARRIER));
-        assertTrue(StrobeManager.letsLightThrough(Material.LIGHT));
-        assertTrue(StrobeManager.ignoresTechnicalBlock(Material.BARRIER));
-        assertTrue(StrobeManager.ignoresTechnicalBlock(Material.LIGHT));
-        assertEquals(false, StrobeManager.letsLightThrough(Material.STONE));
-        assertEquals(false, StrobeManager.letsLightThrough(Material.OAK_LEAVES));
-    }
-
-    @Test
-    void everyNonAirBlockExceptGlassAndTechnicalBlocksOccludesEveryLightSize() {
-        for (Material material : Material.values()) {
-            boolean glass = material.name().equals("GLASS")
-                || material.name().endsWith("_GLASS")
-                || material.name().equals("GLASS_PANE")
-                || material.name().endsWith("_GLASS_PANE");
-            boolean air = material.name().equals("AIR")
-                || material.name().equals("CAVE_AIR")
-                || material.name().equals("VOID_AIR")
-                || material.name().equals("LEGACY_AIR");
-            boolean expected = !air
-                && material != Material.BARRIER
-                && material != Material.LIGHT
-                && !glass;
-            assertEquals(expected, StrobeManager.blocksLight(material), material.name());
-        }
-    }
 }

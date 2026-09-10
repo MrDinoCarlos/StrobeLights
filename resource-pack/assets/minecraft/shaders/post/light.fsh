@@ -10,7 +10,6 @@ in vec2 texCoord;
 flat in vec2 oneTexel;
 flat in vec2 oneTexelAux1;
 flat in float aspectRatio;
-flat in float conversionK;
 flat in float count;
 
 out vec4 outColor;
@@ -55,6 +54,7 @@ vec3 offscreenLightColor(int encodedValue) {
 }
 
 vec3 reconstructOffscreenLight(vec3 proxyCoord, int encodedValue) {
+    proxyCoord.z = max(0.0, proxyCoord.z - 0.25);
     int mode = (encodedValue >> 20) & 7;
     float axisInverse = 16.0;
     float depthInverse = 4.0;
@@ -106,7 +106,7 @@ vec3 reconstructOffscreenLight(vec3 proxyCoord, int encodedValue) {
 void main() {
     outColor = vec4(0.0);
     float depth = LinearizeDepth(texture(DiffuseDepthSampler, texCoord).r);
-    if (depth < Range + LIGHTR) {
+    if (depth < Range + 64.0) {
         vec4 aggColor = vec4(0.0, 0.0, 0.0, 1.0);
 
         vec2 pixCoord = texCoord;
@@ -122,17 +122,23 @@ void main() {
                 LightsSampler,
                 (vec2(float(i), 4.0) + 0.5) * oneTexelAux1
             ).r * 15.0 + 0.5));
+            float sourceMetadata = texture(
+                LightsSampler,
+                (vec2(float(i), 5.0) + 0.5) * oneTexelAux1
+            ).r;
+            bool trpLight = sourceMetadata > 0.0 && sourceMetadata < 0.5;
             int encodedValue = markerValue(lightColor);
             if (isCameraFlash(encodedValue)) {
                 continue;
             }
             bool offscreenLight = isOffscreenLight(encodedValue);
-            float markerConversionK = conversionK;
+            ivec2 projectionBytes = ivec2(floor(texture(LightsSampler,
+                (vec2(float(i), 6.0) + 0.5) * oneTexelAux1).rg * 255.0 + 0.5));
+            float markerConversionK = decodeExactProjectionK(
+                (projectionBytes.r << 8) | projectionBytes.g);
             if (offscreenLight) {
                 lightWorldCoord = reconstructOffscreenLight(lightWorldCoord, encodedValue);
                 lightColor = offscreenLightColor(encodedValue);
-                int projectionCode = (encodedValue >> 16) & 15;
-                markerConversionK = decodeProjectionK(projectionCode);
             }
             vec3 worldCoord = vec3(
                 screenCoord * markerConversionK * depth,
@@ -143,19 +149,43 @@ void main() {
                 0.0,
                 1.0
             );
-            float lightRadius = mix(
-                MIN_LIGHTR,
-                LIGHTR,
-                pow(encodedIntensity, RADIUS_CURVE)
-            ) * decodeExpansionScale(expansionCode);
+            float lightRadius;
+            float falloffPower;
+            float lightBoost;
+            vec3 emittedColor;
+            if (trpLight) {
+                int radiusLowCode = int(clamp(
+                    floor(sourceMetadata * 255.0 + 0.5) - 1.0,
+                    0.0,
+                    15.0
+                ));
+                int radiusBand = expansionCode * 16 + radiusLowCode;
+                lightRadius = 0.01 * pow(6400.0, float(radiusBand) / 255.0);
+                float intensityBand = floor(encodedIntensity * 15.0 + 0.5);
+                float trpIntensity = intensityBand <= 0.0 ? 0.0
+                    : exp2((intensityBand - 15.0) * (16.0 / 14.0));
+                emittedColor = encodedIntensity > 0.0001
+                    ? lightColor / encodedIntensity * trpIntensity : vec3(0.0);
+                falloffPower = 2.0;
+                lightBoost = 1.0;
+            } else {
+                lightRadius = mix(
+                    MIN_LIGHTR,
+                    LIGHTR,
+                    pow(encodedIntensity, RADIUS_CURVE)
+                ) * decodeExpansionScale(expansionCode);
+                emittedColor = lightColor;
+                falloffPower = FALLOFF_POWER;
+                lightBoost = LIGHT_BOOST;
+            }
             float lightDist = length(worldCoord - lightWorldCoord);
             if (lightDist < lightRadius) {
                 float rangeFade = clamp(Range - length(lightWorldCoord), 0.0, 6.0) / 6.0;
                 float radialFalloff = pow(
                     clamp(1.0 - lightDist / lightRadius, 0.0, 1.0),
-                    FALLOFF_POWER
+                    falloffPower
                 );
-                aggColor.rgb += radialFalloff * lightColor * LIGHT_BOOST
+                aggColor.rgb += radialFalloff * emittedColor * lightBoost
                     * rangeFade;
             }
         }
