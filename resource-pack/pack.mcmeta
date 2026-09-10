@@ -1,6 +1,6 @@
 {
   "pack": {
     "pack_format": 84,
-    "description": "StrobeLights 0.10.12 - verified Nexo RGB pipeline - Paper 26.1.2"
+    "description": "StrobeLights 0.10.23 - TRP overlap-safe RGB pipeline - Paper 26.1.2"
   }
 }

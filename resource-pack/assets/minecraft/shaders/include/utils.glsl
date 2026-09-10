@@ -12,12 +12,24 @@
 #define LIGHT_BOOST 1.45
 
 #define ALPHACUTOFF (21.5 / 255.0)
-#define LIGHTALPHA (24.0 / 255.0)
-#define LIGHTALPHATOLERANCE (2.0 / 255.0)
+#define LIGHTALPHA (5.0 / 255.0)
+#define LIGHTALPHATOLERANCE (0.5 / 255.0)
 #define LIGHTDEPTH 0.025
 
 float decodeExpansionScale(int code) {
     return float(clamp(code, 0, 15) + 1) * 0.25;
+}
+
+// v5 carries this value in four carrier alpha nibbles. Keeping the actual
+// projection avoids the visible position/radius jumps of the old 4-bit FOV.
+int encodeExactProjectionK(float value) {
+    float normalized = log2(clamp(value, 0.0000152587890625, 256.0)
+        / 0.0000152587890625) / 24.0;
+    return int(floor(normalized * 65535.0 + 0.5));
+}
+
+float decodeExactProjectionK(int code) {
+    return 0.0000152587890625 * exp2(24.0 * float(clamp(code, 0, 65535)) / 65535.0);
 }
 
 // The Fabulous post chain does not expose the camera projection matrix. Carry

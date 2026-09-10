@@ -52,6 +52,8 @@ public final class FlareService implements Listener {
     private static final int CARTRIDGE_MODEL_DATA = 6_911;
     private static final int FLARE_CORE_MODEL_DATA = 6_912;
     private static final int FLARE_HOT_CORE_MODEL_DATA = 6_913;
+    private static final int FLARE_TELEPORT_DURATION_TICKS = 2;
+    private static final double FLARE_SURFACE_CLEARANCE = 0.30;
     private static final int MENU_SIZE = 27;
     private static final int[] COLOR_SLOTS = {
         1, 2, 3, 4, 5, 6, 7, 8,
@@ -446,8 +448,10 @@ public final class FlareService implements Listener {
                     true
                 );
                 if (collision != null && collision.getHitPosition() != null) {
-                    Vector impact = collision.getHitPosition().subtract(
-                        step.clone().normalize().multiply(0.04)
+                    Vector impact = impactOutsideSurface(
+                        collision,
+                        step,
+                        FLARE_SURFACE_CLEARANCE
                     );
                     flight.location.set(
                         impact.getX(),
@@ -668,8 +672,10 @@ public final class FlareService implements Listener {
             true
         );
         if (collision != null && collision.getHitPosition() != null) {
-            Vector impact = collision.getHitPosition().subtract(
-                movement.clone().normalize().multiply(0.025)
+            Vector impact = impactOutsideSurface(
+                collision,
+                movement,
+                FLARE_SURFACE_CLEARANCE
             );
             burn.location.set(impact.getX(), impact.getY(), impact.getZ());
             burn.velocity.zero();
@@ -700,7 +706,7 @@ public final class FlareService implements Listener {
         }
         double viewRange = Math.max(16.0, Math.min(
             256.0,
-            plugin.getConfig().getDouble("flare.visual.view-range", 192.0)
+            plugin.getConfig().getDouble("flare.visual.view-range", 256.0)
         ));
         ItemDisplay halo = spawnFlareDisplay(
             world,
@@ -739,7 +745,7 @@ public final class FlareService implements Listener {
             entity.setViewRange((float) (viewRange / 64.0));
             entity.setInterpolationDelay(0);
             entity.setInterpolationDuration(2);
-            entity.setTeleportDuration(1);
+            entity.setTeleportDuration(FLARE_TELEPORT_DURATION_TICKS);
             entity.setItemStack(item);
         });
     }
@@ -767,6 +773,17 @@ public final class FlareService implements Listener {
             12.0,
             plugin.getConfig().getDouble(path, fallback)
         ));
+    }
+
+    private static Vector impactOutsideSurface(
+        RayTraceResult collision,
+        Vector movement,
+        double clearance
+    ) {
+        Vector normal = collision.getHitBlockFace() != null
+            ? collision.getHitBlockFace().getDirection()
+            : movement.clone().normalize().multiply(-1.0);
+        return collision.getHitPosition().clone().add(normal.multiply(clearance));
     }
 
     private void updateFlareViewers(FlareVisual visual, Location location) {
@@ -1100,6 +1117,8 @@ public final class FlareService implements Listener {
         private final ItemDisplay hotCore;
         private final double viewRange;
         private final Set<UUID> viewers = new HashSet<>();
+        private float haloScale = Float.NaN;
+        private float hotCoreScale = Float.NaN;
 
         private FlareVisual(ItemDisplay halo, ItemDisplay hotCore, double viewRange) {
             this.halo = halo;
@@ -1108,25 +1127,38 @@ public final class FlareService implements Listener {
         }
 
         private void moveTo(Location location, double size) {
-            moveDisplay(halo, location, size);
-            moveDisplay(hotCore, location, Math.max(0.14, size * 0.18));
+            haloScale = moveDisplay(halo, location, size, haloScale);
+            hotCoreScale = moveDisplay(
+                hotCore,
+                location,
+                Math.max(0.14, size * 0.18),
+                hotCoreScale
+            );
             updateFlareViewers(this, location);
         }
 
-        private void moveDisplay(ItemDisplay display, Location location, double size) {
+        private float moveDisplay(
+            ItemDisplay display,
+            Location location,
+            double size,
+            float previousScale
+        ) {
             if (!display.isValid() || display.isDead()) {
-                return;
+                return previousScale;
             }
             display.teleport(location);
             float scale = (float) Math.max(0.01, size);
-            display.setDisplayWidth(scale * 1.25f);
-            display.setDisplayHeight(scale * 1.25f);
-            display.setTransformation(new Transformation(
-                new Vector3f(),
-                new Quaternionf(),
-                new Vector3f(scale, scale, scale),
-                new Quaternionf()
-            ));
+            if (Float.compare(scale, previousScale) != 0) {
+                display.setDisplayWidth(scale * 1.25f);
+                display.setDisplayHeight(scale * 1.25f);
+                display.setTransformation(new Transformation(
+                    new Vector3f(),
+                    new Quaternionf(),
+                    new Vector3f(scale, scale, scale),
+                    new Quaternionf()
+                ));
+            }
+            return scale;
         }
 
         private void remove() {

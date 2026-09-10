@@ -3,6 +3,7 @@
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
     vec2 DiffuseSize;
+    vec2 ItemEntitySize;
     vec2 ItemEntityDepthSize;
     vec2 ColoredCentersSize;
 };
