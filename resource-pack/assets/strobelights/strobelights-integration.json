@@ -1,4 +1,5 @@
 {
-  "version": "0.10.12",
-  "render_pipeline": "light_painter_rgb"
+  "version": "0.10.23",
+  "render_pipeline": "light_painter_rgb",
+  "marker_protocol": "typed_bitgrid_3x3_v5"
 }

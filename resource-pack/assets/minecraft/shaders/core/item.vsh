@@ -26,7 +26,8 @@ out vec4 overlayColor;
 out vec2 texCoord0;
 out vec2 texCoord2;
 out vec4 glpos;
-out float marker;
+flat out float marker;
+flat out vec4 markerPayload;
 
 float opz(vec4 pos, float factor, float bias) {
     return (((pos.z / pos.w + 1.0) * 0.5 * factor + bias) * 2.0 - 1.0) * pos.w;
@@ -54,9 +55,6 @@ vec3 sourceLightColor(int encodedValue) {
 }
 
 int offscreenMode(vec3 source) {
-    if (length(source) < 0.20) {
-        return 0;
-    }
     vec3 absolute = abs(source);
     if (absolute.z >= absolute.x && absolute.z >= absolute.y) {
         return source.z >= 0.0 ? 6 : 1;
@@ -120,12 +118,12 @@ void main() {
     vec4 tmpcol = texture(Sampler0, UV0);
     vec4 tmp = ModelViewMat * vec4(Position, 1.0);
     bool gui = isGUI(ProjMat);
-    bool markerAlpha = abs(tmpcol.a - LIGHTALPHA) <= LIGHTALPHATOLERANCE;
-    float markerTextureFloor = tmpcol.a * 0.5;
-    float markerTexturePeak = max(max(tmpcol.r, tmpcol.g), tmpcol.b);
-    float markerTextureBase = min(min(tmpcol.r, tmpcol.g), tmpcol.b);
-    bool markerTextureCarrier = markerTexturePeak >= markerTextureFloor
-        && markerTextureBase >= markerTexturePeak * 0.75;
+    vec4 markerTextureBytes = floor(tmpcol * 255.0 + 0.5);
+    bool markerTextureCarrier = all(equal(
+        markerTextureBytes,
+        vec4(37.0, 211.0, 83.0, 5.0)
+    )) || all(equal(markerTextureBytes,
+        vec4(51.0, 204.0, 102.0, 5.0)));
     // Position is already expressed in Minecraft's baked render coordinates;
     // comparing it with raw JSON model units (Y=8) rejects every carrier. The
     // encoded tint is a stronger signature: only StrobeLights emits source-light
@@ -135,12 +133,17 @@ void main() {
         || isSourceLight(encodedValue);
     marker = float(
         !gui
-        && markerAlpha
         && markerTextureCarrier
         && encodedTechnicalCarrier
     );
 
     if (marker > 0.0) {
+        // Minecraft bakes the ItemDisplay pose (including its world position)
+        // into Position before uploading this vertex. A model-space constant
+        // loses that position and makes every light follow the camera. Keep
+        // the microscopic carrier's uploaded position; its sub-millimetre
+        // vertex offsets are smaller than the transport's position precision.
+        tmp = ModelViewMat * vec4(Position, 1.0);
         vertexColor = vec4(Color.rgb, 1.0);
         if (!isCameraFlash(encodedValue)) {
             int lightExpansionCode = 3;
@@ -151,6 +154,9 @@ void main() {
             vec3 fixedSource = vec3(tmp.x, tmp.y, -tmp.z);
             int mode = offscreenMode(fixedSource);
             vec3 proxy = offscreenProxy(fixedSource, mode);
+            // Transport even a source at the eye without near-plane clipping.
+            // The decoder removes this offset before restoring the source.
+            proxy.z += 0.25;
             float projectionK = 2.0 / max(abs(ProjMat[1][1]), 0.0001);
             int projectionCode = encodeProjectionK(projectionK);
             tmp.xyz = vec3(proxy.x, proxy.y, -proxy.z);
@@ -161,6 +167,7 @@ void main() {
                 lightExpansionCode
             );
         }
+        markerPayload = vertexColor;
 
         if (gl_VertexID % 4 == 0) {
             tmp.xy += vec2(-HALFMARKER, HALFMARKER);
@@ -177,7 +184,14 @@ void main() {
         }
     }
 
+    vec2 carrierNdc = vec2(tmp.x / max(-tmp.z, 0.0001) * 0.75 - 0.45,
+        tmp.y / max(-tmp.z, 0.0001) * 1.5);
     tmp = ProjMat * tmp;
+    if (marker > 0.0 && !isCameraFlash(encodedValue)) {
+        // Fixed screen-space lanes keep offscreen lights inside the viewport
+        // even with strong zoom and prevent TRP sources from overwriting them.
+        tmp.xy = carrierNdc * tmp.w;
+    }
     glpos = tmp;
     gl_Position = tmp;
 }

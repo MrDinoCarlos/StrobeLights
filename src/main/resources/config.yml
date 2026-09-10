@@ -4,7 +4,7 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.10.12
+# Version:     0.10.23
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
@@ -16,7 +16,7 @@
 
 # Internal schema used to migrate defaults from older releases without deleting
 # administrator customizations.
-config-version: 7
+config-version: 8
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
@@ -31,26 +31,32 @@ resource-pack:
   enabled: true
   required: true
   send-delay-ticks: 10
-  # When Nexo is installed, this ZIP is merged into Nexo's generated pack. The
-  # final ZIP is checked immediately before Nexo uploads it, and any shader file
-  # changed by another pack, obfuscation or PackSquash is restored byte-for-byte.
-  # Nexo remains the only plugin that sends the combined pack to players.
+
+  # Replace serverip.com with the server's public IP or hostname. Keep the port,
+  # /strobelights/ path, {token} and .zip exactly as shown in standalone mode.
+  # {token} becomes the ZIP's SHA-1, so the route stays valid across restarts.
+  # With TRP installed, TRP combines both plugins in one /trpserveredition/ pack,
+  # sends it, and this URL is only a fallback. The local resource-pack folder is
+  # only an exported copy; its folder name does not form part of the HTTP route.
+  public-url: 'http://serverip.com:8250/strobelights/{token}.zip'
+
+  embedded:
+    enabled: true
+    # TRP owns this listener and combines the StrobeLights assets into its pack.
+    reuse-trp-server: true
+    # These two local settings are used only when TRP sharing is unavailable.
+    bind-address: '0.0.0.0'
+    port: 8250
+
+  # When Nexo is installed, StrobeLights first asks TRP for a verified hybrid
+  # ZIP, then merges TRP + StrobeLights into Nexo's generated client pack. Nexo
+  # remains the only plugin that sends that final three-way pack to players.
   nexo-integration:
     enabled: true
     # Check Nexo after startup. An active Nexo generation is never interrupted.
     regeneration-delay-ticks: 40
     # If Nexo never fires its post-generation event, restore standalone delivery.
     fallback-delay-ticks: 600
-  # Replace serverip.com with the public server address. Leaving this example
-  # URL unchanged produces a red console warning and an admin join title.
-  # The HTTP port must differ from Minecraft's and be allowed by the firewall.
-  # {token} becomes the ZIP's SHA-1. Backends using the same ZIP therefore use
-  # the same immutable path, including when embedded.enabled is false.
-  public-url: 'http://serverip.com:8250/strobelights/{token}.zip'
-  embedded:
-    enabled: true
-    bind-address: '0.0.0.0'
-    port: 8250
 
 client-compatibility-notices:
   # One short chat notice after the pack loads. A client brand containing
@@ -65,8 +71,9 @@ render:
   # the exact saved source and disables client frustum culling, so it can be
   # rendered from above, below and every side without following the camera.
   display-view-range: 192.0
-  # RGB light stays visible above, below, on every side and outside the frame.
-  # It deliberately does not project screen-space shadows or dark silhouettes.
+  # RGB sources stay active above, below, on every side and outside the frame.
+  # The RGB pass ignores intervening block geometry, so surfaces inside the
+  # radius receive smooth light without hard shadows or wall collision.
 
 timing:
   # GUI: normal click changes 1 tick, 20 above 200; Shift changes 100.
@@ -76,8 +83,8 @@ timing:
 discovery:
   enabled: true
   # Nearby strobes are shown to this player as steady RGB lights and editable
-  # handles only with clear line of sight. They never show through blocks and
-  # never change the saved on/off state of the strobes.
+  # handles. Normal depth hides the handle, while its RGB preview passes through
+  # block geometry; discovery never changes the saved on/off state of strobes.
   range: 32.0
   minimum-light-level: 10
 
@@ -104,8 +111,8 @@ vanilla-fallback:
 
 flashbang:
   # RGB resource-pack post effect. It uses each strobe's color, does not apply
-  # Blindness/Darkness and is sent only to eligible players. Opaque block
-  # occlusion is mandatory; glass blocks and panes let the effect through.
+  # Blindness/Darkness and is sent only to eligible players. Block geometry does
+  # not suppress the camera flash or its RGB lighting.
   radius: 16.0
   require-looking-at-light: true
 
@@ -176,7 +183,8 @@ flare:
   visual:
     flight-size: 0.8
     burn-size: 3.2
-    view-range: 192.0
+    # Keep the visible core tracked beyond the RGB scene-light cutoff.
+    view-range: 256.0
   explosion:
     # 800 ticks = 40 seconds. Momentum, gravity, drag and wind keep the burning
     # flare on a curved path; after landing, its light remains active.
