@@ -3,6 +3,6 @@
     "pack_format": 75,
     "min_format": 75,
     "max_format": 75,
-    "description": "StrobeLights 0.10.12 - verified Nexo RGB pipeline - Paper 1.21.11"
+    "description": "StrobeLights 0.10.23 - TRP overlap-safe RGB pipeline - Paper 1.21.11"
   }
 }

@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "es.mrdino"
-version = "0.10.12"
+version = "0.10.23"
 
 val minecraftVersion = "1.21.11"
 val paperApiVersion = "1.21.11-R0.1-SNAPSHOT"
@@ -66,7 +66,7 @@ val exportResourcePack = tasks.register<Copy>("exportResourcePack") {
 }
 
 tasks.jar {
-    archiveFileName = "StrobeLights-v.${project.version}+mc.$minecraftVersion.jar"
+    archiveFileName = "StrobeLights-${project.version}+mc.v.$minecraftVersion.jar"
     manifest {
         attributes(
             "Implementation-Title" to "StrobeLights",

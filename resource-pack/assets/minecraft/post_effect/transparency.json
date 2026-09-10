@@ -5,7 +5,8 @@
         "swap3": {},
         "lightmap1": {},
         "lightmap2": {},
-        "lights": {"width": 1024, "height": 5, "bilinear": false}
+        "lightmap3": {},
+        "lights": {"width": 1024, "height": 7, "bilinear": false}
     },
     "passes": [
         {
@@ -58,6 +59,7 @@
             "fragment_shader": "minecraft:post/aggregate_6",
             "inputs": [
                 {"sampler_name": "Diffuse", "target": "swap1"},
+                {"sampler_name": "ItemEntity", "target": "minecraft:item_entity"},
                 {"sampler_name": "ItemEntityDepth", "target": "minecraft:item_entity", "use_depth_buffer": true},
                 {"sampler_name": "ColoredCenters", "target": "swap3"}
             ],
@@ -81,6 +83,15 @@
                 {"sampler_name": "CompareDepth", "target": "minecraft:main", "use_depth_buffer": true}
             ],
             "output": "lightmap2"
+        },
+        {
+            "vertex_shader": "minecraft:post/light",
+            "fragment_shader": "minecraft:post/light",
+            "inputs": [
+                {"sampler_name": "DiffuseDepth", "target": "minecraft:item_entity", "use_depth_buffer": true},
+                {"sampler_name": "Lights", "target": "lights"}
+            ],
+            "output": "lightmap3"
         },
         {
             "vertex_shader": "minecraft:post/light_apply",
@@ -110,6 +121,7 @@
                 {"sampler_name": "TranslucentDepth", "target": "minecraft:translucent", "use_depth_buffer": true},
                 {"sampler_name": "ItemEntity", "target": "minecraft:item_entity"},
                 {"sampler_name": "ItemEntityDepth", "target": "minecraft:item_entity", "use_depth_buffer": true},
+                {"sampler_name": "ItemEntityLight", "target": "lightmap3"},
                 {"sampler_name": "Particles", "target": "minecraft:particles"},
                 {"sampler_name": "ParticlesDepth", "target": "minecraft:particles", "use_depth_buffer": true},
                 {"sampler_name": "Clouds", "target": "minecraft:clouds"},

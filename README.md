@@ -113,9 +113,8 @@ the visible detonation area from lighting up.
 At close range the directional camera flash reaches `EXTREME`/`200%` and the
 sound uses its configured maximum volume. Flash strength, fade duration and
 audio volume decrease continuously with distance until their configured
-radii. Solid blocks occlude both the directional camera effect and the RGB
-environmental pulse; the vanilla light engine also keeps its white fallback
-on the detonation side of the wall.
+radii. RGB lighting and camera effects ignore intervening block geometry, so
+terrain does not create hard shadows or stop a pulse.
 
 The custom 64×64 model is selected only for flashbangs through reserved custom
 model data on `SNOWBALL`; ordinary snowballs keep their vanilla texture. Without
@@ -206,13 +205,19 @@ port over TCP:
 
 ```yaml
 resource-pack:
+  enabled: true
+  required: true
+  send-delay-ticks: 10
+  public-url: 'http://serverip.com:8250/strobelights/{token}.zip'
+  embedded:
+    enabled: true
+    reuse-trp-server: true
+    bind-address: '0.0.0.0'
+    port: 8250
   nexo-integration:
     enabled: true
     regeneration-delay-ticks: 40
     fallback-delay-ticks: 600
-  public-url: 'http://serverip.com:8250/strobelights/{token}.zip'
-  embedded:
-    port: 8250
 
 render:
   display-view-range: 192.0
@@ -273,7 +278,7 @@ flare:
   visual:
     flight-size: 0.8
     burn-size: 3.2
-    view-range: 192.0
+    view-range: 256.0
   explosion:
     burn-duration-ticks: 800
     ignition-velocity-retention: 0.45
@@ -313,22 +318,28 @@ For Velocity, Nexo recommends NexoProxy so changing backend does not dispatch a
 duplicate pack. See Nexo's
 [resource-pack configuration](https://github.com/Nexo-MC/Nexo-Documentation/blob/master/configuration/resourcepack/README.md).
 
+When TRP Server Edition is enabled, StrobeLights registers its assets with TRP.
+TRP merges both embedded ZIPs, preserves both plugins' item-model dispatch, and
+sends one `/trpserveredition/{token}.zip` pack. Only TRP opens the port and
+StrobeLights does not issue a second resource-pack request. Its local
+`plugins/StrobeLights/resource-pack` folder remains an exported standalone copy.
+
+When Nexo is enabled too, StrobeLights asks TRP to build the hybrid ZIP before
+Nexo generates its client pack. The final Nexo verification restores that hybrid
+item shader byte-for-byte, so Nexo cannot replace the TRP beam renderer with the
+StrobeLights-only core shader.
+
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.12 prints a red translated setup warning in the console and shows a
+0.10.23 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
-
-The HTTP port must be open over TCP and differ from the Minecraft port.
-`{token}` is replaced with the ZIP's SHA-1 in both embedded and external modes.
-Backends running the same StrobeLights build therefore resolve the same immutable
-URL; when `embedded.enabled` is `false`, the external host must serve that path.
 
 ## Notes
 
 - RGB sources remain active for every player inside render distance regardless
-  of camera position or direct line of sight. The shader smoothly accumulates
-  opaque geometry between a visible surface and the source so RGB does not leak
-  through walls; glass follows vanilla transparent behavior.
+  of camera position or direct line of sight. Every visible surface inside the
+  configured radius receives the smooth RGB falloff without block shadows or
+  wall collision.
 - Per-strobe RGB size scales the physical light radius from `0.25x` to `4.00x`
   in Fabulous mode. Fast/Fancy uses Minecraft's white `LIGHT` fallback, whose
   propagation radius is controlled by the vanilla light engine and therefore
@@ -370,10 +381,10 @@ URL; when `embedded.enabled` is `false`, the external host must serve that path.
 Plugin JARs follow this naming scheme:
 
 ```text
-StrobeLights-v.<plugin-version>+mc.<minecraft-version>.jar
+StrobeLights-<plugin-version>+mc.v.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-v.0.10.12+mc.1.21.11.jar`.
+For this build: `StrobeLights-0.10.23+mc.v.1.21.11.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

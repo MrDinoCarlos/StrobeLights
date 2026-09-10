@@ -52,7 +52,7 @@ import org.bukkit.plugin.Plugin;
 /** Loads, hosts and sends the Light Painter shader and GUI icon resource pack. */
 public final class ResourcePackService implements Listener {
 
-    private static final String PACK_REVISION = "0.10.12";
+    private static final String PACK_REVISION = "0.10.23";
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
     private static final String EMBEDDED_PACK =
@@ -64,6 +64,8 @@ public final class ResourcePackService implements Listener {
     private final Set<UUID> deliveryAttemptedPlayers = ConcurrentHashMap.newKeySet();
     private final Set<UUID> compatibilityNotifiedPlayers = ConcurrentHashMap.newKeySet();
     private EmbeddedPackServer httpServer;
+    private Plugin trpResourcePackHost;
+    private boolean trpManaged;
     private byte[] sha1;
     private UUID packId;
     private String publicUrl;
@@ -87,6 +89,7 @@ public final class ResourcePackService implements Listener {
 
     public void start() {
         defaultUrlConfigured = false;
+        trpManaged = false;
         nexoManaged = false;
         nexoMerged = false;
         nexoRegenerationRequested = false;
@@ -108,10 +111,22 @@ public final class ResourcePackService implements Listener {
             plugin.getConfig().getLong("resource-pack.send-delay-ticks", 10L)
         );
 
-        if (startNexoIntegration(exportedPack, packBytes)) {
+        byte[] trpCompatiblePack = hasEnabledNexoIntegration()
+            ? combineWithTrp(packBytes) : null;
+        byte[] nexoSourcePack = trpCompatiblePack == null ? packBytes : trpCompatiblePack;
+        Path nexoSourcePath = trpCompatiblePack == null
+            ? exportedPack
+            : exportPack(
+                trpCompatiblePack,
+                "StrobeLights-TRP-Combined-" + PACK_REVISION + ".zip"
+            );
+        if (startNexoIntegration(nexoSourcePath, nexoSourcePack)) {
             active = true;
             plugin.getLogger().info(
-                "Nexo detected: StrobeLights will be merged into Nexo's resource pack."
+                trpCompatiblePack == null
+                    ? "Nexo detected: StrobeLights will be merged into Nexo's resource pack."
+                    : "Nexo detected: the verified TRP + StrobeLights pack will be merged "
+                        + "into Nexo's final client ZIP."
             );
             return;
         }
@@ -122,6 +137,14 @@ public final class ResourcePackService implements Listener {
     private void startStandaloneDelivery(byte[] packBytes) {
         nexoManaged = false;
         closeEmbeddedServer();
+        if (plugin.getConfig().getBoolean(
+            "resource-pack.embedded.reuse-trp-server", true
+        ) && hostWithTrp(packBytes)) {
+            defaultUrlConfigured = false;
+            active = true;
+            plugin.getLogger().info("3D RGB shader is active in TRP's combined resource pack.");
+            return;
+        }
         boolean embedded = plugin.getConfig().getBoolean(
             "resource-pack.embedded.enabled",
             true
@@ -131,20 +154,17 @@ public final class ResourcePackService implements Listener {
             ""
         ).trim();
         defaultUrlConfigured = isDefaultPublicUrl(configuredUrl);
-        if (defaultUrlConfigured) {
-            plugin.getServer().getConsoleSender().sendMessage(
-                Component.text(
-                    plugin.messages().text(
-                        plugin.getServer().getConsoleSender(),
-                        "resource-pack.unconfigured.console",
-                        "url",
-                        DEFAULT_PUBLIC_URL
-                    ),
-                    NamedTextColor.RED
-                ).decorate(TextDecoration.BOLD)
-            );
-        }
         if (embedded) {
+            byte[] combined = combineWithTrp(packBytes);
+            if (combined != null) {
+                packBytes = combined;
+                sha1 = sha1(packBytes);
+                packId = UUID.nameUUIDFromBytes(sha1);
+                plugin.getLogger().info(
+                    "TRP uses external hosting; StrobeLights will serve one locally combined "
+                        + "TRP + StrobeLights resource pack."
+                );
+            }
             try {
                 startEmbeddedServer(packBytes, configuredUrl);
             } catch (IllegalStateException exception) {
@@ -165,6 +185,20 @@ public final class ResourcePackService implements Listener {
                 disableAutomaticDelivery(exception.getMessage());
                 return;
             }
+        }
+
+        if (defaultUrlConfigured) {
+            plugin.getServer().getConsoleSender().sendMessage(
+                Component.text(
+                    plugin.messages().text(
+                        plugin.getServer().getConsoleSender(),
+                        "resource-pack.unconfigured.console",
+                        "url",
+                        DEFAULT_PUBLIC_URL
+                    ),
+                    NamedTextColor.RED
+                ).decorate(TextDecoration.BOLD)
+            );
         }
 
         active = true;
@@ -215,7 +249,7 @@ public final class ResourcePackService implements Listener {
         boolean deliveryAttempted,
         boolean loaded
     ) {
-        return nexoManaged || !active || deliveryAttempted || loaded;
+        return !active || loaded;
     }
 
     public String revision() {
@@ -230,6 +264,10 @@ public final class ResourcePackService implements Listener {
             sendNexoPack(player);
             return;
         }
+        if (trpManaged) {
+            resendWithTrp(player);
+            return;
+        }
         loadedPlayers.remove(player.getUniqueId());
         sendLater(player);
     }
@@ -241,8 +279,8 @@ public final class ResourcePackService implements Listener {
         loadedPlayers.remove(playerId);
         deliveryAttemptedPlayers.remove(playerId);
         compatibilityNotifiedPlayers.remove(playerId);
-        if (nexoManaged || !active) {
-            plugin.manager().setMarkersVisible(player, true);
+        if (nexoManaged || trpManaged || !active) {
+            plugin.manager().setMarkersVisible(player, !active);
             return;
         }
         plugin.manager().setMarkersVisible(player, false);
@@ -260,7 +298,11 @@ public final class ResourcePackService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPackStatus(PlayerResourcePackStatusEvent event) {
-        if (!active || nexoManaged || !event.getID().equals(packId)) {
+        if (!active) {
+            return;
+        }
+        boolean sharedPack = nexoManaged || trpManaged;
+        if (!sharedPack && !event.getID().equals(packId)) {
             return;
         }
         Player player = event.getPlayer();
@@ -275,6 +317,8 @@ public final class ResourcePackService implements Listener {
                 sendCompatibilityNoticeLater(player);
             }
             case DECLINED, FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD, DISCARDED -> {
+                loadedPlayers.remove(player.getUniqueId());
+                plugin.manager().setMarkersVisible(player, false);
                 plugin.getLogger().warning(
                     "Resource pack " + event.getStatus().name().toLowerCase()
                         + " for " + player.getName()
@@ -289,11 +333,11 @@ public final class ResourcePackService implements Listener {
     }
 
     private void sendLater(Player player) {
-        if (!active || nexoManaged) {
+        if (!active || nexoManaged || trpManaged) {
             return;
         }
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            if (!active || nexoManaged || !player.isOnline()) {
+            if (!active || nexoManaged || trpManaged || !player.isOnline()) {
                 return;
             }
             Component prompt = Component.text(
@@ -302,7 +346,6 @@ public final class ResourcePackService implements Listener {
             );
             deliveryAttemptedPlayers.add(player.getUniqueId());
             player.setResourcePack(packId, publicUrl, sha1, prompt, required);
-            plugin.manager().setMarkersVisible(player, true);
         }, sendDelayTicks);
     }
 
@@ -384,7 +427,7 @@ public final class ResourcePackService implements Listener {
     private void startEmbeddedServer(byte[] packBytes, String configuredUrl) {
         int port = Math.max(
             1,
-            Math.min(65_535, plugin.getConfig().getInt("resource-pack.embedded.port", 8124))
+            Math.min(65_535, plugin.getConfig().getInt("resource-pack.embedded.port", 8250))
         );
         if (port == plugin.getServer().getPort()) {
             throw new IllegalStateException(
@@ -419,7 +462,9 @@ public final class ResourcePackService implements Listener {
             httpServer.start();
         } catch (BindException exception) {
             throw new IllegalStateException(
-                "HTTP port " + port + " is already in use; change resource-pack.embedded.port",
+                "HTTP port " + port + " is already in use. If TRP Server Edition is installed, "
+                    + "update both plugins so StrobeLights can reuse its listener; otherwise "
+                    + "change resource-pack.embedded.port",
                 exception
             );
         } catch (IOException exception) {
@@ -439,17 +484,127 @@ public final class ResourcePackService implements Listener {
     }
 
     private Path exportPack(byte[] bytes) {
+        return exportPack(bytes, "StrobeLights-ResourcePack-1.21.11.zip");
+    }
+
+    private Path exportPack(byte[] bytes, String fileName) {
         try {
             Path directory = plugin.getDataFolder().toPath().resolve("resource-pack");
             Files.createDirectories(directory);
-            return Files.write(
-                directory.resolve("StrobeLights-ResourcePack-1.21.11.zip"),
-                bytes
-            );
+            return Files.write(directory.resolve(fileName), bytes);
         } catch (IOException exception) {
             plugin.getLogger().warning("Could not export a copy of the resource pack: "
                 + exception.getMessage());
             return null;
+        }
+    }
+
+    private byte[] combineWithTrp(byte[] packBytes) {
+        Plugin trp = plugin.getServer().getPluginManager().getPlugin("TRPServerEdition");
+        if (trp == null || !trp.isEnabled()) {
+            return null;
+        }
+        try {
+            Method combine = trp.getClass().getMethod(
+                "combineResourcePackOverlay", Plugin.class, String.class, byte[].class
+            );
+            Object result = combine.invoke(
+                trp, plugin, "StrobeLights-ResourcePack-" + PACK_REVISION + ".zip", packBytes
+            );
+            if (result instanceof byte[] combined && combined.length > 0) {
+                return combined;
+            }
+        } catch (NoSuchMethodException exception) {
+            plugin.getLogger().warning(
+                "TRP is installed but cannot prepare a pack for Nexo. Update TRP Server "
+                    + "Edition and StrobeLights together."
+            );
+        } catch (IllegalAccessException | InvocationTargetException exception) {
+            plugin.getLogger().warning(
+                "Could not prepare the TRP-compatible resource pack: " + exception.getMessage()
+            );
+        }
+        return null;
+    }
+
+    private boolean hasEnabledNexoIntegration() {
+        if (!plugin.getConfig().getBoolean("resource-pack.nexo-integration.enabled", true)) {
+            return false;
+        }
+        Plugin nexo = plugin.getServer().getPluginManager().getPlugin("Nexo");
+        return nexo != null && nexo.isEnabled();
+    }
+
+    private boolean hostWithTrp(byte[] packBytes) {
+        Plugin trp = plugin.getServer().getPluginManager().getPlugin("TRPServerEdition");
+        if (trp == null || !trp.isEnabled()) {
+            return false;
+        }
+        try {
+            Method register = trp.getClass().getMethod(
+                "registerResourcePackOverlay", Plugin.class, String.class, byte[].class
+            );
+            Object result = register.invoke(
+                trp, plugin, "StrobeLights-ResourcePack-" + PACK_REVISION + ".zip", packBytes
+            );
+            if (result instanceof String combinedUrl && !combinedUrl.isBlank()) {
+                validateUrl(combinedUrl);
+                publicUrl = combinedUrl;
+                trpResourcePackHost = trp;
+                trpManaged = true;
+                plugin.getLogger().info(
+                    "StrobeLights resources merged into TRP's single resource pack."
+                );
+                return true;
+            }
+        } catch (NoSuchMethodException ignored) {
+            // Older TRP builds can still share the listener without combining packs.
+        } catch (IllegalAccessException | InvocationTargetException | IllegalStateException exception) {
+            plugin.getLogger().warning(
+                "Could not merge StrobeLights resources into TRP: " + exception.getMessage()
+            );
+        }
+        try {
+            Method host = trp.getClass().getMethod(
+                "hostResourcePack", Plugin.class, String.class, byte[].class
+            );
+            Object result = host.invoke(
+                trp, plugin, "StrobeLights-ResourcePack-" + PACK_REVISION + ".zip", packBytes
+            );
+            if (!(result instanceof String hostedUrl) || hostedUrl.isBlank()) {
+                return false;
+            }
+            validateUrl(hostedUrl);
+            publicUrl = hostedUrl;
+            trpResourcePackHost = trp;
+            plugin.getLogger().info(
+                "Resource-pack downloads reuse TRP Server Edition's HTTP port."
+            );
+            return true;
+        } catch (NoSuchMethodException exception) {
+            return false;
+        } catch (IllegalAccessException | InvocationTargetException | IllegalStateException exception) {
+            plugin.getLogger().warning(
+                "Could not reuse TRP Server Edition's resource-pack server: "
+                    + exception.getMessage()
+            );
+            return false;
+        }
+    }
+
+    private void resendWithTrp(Player player) {
+        if (trpResourcePackHost == null) {
+            return;
+        }
+        try {
+            Method resend = trpResourcePackHost.getClass().getMethod(
+                "resendResourcePack", Plugin.class, Player.class
+            );
+            resend.invoke(trpResourcePackHost, plugin, player);
+        } catch (ReflectiveOperationException exception) {
+            plugin.getLogger().warning(
+                "Could not resend TRP's combined resource pack: " + exception.getMessage()
+            );
         }
     }
 
@@ -1057,6 +1212,22 @@ public final class ResourcePackService implements Listener {
     }
 
     private void closeEmbeddedServer() {
+        if (trpResourcePackHost != null) {
+            try {
+                Method unhost = trpResourcePackHost.getClass().getMethod(
+                    trpManaged ? "unregisterResourcePackOverlay" : "unhostResourcePacks",
+                    Plugin.class
+                );
+                unhost.invoke(trpResourcePackHost, plugin);
+            } catch (ReflectiveOperationException exception) {
+                plugin.getLogger().fine(
+                    "TRP shared resource-pack route was already unavailable: "
+                        + exception.getMessage()
+                );
+            }
+            trpResourcePackHost = null;
+        }
+        trpManaged = false;
         if (httpServer != null) {
             httpServer.close();
             httpServer = null;
