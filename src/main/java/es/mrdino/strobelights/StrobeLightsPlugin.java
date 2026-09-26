@@ -16,7 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class StrobeLightsPlugin extends JavaPlugin {
 
-    private static final int CONFIG_VERSION = 8;
+    private static final int CONFIG_VERSION = 10;
 
     private StrobeRepository repository;
     private Messages messages;
@@ -85,6 +85,11 @@ public final class StrobeLightsPlugin extends JavaPlugin {
 
     public ResourcePackService resourcePack() {
         return resourcePack;
+    }
+
+    /** Allows TRP to retry the optional Nexo overlay handshake after plugin startup/reload. */
+    public boolean registerResourcePackWithTrpNexo() {
+        return resourcePack != null && resourcePack.registerWithTrpNexo();
     }
 
     public FlashbangService flashbangs() {
@@ -172,6 +177,7 @@ public final class StrobeLightsPlugin extends JavaPlugin {
         replaceLegacyInt("flare.explosion.screen-flash.maximum-duration-ticks", 80, 50);
         replaceLegacyInt("flare.explosion.screen-flash.strength-percent", 135, 85);
         replaceLegacyDouble("render.display-view-range", 128.0, 192.0);
+        replaceLegacyDouble("render.display-view-range", 192.0, 512.0);
         replaceLegacyDouble("flare.explosion.scene-view-range", 128.0, 192.0);
         replaceLegacyDouble("flare.visual.view-range", 192.0, 256.0);
         removeRetiredFlareParticleSettings();

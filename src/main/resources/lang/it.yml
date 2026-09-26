@@ -113,6 +113,12 @@ gui:
       title: "Dimensione luce RGB"
       value: "Espansione attuale: {scale}"
       shift: "Maiusc: cambia 1.00× · intervallo 0.25×–4.00×"
+    shadows:
+      title: "Ombre geometriche"
+      enabled: "Stato: ATTIVE · i blocchi fermano la luce RGB"
+      disabled: "Stato: DISATTIVE · la luce attraversa i blocchi"
+      toggle: "Clic: attiva o disattiva per questo strobe"
+      cost: "La modalità attiva usa più risorse GPU"
     group:
       title: "Gruppo"
       value: "Gruppo attuale: {group}"
@@ -183,6 +189,8 @@ gui:
     static: "Aggiornamento: STATICO · luce continua"
     intensity: "Intensità RGB: {level}/15"
     expansion: "Dimensione luce RGB: {scale}"
+    shadows-enabled: "Ombre geometriche: ATTIVE"
+    shadows-disabled: "Ombre geometriche: DISATTIVE"
     group: "Gruppo: {group}"
     screen-flash: "Flash schermo: {level}"
     flash-power: "Potenza flash RGB: {power}%"

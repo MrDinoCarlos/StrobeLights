@@ -119,6 +119,12 @@ gui:
       title: "RGB light size"
       value: "Current expansion: {scale}"
       shift: "Shift: change 1.00× · range 0.25×–4.00×"
+    shadows:
+      title: "Geometry shadows"
+      enabled: "Current: ENABLED · blocks stop RGB light"
+      disabled: "Current: DISABLED · light passes through blocks"
+      toggle: "Click: toggle for this strobe"
+      cost: "Enabled mode uses more GPU time"
     group:
       title: "Group"
       value: "Current group: {group}"
@@ -189,6 +195,8 @@ gui:
     static: "Refresh: STATIC · continuous light"
     intensity: "RGB intensity: {level}/15"
     expansion: "RGB light size: {scale}"
+    shadows-enabled: "Geometry shadows: ENABLED"
+    shadows-disabled: "Geometry shadows: DISABLED"
     group: "Group: {group}"
     screen-flash: "Screen flash: {level}"
     flash-power: "RGB flash power: {power}%"

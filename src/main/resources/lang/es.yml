@@ -113,6 +113,12 @@ gui:
       title: "Tamaño de luz RGB"
       value: "Expansión actual: {scale}"
       shift: "Shift: cambia 1.00× · rango 0.25×–4.00×"
+    shadows:
+      title: "Sombras por geometría"
+      enabled: "Actual: ACTIVADAS · los bloques frenan la luz RGB"
+      disabled: "Actual: DESACTIVADAS · la luz atraviesa bloques"
+      toggle: "Clic: alternar para este strobe"
+      cost: "Activarlas requiere más potencia gráfica"
     group:
       title: "Grupo"
       value: "Grupo actual: {group}"
@@ -183,6 +189,8 @@ gui:
     static: "Refresh: ESTÁTICO · luz continua"
     intensity: "Intensidad RGB: {level}/15"
     expansion: "Tamaño de luz RGB: {scale}"
+    shadows-enabled: "Sombras por geometría: ACTIVADAS"
+    shadows-disabled: "Sombras por geometría: DESACTIVADAS"
     group: "Grupo: {group}"
     screen-flash: "Flash de pantalla: {level}"
     flash-power: "Potencia flash RGB: {power}%"

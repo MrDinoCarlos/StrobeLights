@@ -26,6 +26,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Color;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -76,6 +77,7 @@ public final class StrobeGui implements Listener {
     private static final int EDITOR_TELEPORT_SLOT = 20;
     private static final int EDITOR_GROUP_SLOT = 21;
     private static final int EDITOR_RENAME_SLOT = 22;
+    private static final int EDITOR_SHADOWS_SLOT = 23;
     private static final int EDITOR_DELETE_SLOT = 24;
     private static final int EDITOR_CLOSE_SLOT = 26;
     private static final int PALETTE_SIZE = 45;
@@ -432,6 +434,18 @@ public final class StrobeGui implements Listener {
                 tr(player, "gui.editor.group.clear")
             ),
             strobe.hasGroup()
+        ));
+        inventory.setItem(EDITOR_SHADOWS_SLOT, item(
+            GuiIcon.SHADOWS,
+            title(tr(player, "gui.editor.shadows.title"), NamedTextColor.DARK_AQUA),
+            lore(
+                tr(player, strobe.geometryOcclusion()
+                    ? "gui.editor.shadows.enabled"
+                    : "gui.editor.shadows.disabled"),
+                tr(player, "gui.editor.shadows.toggle"),
+                tr(player, "gui.editor.shadows.cost")
+            ),
+            strobe.geometryOcclusion()
         ));
         inventory.setItem(EDITOR_TELEPORT_SLOT, item(
             GuiIcon.TELEPORT,
@@ -988,6 +1002,13 @@ public final class StrobeGui implements Listener {
                 );
                 openEditor(player, strobe, holder.page);
             }
+            case EDITOR_SHADOWS_SLOT -> {
+                plugin.manager().setGeometryOcclusion(
+                    strobe,
+                    !strobe.geometryOcclusion()
+                );
+                openEditor(player, strobe, holder.page);
+            }
             case EDITOR_MOVE_SLOT -> {
                 pendingPlacements.put(
                     player.getUniqueId(),
@@ -1160,6 +1181,9 @@ public final class StrobeGui implements Listener {
                     NamedTextColor.AQUA),
                 title(tr(player, "gui.strobe.expansion", "scale",
                     formatExpansion(strobe.expansion())), NamedTextColor.AQUA),
+                title(tr(player, strobe.geometryOcclusion()
+                    ? "gui.strobe.shadows-enabled"
+                    : "gui.strobe.shadows-disabled"), NamedTextColor.DARK_AQUA),
                 title(tr(player, "gui.strobe.group", "group",
                     strobe.hasGroup() ? strobe.group() : tr(player, "gui.common.none")),
                     NamedTextColor.LIGHT_PURPLE),
@@ -1191,6 +1215,9 @@ public final class StrobeGui implements Listener {
         CustomModelDataComponent component = meta.getCustomModelDataComponent();
         component.setFloats(List.of(icon.customModelData));
         meta.setCustomModelDataComponent(component);
+        meta.setItemModel(Objects.requireNonNull(NamespacedKey.fromString(
+            "strobelights:gui/" + icon.name().toLowerCase(Locale.ROOT)
+        )));
         stack.setItemMeta(meta);
         return stack;
     }
@@ -1342,7 +1369,8 @@ public final class StrobeGui implements Listener {
         COLOR_SWATCH(6_821.0f),
         NO_STROBES(6_822.0f),
         GROUPS(6_823.0f),
-        EXPANSION(6_824.0f);
+        EXPANSION(6_824.0f),
+        SHADOWS(6_825.0f);
 
         private final float customModelData;
 

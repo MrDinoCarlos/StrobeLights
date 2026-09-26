@@ -164,6 +164,7 @@ void main() {
             );
         }
         markerPayload = vertexColor;
+        markerPayload.a = 1.0;
 
         if (gl_VertexID % 4 == 0) {
             tmp.xy += vec2(-HALFMARKER, HALFMARKER);

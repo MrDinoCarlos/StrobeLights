@@ -113,6 +113,12 @@ gui:
       title: "RGB-Lichtgröße"
       value: "Aktuelle Ausdehnung: {scale}"
       shift: "Umschalt: 1.00× ändern · Bereich 0.25×–4.00×"
+    shadows:
+      title: "Geometrieschatten"
+      enabled: "Aktuell: AN · Blöcke stoppen RGB-Licht"
+      disabled: "Aktuell: AUS · Licht geht durch Blöcke"
+      toggle: "Klick: für dieses Strobe umschalten"
+      cost: "Aktiv benötigt mehr GPU-Leistung"
     group:
       title: "Gruppe"
       value: "Aktuelle Gruppe: {group}"
@@ -183,6 +189,8 @@ gui:
     static: "Aktualisierung: STATISCH · Dauerlicht"
     intensity: "RGB-Intensität: {level}/15"
     expansion: "RGB-Lichtgröße: {scale}"
+    shadows-enabled: "Geometrieschatten: AN"
+    shadows-disabled: "Geometrieschatten: AUS"
     group: "Gruppe: {group}"
     screen-flash: "Bildschirmblitz: {level}"
     flash-power: "RGB-Blitzstärke: {power}%"

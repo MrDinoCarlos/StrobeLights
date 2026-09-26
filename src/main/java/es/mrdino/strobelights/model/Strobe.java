@@ -20,6 +20,7 @@ public final class Strobe {
     public static final double MAXIMUM_EXPANSION = 4.0;
     public static final double EXPANSION_STEP = 0.25;
     public static final String DEFAULT_GROUP = "";
+    public static final boolean DEFAULT_GEOMETRY_OCCLUSION = false;
     public static final BlindnessLevel DEFAULT_BLINDNESS = BlindnessLevel.LOW;
     public static final StrobeMode DEFAULT_MODE = StrobeMode.STROBE;
 
@@ -35,6 +36,7 @@ public final class Strobe {
     private int flashPower;
     private double expansion;
     private String group;
+    private boolean geometryOcclusion;
     private BlindnessLevel blindness;
     private StrobeMode mode;
     private boolean enabled;
@@ -60,7 +62,7 @@ public final class Strobe {
         this(
             name, worldId, worldName, x, y, z, rgb, refreshTicks, lightLevel,
             flashPower, blindness, enabled, face, placed, DEFAULT_MODE,
-            DEFAULT_EXPANSION, DEFAULT_GROUP
+            DEFAULT_EXPANSION, DEFAULT_GROUP, DEFAULT_GEOMETRY_OCCLUSION
         );
     }
 
@@ -84,7 +86,7 @@ public final class Strobe {
         this(
             name, worldId, worldName, x, y, z, rgb, refreshTicks, lightLevel,
             flashPower, blindness, enabled, face, placed, mode,
-            DEFAULT_EXPANSION, DEFAULT_GROUP
+            DEFAULT_EXPANSION, DEFAULT_GROUP, DEFAULT_GEOMETRY_OCCLUSION
         );
     }
 
@@ -107,6 +109,33 @@ public final class Strobe {
         double expansion,
         String group
     ) {
+        this(
+            name, worldId, worldName, x, y, z, rgb, refreshTicks, lightLevel,
+            flashPower, blindness, enabled, face, placed, mode, expansion, group,
+            DEFAULT_GEOMETRY_OCCLUSION
+        );
+    }
+
+    public Strobe(
+        String name,
+        UUID worldId,
+        String worldName,
+        double x,
+        double y,
+        double z,
+        int rgb,
+        int refreshTicks,
+        int lightLevel,
+        int flashPower,
+        BlindnessLevel blindness,
+        boolean enabled,
+        BlockFace face,
+        boolean placed,
+        StrobeMode mode,
+        double expansion,
+        String group,
+        boolean geometryOcclusion
+    ) {
         this.name = Objects.requireNonNull(name, "name");
         this.worldId = Objects.requireNonNull(worldId, "worldId");
         this.worldName = Objects.requireNonNull(worldName, "worldName");
@@ -119,6 +148,7 @@ public final class Strobe {
         this.flashPower = Math.max(0, Math.min(200, flashPower));
         this.expansion = normalizeExpansion(expansion);
         this.group = sanitizeGroup(group);
+        this.geometryOcclusion = geometryOcclusion;
         this.blindness = Objects.requireNonNull(blindness, "blindness");
         this.mode = Objects.requireNonNull(mode, "mode");
         this.enabled = enabled;
@@ -223,6 +253,10 @@ public final class Strobe {
         return !group.isEmpty();
     }
 
+    public boolean geometryOcclusion() {
+        return geometryOcclusion;
+    }
+
     public BlindnessLevel blindness() {
         return blindness;
     }
@@ -314,6 +348,10 @@ public final class Strobe {
 
     public void setGroup(String group) {
         this.group = sanitizeGroup(group);
+    }
+
+    public void setGeometryOcclusion(boolean geometryOcclusion) {
+        this.geometryOcclusion = geometryOcclusion;
     }
 
     public void setBlindness(BlindnessLevel blindness) {

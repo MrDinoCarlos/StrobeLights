@@ -113,6 +113,12 @@ gui:
       title: "Taille de lumière RGB"
       value: "Expansion actuelle : {scale}"
       shift: "Maj : changer de 1.00× · plage 0.25×–4.00×"
+    shadows:
+      title: "Ombres géométriques"
+      enabled: "Actuel : ACTIVÉES · les blocs arrêtent la lumière RGB"
+      disabled: "Actuel : DÉSACTIVÉES · la lumière traverse les blocs"
+      toggle: "Clic : basculer pour ce strobe"
+      cost: "Le mode activé utilise davantage le GPU"
     group:
       title: "Groupe"
       value: "Groupe actuel : {group}"
@@ -183,6 +189,8 @@ gui:
     static: "Rafraîchissement : STATIQUE · lumière continue"
     intensity: "Intensité RGB : {level}/15"
     expansion: "Taille de lumière RGB : {scale}"
+    shadows-enabled: "Ombres géométriques : ACTIVÉES"
+    shadows-disabled: "Ombres géométriques : DÉSACTIVÉES"
     group: "Groupe : {group}"
     screen-flash: "Flash d'écran : {level}"
     flash-power: "Puissance flash RGB : {power}%"

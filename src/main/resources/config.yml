@@ -4,7 +4,7 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.10.23
+# Version:     0.10.36
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
@@ -16,7 +16,7 @@
 
 # Internal schema used to migrate defaults from older releases without deleting
 # administrator customizations.
-config-version: 8
+config-version: 10
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
@@ -29,6 +29,9 @@ language:
 
 resource-pack:
   enabled: true
+  # AUTO detects Nexo. With TRP installed, StrobeLights registers its namespaced
+  # assets in TRPServerEdition.zip and Nexo alone builds, hosts and sends the pack.
+  mode: AUTO
   required: true
   send-delay-ticks: 10
 
@@ -48,11 +51,16 @@ resource-pack:
     bind-address: '0.0.0.0'
     port: 8250
 
-  # When Nexo is installed, StrobeLights first asks TRP for a verified hybrid
-  # ZIP, then merges TRP + StrobeLights into Nexo's generated client pack. Nexo
-  # remains the only plugin that sends that final three-way pack to players.
+  # With TRP installed, StrobeLights joins TRP's required Nexo MultiPack
+  # template so both shader pipelines remain compatible. Without TRP, Nexo
+  # 1.27+ receives a standalone StrobeLights template automatically.
   nexo-integration:
     enabled: true
+    multipack:
+      template-id: 'strobelights'
+      pack-name: 'StrobeLights.zip'
+      required: true
+      default: true
     # Check Nexo after startup. An active Nexo generation is never interrupted.
     regeneration-delay-ticks: 40
     # If Nexo never fires its post-generation event, restore standalone delivery.
@@ -67,13 +75,12 @@ client-compatibility-notices:
   delay-ticks: 20
 
 render:
-  # 192 blocks, matching the flare visual. The technical display remains at
-  # the exact saved source and disables client frustum culling, so it can be
-  # rendered from above, below and every side without following the camera.
-  display-view-range: 192.0
-  # RGB sources stay active above, below, on every side and outside the frame.
-  # The RGB pass ignores intervening block geometry, so surfaces inside the
-  # radius receive smooth light without hard shadows or wall collision.
+  # Maximum RGB source distance. Each player receives a private technical carrier
+  # in their loaded chunk, while its transform preserves the exact saved source.
+  display-view-range: 512.0
+  # Default for new strobes and old strobes without a saved per-strobe value.
+  # The GUI can then enable or disable geometry shadows independently per strobe.
+  geometry-occlusion: false
 
 timing:
   # GUI: normal click changes 1 tick, 20 above 200; Shift changes 100.

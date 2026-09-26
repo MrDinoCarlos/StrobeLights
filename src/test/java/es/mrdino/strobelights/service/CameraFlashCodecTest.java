@@ -4,6 +4,7 @@ import es.mrdino.strobelights.model.BlindnessLevel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.bukkit.Location;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
@@ -141,6 +142,12 @@ class CameraFlashCodecTest {
         assertTrue(edge > 0.0);
         assertTrue(centered > edge);
         assertEquals(1.0, StrobeManager.flareGlareViewScale(1.0, 0.72, 0.6));
+    }
+
+    @Test
+    void doesNotContinuouslyRefreshAOneTickDistantFlareGlare() {
+        assertEquals(false, StrobeManager.shouldRefreshFlareCameraGlare(1));
+        assertTrue(StrobeManager.shouldRefreshFlareCameraGlare(2));
     }
 
     @Test

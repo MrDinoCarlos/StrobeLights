@@ -138,12 +138,67 @@ class EmbeddedPackServerTest {
     }
 
     @Test
+    void keepsPerSourceOcclusionInTheTrpOverlayWithoutReplacingItsCoreShader()
+        throws Exception {
+        byte[] source = zip(Map.of(
+            "assets/minecraft/shaders/core/item.vsh", utf8("strobe-core"),
+            "assets/minecraft/shaders/post/light.fsh",
+            utf8("hasGeometryOcclusionToken"),
+            "assets/strobelights/strobelights-integration.json",
+            utf8("{\"marker_protocol\":\"typed_bitgrid_3x3_v5\"}")
+        ));
+
+        Map<String, byte[]> overlay = unzip(ResourcePackService.prepareTrpOverlay(source));
+        assertFalse(overlay.containsKey("assets/minecraft/shaders/core/item.vsh"));
+        assertTrue(new String(
+            overlay.get("assets/minecraft/shaders/post/light.fsh"),
+            StandardCharsets.UTF_8
+        ).contains("hasGeometryOcclusionToken"));
+        assertTrue(new String(
+            overlay.get("assets/strobelights/strobelights-integration.json"),
+            StandardCharsets.UTF_8
+        ).contains("typed_bitgrid_3x3_v5"));
+    }
+
+    @Test
     void invalidatesNexoSelfHostBytesAfterPackRegeneration() throws Exception {
         FakeNexoSelfHost server = new FakeNexoSelfHost(new byte[] {9, 8, 7});
 
         ResourcePackService.clearNexoPackServerCache(server);
 
         assertNull(server.cachedBytes());
+    }
+
+    @Test
+    void letsTrpSupplyTheOnlyVersionSpecificHybridCoreShader() throws Exception {
+        byte[] postShader = utf8("strobe-post-pipeline");
+        byte[] integration = utf8("typed_bitgrid_3x3_v5");
+        byte[] source = zip(Map.of(
+            "assets/minecraft/shaders/core/item.vsh", utf8("strobe-item-core"),
+            "assets/minecraft/shaders/core/item.fsh", utf8("strobe-item-core"),
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh",
+            utf8("strobe-legacy-core"),
+            "assets/minecraft/shaders/post/light.fsh", postShader,
+            "assets/strobelights/strobelights-integration.json", integration
+        ));
+
+        Map<String, byte[]> overlay = unzip(
+            ResourcePackService.prepareTrpOverlay(source)
+        );
+
+        assertFalse(overlay.containsKey("assets/minecraft/shaders/core/item.vsh"));
+        assertFalse(overlay.containsKey("assets/minecraft/shaders/core/item.fsh"));
+        assertFalse(overlay.containsKey(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        ));
+        assertArrayEquals(
+            postShader,
+            overlay.get("assets/minecraft/shaders/post/light.fsh")
+        );
+        assertArrayEquals(
+            integration,
+            overlay.get("assets/strobelights/strobelights-integration.json")
+        );
     }
 
     @Test

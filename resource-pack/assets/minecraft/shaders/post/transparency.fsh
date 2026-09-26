@@ -98,7 +98,11 @@ int try_insert( sampler2D cSampler, sampler2D dSampler, vec2 coord, int ie ) {
 
     float depth = texture( dSampler, coord ).r;
     if (ie > 0) {
-        if (depth < LIGHTDEPTH && technicalMarkerPixel(cSampler, coord)) {
+        // RGB carriers deliberately occupy the reserved shallow-depth band.
+        // Their 3x3 bytes have already been collected by the light pass; do
+        // not let framebuffer colour conversion (notably OptiFine's) decide
+        // whether one data pixel leaks into the final scene.
+        if (depth < LIGHTDEPTH) {
             if (Test > 0.0) {
                 color.rgb = vec3(0.0, 1.0, 0.0);
                 depth = 0.0;

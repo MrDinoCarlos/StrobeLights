@@ -45,7 +45,8 @@ class ShaderPackContractTest {
         assertContains(transparency, "color.rgb += itemLight * color.a * 0.55");
         assertContains(pipeline, "\"lightmap3\"");
         assertContains(pipeline, "\"sampler_name\": \"ItemEntityLight\"");
-        assertContains(
+        assertContains(transparency, "if (depth < LIGHTDEPTH) {");
+        assertNotContains(
             transparency,
             "depth < LIGHTDEPTH && technicalMarkerPixel(cSampler, coord)"
         );
@@ -54,12 +55,45 @@ class ShaderPackContractTest {
     }
 
     @Test
+    void trpRgbRestoresWorldPositionAndWhiteSourceColorBeforeLighting() throws IOException {
+        Path shaders = PACK.resolve("assets/minecraft/shaders");
+        Path program = Files.isRegularFile(shaders.resolve("post/light.fsh"))
+            ? shaders.resolve("post") : shaders.resolve("program");
+        assertContains(program.resolve("aggregate_6.fsh"), "mode >= 1 && mode <= 6");
+        for (String name : new String[] {"light.fsh", "light_t.fsh"}) {
+            Path shader = program.resolve(name);
+            String source = Files.readString(shader);
+            assertTrue(source.contains("bool offscreenLight = isOffscreenLight(encodedValue);"));
+            assertFalse(source.contains("bool offscreenLight = !trpLight"));
+            assertTrue(source.contains("if (trpLight && !offscreenLight)"));
+            assertTrue(source.contains("lightWorldCoord = reconstructOffscreenLight("));
+            assertTrue(source.contains("lightColor = offscreenLightColor(encodedValue);"));
+            assertTrue(source.indexOf("lightColor = offscreenLightColor(encodedValue);")
+                < source.indexOf("float lightDist = length(worldCoord - lightWorldCoord)"));
+        }
+    }
+
+    @Test
+    void packagedRevisionMatchesThePluginVersion() throws IOException {
+        String build = Files.readString(Path.of("build.gradle.kts"));
+        var matcher = Pattern.compile("(?m)^version = \"([^\"]+)\"").matcher(build);
+        assertTrue(matcher.find());
+        String version = matcher.group(1);
+        assertContains(Path.of(
+            "src/main/java/es/mrdino/strobelights/resourcepack/ResourcePackService.java"
+        ), "PACK_REVISION = \"" + version + "\"");
+        assertContains(PACK.resolve(
+            "assets/strobelights/strobelights-integration.json"
+        ), "\"version\": \"" + version + "\"");
+    }
+
+    @Test
     void carriesAnIntegrationRevisionThatInvalidatesMergedPackCaches() throws IOException {
         Path integration = PACK.resolve(
             "assets/strobelights/strobelights-integration.json"
         );
         assertTrue(Files.isRegularFile(integration));
-        assertContains(integration, "\"version\": \"0.10.23\"");
+        assertContains(integration, "\"version\": \"0.10.36\"");
         assertContains(integration, "\"render_pipeline\": \"light_painter_rgb\"");
         assertContains(integration, "\"marker_protocol\": \"typed_bitgrid_3x3_v5\"");
     }
@@ -82,13 +116,12 @@ class ShaderPackContractTest {
     @Test
     void keepsTheTechnicalMarkerMicroscopicButNonDegenerateForOptiFine()
         throws IOException {
+        assertFalse(Files.exists(
+            PACK.resolve("assets/minecraft/items/lime_stained_glass.json")
+        ));
         assertContains(
-            PACK.resolve("assets/minecraft/items/lime_stained_glass.json"),
-            "\"threshold\": 4000000"
-        );
-        assertContains(
-            PACK.resolve("assets/minecraft/items/lime_stained_glass.json"),
-            "minecraft:custom_model_data"
+            PACK.resolve("assets/strobelights/items/carrier/rgb.json"),
+            "strobelights:item/strobe_rgb_carrier"
         );
         assertContains(
             PACK.resolve("assets/strobelights/models/item/strobe_rgb_carrier.json"),
@@ -309,15 +342,19 @@ class ShaderPackContractTest {
             "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
         );
         assertContains(manager, "updateFixedSourceViewers(strobe, state)");
-        assertContains(manager, "Location markerLocation = fixedSourceLocation(strobe)");
+        assertContains(manager, "spawnViewerLightDisplay(player, source");
         assertContains(manager, "source.distanceSquared(player.getEyeLocation()) > maximumDistanceSquared");
         assertContains(manager, "spawnFixedLightDisplay(markerLocation");
         assertContains(manager, "display.setBillboard(Display.Billboard.CENTER)");
+        assertContains(manager, "player.showEntity(plugin, display)");
+        assertContains(manager, "ItemDisplay display = spawnFixedLightDisplay(source, initializer)");
+        assertContains(manager, "fixedLightDisplayChanged(carrier, source)");
+        assertNotContains(manager, "viewerRenderCarrier(");
         assertContains(manager, "display.setDisplayWidth(carrier.displayWidth())");
         assertContains(manager, "display.setDisplayHeight(carrier.displayHeight())");
         assertContains(manager, "new Vector3f(0.0f, carrier.translationY(), 0.0f)");
         assertContains(manager, "sourceY,\n            0.0f,\n            0.0f,\n            0.0f");
-        assertContains(manager, "state.marker.setItemStack(technicalMarker(0))");
+        assertContains(manager, "markerItem = technicalMarker(0)");
         assertNotContains(manager, "state.marker.setItemStack(new ItemStack(Material.AIR))");
         assertNotContains(manager, "displayAnchor(");
         assertNotContains(manager, "setDisplaySourceOffset(");
@@ -457,11 +494,9 @@ class ShaderPackContractTest {
 
     @Test
     void containsGuiOnlyCustomPaperIcons() throws IOException {
-        Path definition = PACK.resolve("assets/minecraft/items/paper.json");
-        assertContains(definition, "\"threshold\": 6800");
-        assertContains(definition, "\"threshold\": 6815");
-        assertContains(definition, "\"threshold\": 6822.5");
-        assertContains(definition, "\"model\": \"minecraft:item/paper\"");
+        assertFalse(Files.exists(PACK.resolve("assets/minecraft/items/paper.json")));
+        Path definition = PACK.resolve("assets/strobelights/items/gui/strobe.json");
+        assertContains(definition, "strobelights:item/gui/strobe");
         assertTrue(Files.isRegularFile(PACK.resolve(
             "assets/strobelights/textures/item/gui/strobe.png"
         )));
@@ -496,10 +531,17 @@ class ShaderPackContractTest {
         assertEquals(32, groupsIcon.getHeight());
         assertEquals(32, expansionIcon.getWidth());
         assertEquals(32, expansionIcon.getHeight());
-        assertContains(definition, "\"threshold\": 6823");
-        assertContains(definition, "strobelights:item/gui/groups");
-        assertContains(definition, "\"threshold\": 6824");
-        assertContains(definition, "strobelights:item/gui/expansion");
+        assertContains(PACK.resolve("assets/strobelights/items/gui/groups.json"),
+            "strobelights:item/gui/groups");
+        assertContains(PACK.resolve("assets/strobelights/items/gui/expansion.json"),
+            "strobelights:item/gui/expansion");
+        assertContains(PACK.resolve("assets/strobelights/items/gui/shadows.json"),
+            "strobelights:item/gui/shadows");
+        var shadowsIcon = ImageIO.read(PACK.resolve(
+            "assets/strobelights/textures/item/gui/shadows.png"
+        ).toFile());
+        assertEquals(32, shadowsIcon.getWidth());
+        assertEquals(32, shadowsIcon.getHeight());
         Path gui = Path.of("src/main/java/es/mrdino/strobelights/ui/StrobeGui.java");
         assertContains(gui, "title(tr(player, \"gui.delete.confirm\"), NamedTextColor.RED)");
         assertContains(gui, "GuiIcon.DELETE");
@@ -516,25 +558,47 @@ class ShaderPackContractTest {
     }
 
     @Test
-    void illuminatesSurfacesWithoutGeometryOcclusion() throws IOException {
-        Path core = PACK.resolve(
+    void keepsClassicLightingAsDefaultAndOffersAdaptiveSourceOcclusion() throws IOException {
+        Path coreVertex = PACK.resolve(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
         );
-        assertContains(core, "offscreenProxy");
-        assertContains(core, "float axisScale = 0.0625");
-        assertContains(core, "float depthScale = 0.25");
+        Path coreFragment = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+        );
+        Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
+        Path config = Path.of("src/main/resources/config.yml");
+        assertContains(coreVertex, "offscreenProxy");
+        assertContains(coreVertex, "float axisScale = 0.0625");
+        assertContains(coreVertex, "float depthScale = 0.25");
+        assertContains(coreVertex, "(encodedValue >> 20) == 10");
+        assertNotContains(coreVertex, "signature == 11");
+        assertContains(coreFragment, "vec4(vec3(0.4), 5.0 / 255.0)");
+        assertContains(filter, "float sourceMetadata = strobeCarrier");
+        assertContains(filter, "? 1.0");
+        assertContains(config, "geometry-occlusion: false");
         for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
             Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
-            assertNotContains(shader, "lightBlocked");
-            assertNotContains(shader, "lightTransmission");
-            assertNotContains(shader, "rayIndex");
-            assertNotContains(shader, "depthGap");
-            assertNotContains(shader, "stepOcclusion");
-            assertNotContains(shader, "blockedWeight");
             assertContains(shader, "float axisInverse = 16.0");
             assertContains(shader, "float depthInverse = 4.0");
             assertContains(shader, "lightRadius = mix(");
             assertContains(shader, "float radialFalloff = pow(");
+            assertNotContains(shader, "STROBELIGHTS_GEOMETRY_OCCLUSION");
+            assertContains(shader, "bool geometryOcclusion");
+            assertContains(shader, "hasGeometryOcclusionToken");
+            assertContains(shader, "tokenMetadata < 0.5");
+            assertContains(shader, "bool geometryToken = !trpLight");
+            assertContains(shader, "bool offscreenLight = isOffscreenLight(encodedValue);");
+            assertNotContains(shader, "bool offscreenLight = !trpLight");
+            assertContains(shader, "int raySteps = trpLight ? 6");
+            assertContains(shader, "bool geometryOcclusion = trpLight");
+            assertContains(shader, "markerConversionK, trpLight");
+            assertContains(shader, "rayStep <= 32");
+            assertContains(shader, "mix(lightPosition, surfacePosition, fraction)");
+            assertContains(shader, "? screenSpaceVisibility(");
+            assertContains(shader, "float terrainFacing(");
+            assertContains(shader, "float terrainResponse = terrainFacing(");
+            assertContains(shader, "* rangeFade * occlusion * terrainResponse;");
+            assertNotContains(shader, "sampleIndex <= 6");
         }
         assertContains(
             PACK.resolve("assets/minecraft/shaders/include/utils.glsl"),
@@ -577,10 +641,9 @@ class ShaderPackContractTest {
 
     @Test
     void containsAnIsolatedFlashbangModelAndVorbisSound() throws IOException {
-        Path definition = PACK.resolve("assets/minecraft/items/snowball.json");
-        assertContains(definition, "\"threshold\": 6900");
-        assertContains(definition, "\"threshold\": 6900.5");
-        assertContains(definition, "\"model\": \"minecraft:item/snowball\"");
+        assertFalse(Files.exists(PACK.resolve("assets/minecraft/items/snowball.json")));
+        Path definition = PACK.resolve("assets/strobelights/items/tools/flashbang.json");
+        assertContains(definition, "strobelights:item/flashbang");
         assertTrue(Files.isRegularFile(PACK.resolve(
             "assets/strobelights/models/item/flashbang.json"
         )));
@@ -619,19 +682,23 @@ class ShaderPackContractTest {
 
     @Test
     void containsAProjectileFreeSimulatedFlareAndTintedCartridge() throws IOException {
-        Path launcherDefinition = PACK.resolve("assets/minecraft/items/blaze_rod.json");
-        Path cartridgeDefinition = PACK.resolve(
+        assertFalse(Files.exists(PACK.resolve("assets/minecraft/items/blaze_rod.json")));
+        assertFalse(Files.exists(PACK.resolve(
             "assets/minecraft/items/leather_horse_armor.json"
+        )));
+        Path launcherDefinition = PACK.resolve(
+            "assets/strobelights/items/tools/flare_launcher.json"
         );
-        assertContains(launcherDefinition, "\"threshold\": 6910");
+        Path cartridgeDefinition = PACK.resolve(
+            "assets/strobelights/items/tools/flare_cartridge.json"
+        );
         assertContains(launcherDefinition, "strobelights:item/flare_launcher");
-        assertContains(cartridgeDefinition, "\"threshold\": 6911");
         assertContains(cartridgeDefinition, "strobelights:item/flare_cartridge");
-        assertContains(cartridgeDefinition, "\"threshold\": 6912");
-        assertContains(cartridgeDefinition, "strobelights:item/flare_core");
-        assertContains(cartridgeDefinition, "\"threshold\": 6913");
-        assertContains(cartridgeDefinition, "strobelights:item/flare_hot_core");
         assertContains(cartridgeDefinition, "minecraft:custom_model_data");
+        assertContains(PACK.resolve("assets/strobelights/items/tools/flare_core.json"),
+            "strobelights:item/flare_core");
+        assertContains(PACK.resolve("assets/strobelights/items/tools/flare_hot_core.json"),
+            "strobelights:item/flare_hot_core");
 
         for (String asset : new String[] {"flare_launcher", "flare_cartridge"}) {
             assertTrue(Files.isRegularFile(PACK.resolve(
@@ -717,7 +784,7 @@ class ShaderPackContractTest {
         assertContains(config, "flight-light-expansion: 2.0");
         assertContains(config, "maximum-duration-ticks: 50");
         assertContains(config, "strength-percent: 85");
-        assertContains(config, "config-version: 8");
+        assertContains(config, "config-version: 10");
         assertContains(config, "ground-projection:");
         assertContains(config, "maximum-drop-distance: 128.0");
         assertContains(config, "scene-view-range: 192.0");
@@ -729,7 +796,7 @@ class ShaderPackContractTest {
         assertContains(service, "burn.grounded = true");
         assertContains(service, "moveFlareLight(burn.lightId, burn.location)");
         assertContains(service, "moveFlareGroundLight(burn.groundLightId, burn.location)");
-        assertContains(service, "refreshFlareCameraGlare(burn.location, burn.color.rgb)");
+        assertNotContains(service, "refreshFlareCameraGlare(burn.location, burn.color.rgb)");
         assertContains(manager, "public void moveFlareLight(UUID id, Location location)");
         assertContains(manager, "public UUID beginFlareGroundLight(Location flareLocation, int rgb)");
         assertContains(manager, "public void moveFlareGroundLight(UUID id, Location flareLocation)");
@@ -744,6 +811,7 @@ class ShaderPackContractTest {
         assertContains(plugin, "migrateConfiguration();");
         assertContains(plugin, "burn-duration-ticks\", 600, 800");
         assertContains(plugin, "render.display-view-range\", 128.0, 192.0");
+        assertContains(plugin, "render.display-view-range\", 192.0, 512.0");
         assertContains(plugin, "flare.visual.view-range\", 192.0, 256.0");
         assertFalse(Pattern.compile(
             "Particle\\.FLASH,[\\s\\S]{0,180}Color\\."

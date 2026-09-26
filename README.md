@@ -16,14 +16,20 @@ emit visible vanilla effects.
 - **Fast/Fancy or renderers that replace that pipeline:** automatic white vanilla
   light fallback using invisible `LIGHT` blocks.
 
-The 0.9 renderer reconstructs every light at its real, fixed world position.
-Its technical display disables client frustum culling and always transports its
-invisible marker through a stable, near-screen carrier, so the source can render
-from far away, above, below and on every side without moving. No normal,
-discovery or environmental light marker is attached to a player or derived from
-camera yaw, pitch or movement.
+The renderer reconstructs every light at its real, fixed world position. Each
+client receives a private technical carrier in its own loaded chunk; the carrier
+transform restores the saved source before the shader moves its invisible 3×3
+payload into a safe screen lane. This keeps lights active from above, below,
+behind geometry and across the full 512-block RGB range without moving their
+logical source.
 The camera flash remains directional: it is not triggered when the player
 faces away from the source.
+
+Geometry shadows are configured independently in each strobe editor. They are
+disabled by default, preserving the smooth RGB mode that passes through walls.
+Enabling the GUI option adds adaptive screen-space shadows traced from that
+strobe to each visible surface. `render.geometry-occlusion` now selects only the
+initial value for new and legacy strobes. The shadowed mode uses more GPU time.
 
 RGB intensity now controls both power and reach. Low levels remain localized,
 while `15/15` uses a broad saturated falloff with an 18-block outer radius, so
@@ -82,9 +88,11 @@ dependency. For Paper 1.21.11 use its v2 line. While a player holds the tool fro
 `/eas give`, StrobeLights automatically enables discovery for that player. The
 temporary 3-axis handle can then be selected and moved with EasyArmorStands;
 the exact invisible light position follows it. Removing the tool hides the
-handles again. StrobeLights registers each handle as a persistent
-`minecraft:item_display` because EasyArmorStands rejects non-persistent
-entities by default, and gives it a configurable 1×1-block selection box.
+handles again. StrobeLights registers each temporary handle as a persistent
+`minecraft:item_display` while a nearby player is discovering it because
+EasyArmorStands rejects non-persistent entities by default. The handle is
+removed as soon as nobody is editing it and has a configurable 1×1-block
+selection box.
 
 ## Throwable tactical flashbang
 
@@ -113,8 +121,8 @@ the visible detonation area from lighting up.
 At close range the directional camera flash reaches `EXTREME`/`200%` and the
 sound uses its configured maximum volume. Flash strength, fade duration and
 audio volume decrease continuously with distance until their configured
-radii. RGB lighting and camera effects ignore intervening block geometry, so
-terrain does not create hard shadows or stop a pulse.
+  radii. Camera flashes and environmental RGB light are not cancelled by leaves,
+  solid blocks or invisible technical blocks.
 
 The custom 64×64 model is selected only for flashbangs through reserved custom
 model data on `SNOWBALL`; ordinary snowballs keep their vanilla texture. Without
@@ -220,7 +228,8 @@ resource-pack:
     fallback-delay-ticks: 600
 
 render:
-  display-view-range: 192.0
+  display-view-range: 512.0
+  geometry-occlusion: false
 
 timing:
   maximum-refresh-ticks: 1200
@@ -304,14 +313,12 @@ flare:
       strength-percent: 85
 ```
 
-When Nexo is enabled, StrobeLights adds this ZIP at the final priority of Nexo's
-post-generation event and restores Nexo's original pack metadata. Immediately
-before Nexo uploads or hosts the result, StrobeLights checks every RGB shader in
-the actual client ZIP and restores any file changed by another pack,
-obfuscation or PackSquash. It also invalidates Nexo SELFHOST's in-memory ZIP
-cache after regeneration. The verified combined ZIP is exported beside the
-standalone pack. Nexo remains responsible for delivery, and `/strobe pack` asks
-Nexo to resend that verified pack.
+With Nexo 1.27 or newer and no TRP installation, StrobeLights atomically
+maintains `pack/template_packs/StrobeLights.zip` and only its own
+`templates.strobelights` entry in Nexo's `multipack.yml`. Nexo hosts and sends
+that required template above its base pack. Older compatible Nexo versions keep
+the existing post-generation integration. Nexo remains responsible for player
+delivery in both cases.
 
 On a proxy network, configure every backend to generate the same combined pack.
 For Velocity, Nexo recommends NexoProxy so changing backend does not dispatch a
@@ -324,22 +331,22 @@ sends one `/trpserveredition/{token}.zip` pack. Only TRP opens the port and
 StrobeLights does not issue a second resource-pack request. Its local
 `plugins/StrobeLights/resource-pack` folder remains an exported standalone copy.
 
-When Nexo is enabled too, StrobeLights asks TRP to build the hybrid ZIP before
-Nexo generates its client pack. The final Nexo verification restores that hybrid
-item shader byte-for-byte, so Nexo cannot replace the TRP beam renderer with the
-StrobeLights-only core shader.
+When Nexo and TRP are enabled together, StrobeLights registers its assets inside
+TRP's MultiPack template. Both plugins share one reviewed transparency shader
+pipeline, so independent templates cannot overwrite each other's shader files.
+Nexo then sends its base pack and the combined TRP/StrobeLights template.
 
 `serverip.com` is only a placeholder. While it remains unchanged, version
-0.10.23 prints a red translated setup warning in the console and shows a
+0.10.35 prints a red translated setup warning in the console and shows a
 translated title/subtitle to joining players with `strobelights.admin`.
 Replace it with the server's public IP or hostname before inviting players.
 
 ## Notes
 
-- RGB sources remain active for every player inside render distance regardless
-  of camera position or direct line of sight. Every visible surface inside the
-  configured radius receives the smooth RGB falloff without block shadows or
-  wall collision.
+- RGB sources remain active for every player inside the configured 512-block
+  range regardless of camera position or source-chunk tracking. Per-strobe
+  occlusion uses 12–32 adaptive depth steps along the 3D ray from the strobe to
+  each visible surface.
 - Per-strobe RGB size scales the physical light radius from `0.25x` to `4.00x`
   in Fabulous mode. Fast/Fancy uses Minecraft's white `LIGHT` fallback, whose
   propagation radius is controlled by the vanilla light engine and therefore
@@ -384,7 +391,7 @@ Plugin JARs follow this naming scheme:
 StrobeLights-<plugin-version>+mc.v.<minecraft-version>.jar
 ```
 
-For this build: `StrobeLights-0.10.23+mc.v.1.21.11.jar`.
+For this build: `StrobeLights-0.10.35+mc.v.1.21.11.jar`.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

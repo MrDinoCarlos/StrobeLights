@@ -71,7 +71,14 @@ public final class StrobeRepository {
                     section.getBoolean("placed", true),
                     mode,
                     section.getDouble("expansion-scale", Strobe.DEFAULT_EXPANSION),
-                    section.getString("group", Strobe.DEFAULT_GROUP)
+                    section.getString("group", Strobe.DEFAULT_GROUP),
+                    section.getBoolean(
+                        "geometry-occlusion",
+                        plugin.getConfig().getBoolean(
+                            "render.geometry-occlusion",
+                            Strobe.DEFAULT_GEOMETRY_OCCLUSION
+                        )
+                    )
                 );
                 result.put(strobe.key(), strobe);
             } catch (RuntimeException exception) {
@@ -117,6 +124,7 @@ public final class StrobeRepository {
         section.set("flash-power", strobe.flashPower());
         section.set("expansion-scale", strobe.expansion());
         section.set("group", strobe.hasGroup() ? strobe.group() : null);
+        section.set("geometry-occlusion", strobe.geometryOcclusion());
         section.set("blindness", strobe.blindness().name());
         section.set("mode", strobe.mode().name());
         section.set("enabled", strobe.enabled());

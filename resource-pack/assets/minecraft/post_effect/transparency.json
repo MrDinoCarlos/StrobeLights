@@ -70,6 +70,7 @@
             "fragment_shader": "minecraft:post/light",
             "inputs": [
                 {"sampler_name": "DiffuseDepth", "target": "minecraft:main", "use_depth_buffer": true},
+                {"sampler_name": "OcclusionDepth", "target": "minecraft:main", "use_depth_buffer": true},
                 {"sampler_name": "Lights", "target": "lights"}
             ],
             "output": "lightmap1"
@@ -89,6 +90,7 @@
             "fragment_shader": "minecraft:post/light",
             "inputs": [
                 {"sampler_name": "DiffuseDepth", "target": "minecraft:item_entity", "use_depth_buffer": true},
+                {"sampler_name": "OcclusionDepth", "target": "minecraft:main", "use_depth_buffer": true},
                 {"sampler_name": "Lights", "target": "lights"}
             ],
             "output": "lightmap3"

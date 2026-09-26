@@ -47,7 +47,8 @@ int markerValue(vec3 color) {
 }
 
 bool isOffscreenLight(int encodedValue) {
-    return (encodedValue >> 23) == 0;
+    int mode = (encodedValue >> 20) & 7;
+    return (encodedValue >> 23) == 0 && mode >= 1 && mode <= 6;
 }
 
 void main() {

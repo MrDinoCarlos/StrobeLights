@@ -59,10 +59,11 @@ void main() {
                 }
             }
             if (validCarrier) {
-                // Alpha 1 is a native StrobeLights source. TRP uses the sixteen
-                // non-zero byte values to transport the low radius nibble.
+                // Native metadata stays at 1.0. TRP keeps its sixteen low
+                // values for its independent logarithmic radius payload.
                 float sourceMetadata = strobeCarrier
-                    ? 1.0 : float(anchorBytes.a - 6) / 255.0;
+                    ? 1.0
+                    : float(anchorBytes.a - 6) / 255.0;
                 outColor = vec4(
                     float((encodedValue >> 16) & 255),
                     float((encodedValue >> 8) & 255),
