@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "es.mrdino"
-version = "0.10.36"
+version = "0.10.37"
 
 val minecraftVersion = "1.21.11"
 val paperApiVersion = "1.21.11-R0.1-SNAPSHOT"
@@ -19,6 +19,7 @@ dependencies {
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.mockito:mockito-core:5.23.0")
     testImplementation("io.papermc.paper:paper-api:$paperApiVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

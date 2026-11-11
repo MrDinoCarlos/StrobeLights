@@ -71,6 +71,7 @@ public final class StrobeManager implements Listener {
 
     private final StrobeLightsPlugin plugin;
     private final StrobeRepository repository;
+    private final TrpGraphicsCompatibility trpGraphics;
     private final Map<String, Strobe> strobes;
     private final Map<String, RuntimeState> runtime = new LinkedHashMap<>();
     private final Map<UUID, CameraFlash> cameraFlashes = new LinkedHashMap<>();
@@ -96,6 +97,9 @@ public final class StrobeManager implements Listener {
     ) {
         this.plugin = plugin;
         this.repository = repository;
+        this.trpGraphics = new TrpGraphicsCompatibility(
+            () -> plugin.getServer().getPluginManager().getPlugin("TRPServerEdition")
+        );
         this.strobes = new LinkedHashMap<>(strobes);
         this.entityKey = new NamespacedKey(plugin, "strobe_marker");
         this.proxyEntityKey = new NamespacedKey(plugin, "offscreen_light_proxy");
@@ -469,7 +473,7 @@ public final class StrobeManager implements Listener {
     public boolean previewCameraFlash(Player player, Strobe strobe) {
         if (!strobe.blindness().enabled()
             || strobe.flashPower() <= 0
-            || plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+            || !canRenderRgb(player)) {
             return false;
         }
         Location source = fixedSourceLocation(strobe);
@@ -787,7 +791,7 @@ public final class StrobeManager implements Listener {
             true
         );
         for (Player player : world.getPlayers()) {
-            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+            if (!canRenderRgb(player)) {
                 continue;
             }
             Location eye = player.getEyeLocation();
@@ -997,7 +1001,7 @@ public final class StrobeManager implements Listener {
             true
         );
         for (Player player : world.getPlayers()) {
-            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+            if (!canRenderRgb(player)) {
                 continue;
             }
             Location eye = player.getEyeLocation();
@@ -1642,6 +1646,11 @@ public final class StrobeManager implements Listener {
         return stack;
     }
 
+    private boolean canRenderRgb(Player player) {
+        return (plugin.resourcePack() == null || plugin.resourcePack().isLoaded(player))
+            && trpGraphics.allowsRgb(player.getUniqueId());
+    }
+
     private void updateFixedSourceViewers(Strobe strobe, RuntimeState state) {
         // Disabled strobes and zero-power lights have no RGB contribution to
         // transport. Release their private carriers until the next pulse or
@@ -1666,8 +1675,7 @@ public final class StrobeManager implements Listener {
         for (Player player : source.getWorld().getPlayers()) {
             UUID playerId = player.getUniqueId();
             hideSourceMarker(player, state);
-            boolean packLoaded = plugin.resourcePack() == null
-                || plugin.resourcePack().isLoaded(player);
+            boolean packLoaded = canRenderRgb(player);
             if (!packLoaded
                 || discoveryApplies(player, source)
                 || source.distanceSquared(player.getEyeLocation()) > maximumDistanceSquared) {
@@ -1750,8 +1758,7 @@ public final class StrobeManager implements Listener {
     private void tickDiscovery() {
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             boolean active = activeDiscoveryPlayers.contains(player.getUniqueId());
-            boolean packLoaded = plugin.resourcePack() == null
-                || plugin.resourcePack().isLoaded(player);
+            boolean packLoaded = canRenderRgb(player);
             for (Strobe strobe : strobes.values()) {
                 RuntimeState state = runtime.get(strobe.key());
                 if (state == null || !strobe.placed()) {
@@ -1957,7 +1964,7 @@ public final class StrobeManager implements Listener {
         Set<UUID> eligibleViewers = new HashSet<>();
         for (Player player : world.getPlayers()) {
             UUID playerId = player.getUniqueId();
-            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+            if (!canRenderRgb(player)) {
                 scene.removeViewerCarrier(playerId);
                 continue;
             }
@@ -2155,7 +2162,7 @@ public final class StrobeManager implements Listener {
             plugin.getConfig().getBoolean("blindness.require-looking-at-light", true)
         );
         for (Player player : world.getPlayers()) {
-            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+            if (!canRenderRgb(player)) {
                 continue;
             }
             Location eye = player.getEyeLocation();
@@ -2203,6 +2210,9 @@ public final class StrobeManager implements Listener {
         double strengthScale,
         int durationTicks
     ) {
+        if (!canRenderRgb(player)) {
+            return;
+        }
         double peakStrength = Math.min(
             1.0,
             level.screenStrength() * flashPower / 100.0
@@ -2231,7 +2241,7 @@ public final class StrobeManager implements Listener {
             if (player == null
                 || !player.isOnline()
                 || flash.remainingTicks <= 0
-                || plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+                || !canRenderRgb(player)) {
                 flash.remove();
                 iterator.remove();
                 continue;

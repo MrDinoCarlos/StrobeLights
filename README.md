@@ -1,5 +1,12 @@
 # StrobeLights — Paper 1.21.11
 
+Version 0.10.37: with TRP 0.4.18+, RGB technical carriers follow each viewer's
+Native/Fabulous profile. Native removes encoded source, shadow, discovery,
+scene and camera-flash pixels without hiding editor handles, sounds, visible
+models or vanilla lighting. Use `/trplive graphics native` for Fast/Fancy;
+Fabulous RGB remains available with `/trplive graphics fabulous` and Fabulous
+selected in Minecraft. Standalone behavior and resource-pack shaders and assets are unchanged; version metadata is updated.
+
 StrobeLights provides configurable 3D RGB strobe lighting based on
 [Light Painter](https://github.com/bradleyq/light_painter), revision `2364940`,
 plus a per-player RGB camera flash. Normal sources do not draw fixtures, beams
