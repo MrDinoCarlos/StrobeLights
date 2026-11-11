@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -576,7 +577,6 @@ public final class FlareService implements Listener {
             tickBurnPosition(burn);
             plugin.manager().moveFlareLight(burn.lightId, burn.location);
             plugin.manager().moveFlareGroundLight(burn.groundLightId, burn.location);
-            plugin.manager().refreshFlareCameraGlare(burn.location, burn.color.rgb);
             double remainingScale = Math.min(
                 1.0,
                 Math.max(0.0, (burn.duration - burn.elapsed) / 40.0)
@@ -994,6 +994,16 @@ public final class FlareService implements Listener {
             component.setColors(List.of(tint));
         }
         meta.setCustomModelDataComponent(component);
+        String itemModel = switch (modelData) {
+            case LAUNCHER_MODEL_DATA -> "tools/flare_launcher";
+            case CARTRIDGE_MODEL_DATA -> "tools/flare_cartridge";
+            case FLARE_CORE_MODEL_DATA -> "tools/flare_core";
+            case FLARE_HOT_CORE_MODEL_DATA -> "tools/flare_hot_core";
+            default -> throw new IllegalArgumentException("Unknown StrobeLights item model " + modelData);
+        };
+        meta.setItemModel(Objects.requireNonNull(
+            NamespacedKey.fromString("strobelights:" + itemModel)
+        ));
     }
 
     private static ItemStack itemInHand(Player player, EquipmentSlot hand) {

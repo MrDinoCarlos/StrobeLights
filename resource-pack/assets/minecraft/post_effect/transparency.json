@@ -129,6 +129,11 @@
                     "use_depth_buffer": true
                 },
                 {
+                    "sampler_name": "OcclusionDepth",
+                    "target": "minecraft:main",
+                    "use_depth_buffer": true
+                },
+                {
                     "sampler_name": "Lights",
                     "target": "lights"
                 }
@@ -163,6 +168,11 @@
                 {
                     "sampler_name": "DiffuseDepth",
                     "target": "minecraft:item_entity",
+                    "use_depth_buffer": true
+                },
+                {
+                    "sampler_name": "OcclusionDepth",
+                    "target": "minecraft:main",
                     "use_depth_buffer": true
                 },
                 {

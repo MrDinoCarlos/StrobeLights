@@ -17,6 +17,7 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -52,7 +53,7 @@ import org.bukkit.plugin.Plugin;
 /** Loads, hosts and sends the Light Painter shader and GUI icon resource pack. */
 public final class ResourcePackService implements Listener {
 
-    private static final String PACK_REVISION = "0.10.23";
+    private static final String PACK_REVISION = "0.10.37";
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
     private static final String EMBEDDED_PACK =
@@ -101,7 +102,7 @@ public final class ResourcePackService implements Listener {
             return;
         }
 
-        byte[] packBytes = readEmbeddedPack();
+        byte[] packBytes = readConfiguredPack();
         sha1 = sha1(packBytes);
         packId = UUID.nameUUIDFromBytes(sha1);
         Path exportedPack = exportPack(packBytes);
@@ -111,7 +112,51 @@ public final class ResourcePackService implements Listener {
             plugin.getConfig().getLong("resource-pack.send-delay-ticks", 10L)
         );
 
-        byte[] trpCompatiblePack = hasEnabledNexoIntegration()
+        String configuredMode = configuredDeliveryMode();
+        boolean nexoAvailable = hasEnabledNexoIntegration();
+        boolean nexoSelected = "NEXO".equals(configuredMode)
+            || "AUTO".equals(configuredMode) && nexoAvailable;
+        plugin.getLogger().info(
+            "Resource-pack mode: " + configuredMode + "; Nexo detected: "
+                + (nexoAvailable ? "YES" : "NO") + "; resolved provider: "
+                + (nexoSelected ? "NEXO" : configuredMode.equals("EXTERNAL")
+                    ? "EXTERNAL" : "EMBEDDED")
+        );
+        if (nexoSelected && !nexoAvailable) {
+            active = false;
+            plugin.getLogger().severe(
+                "NEXO mode was selected but Nexo is unavailable. StrobeLights will not send "
+                    + "a second resource pack."
+            );
+            return;
+        }
+        if (nexoSelected && hasEnabledTrp()) {
+            if (registerNexoOverlayWithTrp(packBytes)) {
+                active = true;
+                plugin.getLogger().info(
+                    "AUTO -> NEXO: StrobeLights assets registered in TRPServerEdition.zip; "
+                        + "Nexo exclusively owns final pack generation, hosting and delivery."
+                );
+                return;
+            }
+            // TRP may deliberately use EMBEDDED while Nexo sends its own pack.
+            // In that mode, merge StrobeLights into TRP's appended UUID pack.
+            if (hostWithTrp(packBytes)) {
+                active = true;
+                plugin.getLogger().info(
+                    "TRP resolved to EMBEDDED: StrobeLights assets are in TRP's appended "
+                        + "resource pack; Nexo continues to deliver its own pack."
+                );
+                return;
+            }
+            active = false;
+            plugin.getLogger().severe(
+                "TRP is present but neither its Nexo provider nor its embedded provider "
+                    + "accepted the StrobeLights overlay. Existing packs were preserved."
+            );
+            return;
+        }
+        byte[] trpCompatiblePack = nexoSelected
             ? combineWithTrp(packBytes) : null;
         byte[] nexoSourcePack = trpCompatiblePack == null ? packBytes : trpCompatiblePack;
         Path nexoSourcePath = trpCompatiblePack == null
@@ -120,7 +165,7 @@ public final class ResourcePackService implements Listener {
                 trpCompatiblePack,
                 "StrobeLights-TRP-Combined-" + PACK_REVISION + ".zip"
             );
-        if (startNexoIntegration(nexoSourcePath, nexoSourcePack)) {
+        if (nexoSelected && startNexoIntegration(nexoSourcePath, nexoSourcePack)) {
             active = true;
             plugin.getLogger().info(
                 trpCompatiblePack == null
@@ -131,10 +176,19 @@ public final class ResourcePackService implements Listener {
             return;
         }
 
-        startStandaloneDelivery(packBytes);
+        if (nexoSelected) {
+            active = false;
+            plugin.getLogger().severe(
+                "Nexo owns resource-pack delivery, but safe StrobeLights registration failed. "
+                    + "No separate StrobeLights pack will be sent."
+            );
+            return;
+        }
+
+        startStandaloneDelivery(packBytes, configuredMode);
     }
 
-    private void startStandaloneDelivery(byte[] packBytes) {
+    private void startStandaloneDelivery(byte[] packBytes, String configuredMode) {
         nexoManaged = false;
         closeEmbeddedServer();
         if (plugin.getConfig().getBoolean(
@@ -254,6 +308,19 @@ public final class ResourcePackService implements Listener {
 
     public String revision() {
         return PACK_REVISION;
+    }
+
+    /** Re-registers this immutable pack when TRP initializes or reloads after StrobeLights. */
+    public boolean registerWithTrpNexo() {
+        if (!hasEnabledNexoIntegration() || !hasEnabledTrp()) {
+            return false;
+        }
+        byte[] packBytes = readConfiguredPack();
+        if (!registerNexoOverlayWithTrp(packBytes)) {
+            return false;
+        }
+        active = true;
+        return true;
     }
 
     public void resend(Player player) {
@@ -481,8 +548,9 @@ public final class ResourcePackService implements Listener {
             Method register = trp.getClass().getMethod(
                 "registerResourcePackOverlay", Plugin.class, String.class, byte[].class
             );
+            byte[] trpOverlay = prepareTrpOverlay(packBytes);
             Object result = register.invoke(
-                trp, plugin, "StrobeLights-ResourcePack-" + PACK_REVISION + ".zip", packBytes
+                trp, plugin, "StrobeLights-ResourcePack-" + PACK_REVISION + ".zip", trpOverlay
             );
             if (result instanceof String combinedUrl && !combinedUrl.isBlank()) {
                 validateUrl(combinedUrl);
@@ -496,7 +564,8 @@ public final class ResourcePackService implements Listener {
             }
         } catch (NoSuchMethodException ignored) {
             // Older TRP builds can still share the listener without combining packs.
-        } catch (IllegalAccessException | InvocationTargetException | IllegalStateException exception) {
+        } catch (IllegalAccessException | InvocationTargetException | IllegalStateException
+            | IOException exception) {
             plugin.getLogger().warning(
                 "Could not merge StrobeLights resources into TRP: " + exception.getMessage()
             );
@@ -556,6 +625,10 @@ public final class ResourcePackService implements Listener {
         }
     }
 
+    private byte[] readConfiguredPack() {
+        return readEmbeddedPack();
+    }
+
     private Path exportPack(byte[] bytes) {
         return exportPack(bytes, "StrobeLights-ResourcePack-26.2.zip");
     }
@@ -581,8 +654,9 @@ public final class ResourcePackService implements Listener {
             Method combine = trp.getClass().getMethod(
                 "combineResourcePackOverlay", Plugin.class, String.class, byte[].class
             );
+            byte[] trpOverlay = prepareTrpOverlay(packBytes);
             Object result = combine.invoke(
-                trp, plugin, "StrobeLights-ResourcePack-" + PACK_REVISION + ".zip", packBytes
+                trp, plugin, "StrobeLights-ResourcePack-" + PACK_REVISION + ".zip", trpOverlay
             );
             if (result instanceof byte[] combined && combined.length > 0) {
                 return combined;
@@ -592,7 +666,7 @@ public final class ResourcePackService implements Listener {
                 "TRP is installed but cannot prepare a pack for Nexo. Update TRP Server "
                     + "Edition and StrobeLights together."
             );
-        } catch (IllegalAccessException | InvocationTargetException exception) {
+        } catch (IllegalAccessException | InvocationTargetException | IOException exception) {
             plugin.getLogger().warning(
                 "Could not prepare the TRP-compatible resource pack: " + exception.getMessage()
             );
@@ -600,6 +674,65 @@ public final class ResourcePackService implements Listener {
         return null;
     }
 
+    private boolean hasEnabledTrp() {
+        Plugin trp = plugin.getServer().getPluginManager().getPlugin("TRPServerEdition");
+        return trp != null && trp.isEnabled();
+    }
+    private boolean registerNexoOverlayWithTrp(byte[] packBytes) {
+        Plugin nexo = plugin.getServer().getPluginManager().getPlugin("Nexo");
+        Plugin trp = plugin.getServer().getPluginManager().getPlugin("TRPServerEdition");
+        if (nexo == null || !nexo.isEnabled() || trp == null || !trp.isEnabled()) {
+            return false;
+        }
+        try {
+            Method register = trp.getClass().getMethod(
+                "registerNexoResourcePackOverlay", Plugin.class, String.class, byte[].class
+            );
+            byte[] trpOverlay = prepareTrpOverlay(packBytes);
+            Object result = register.invoke(
+                trp, plugin, "StrobeLights-ResourcePack-" + PACK_REVISION + ".zip", trpOverlay
+            );
+            if (!Boolean.TRUE.equals(result)) {
+                return false;
+            }
+            trpResourcePackHost = trp;
+            trpManaged = true;
+            nexoManaged = true;
+            nexoPlugin = nexo;
+            closeLocalHttpServerOnly();
+            return true;
+        } catch (NoSuchMethodException exception) {
+            plugin.getLogger().warning(
+                "TRP does not expose the safe Nexo overlay API. Update TRP Server Edition and "
+                    + "StrobeLights together."
+            );
+        } catch (IllegalAccessException | InvocationTargetException | IOException exception) {
+            plugin.getLogger().warning(
+                "Could not register StrobeLights in TRP's Nexo external pack: "
+                    + exception.getMessage()
+            );
+        }
+        return false;
+    }
+
+    private void closeLocalHttpServerOnly() {
+        if (httpServer != null) {
+            httpServer.close();
+            httpServer = null;
+        }
+        publicUrl = null;
+    }
+    private String configuredDeliveryMode() {
+        String value = plugin.getConfig().getString("resource-pack.mode", "AUTO");
+        String mode = value == null ? "AUTO" : value.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("AUTO", "NEXO", "EMBEDDED", "EXTERNAL").contains(mode)) {
+            plugin.getLogger().warning(
+                "Unknown resource-pack.mode '" + value + "'; using AUTO."
+            );
+            return "AUTO";
+        }
+        return mode;
+    }
     private boolean hasEnabledNexoIntegration() {
         if (!plugin.getConfig().getBoolean("resource-pack.nexo-integration.enabled", true)) {
             return false;
@@ -622,6 +755,35 @@ public final class ResourcePackService implements Listener {
                     + "using standalone delivery instead."
             );
             return false;
+        }
+
+        if (NexoMultipackInstaller.supports(detected)) {
+            try {
+                NexoMultipackInstaller.InstallResult result =
+                    new NexoMultipackInstaller(plugin, detected).install(packBytes);
+                nexoPlugin = detected;
+                nexoPackPath = result.path();
+                nexoSourcePackBytes = packBytes.clone();
+                nexoManaged = true;
+                nexoMerged = true;
+                if (result.changed()) {
+                    requestNexoMultipackReloadWhenReady(detected);
+                } else {
+                    plugin.getLogger().info(
+                        "StrobeLights Nexo MultiPack template is unchanged; skipping reload."
+                    );
+                }
+                plugin.getLogger().info(
+                    "StrobeLights registered as Nexo MultiPack template: " + result.path()
+                );
+                return true;
+            } catch (IOException | RuntimeException exception) {
+                plugin.getLogger().severe(
+                    "Could not install the StrobeLights Nexo MultiPack template: "
+                        + exception.getMessage()
+                );
+                return false;
+            }
         }
 
         try {
@@ -665,6 +827,39 @@ public final class ResourcePackService implements Listener {
             );
             return false;
         }
+    }
+
+    private void requestNexoMultipackReloadWhenReady(Plugin detected) {
+        Runnable request = () -> {
+            if (!plugin.isEnabled() || !detected.isEnabled()) {
+                return;
+            }
+            plugin.getLogger().info(
+                "Requesting Nexo MultiPack reload: nexo reload pack"
+            );
+            if (!plugin.getServer().dispatchCommand(
+                plugin.getServer().getConsoleSender(), "nexo reload pack"
+            )) {
+                plugin.getLogger().severe("Nexo rejected the MultiPack reload command.");
+            }
+        };
+        try {
+            Object generator = detected.getClass().getMethod("packGenerator").invoke(detected);
+            Object futureValue = generator.getClass()
+                .getMethod("getPackGenFuture")
+                .invoke(generator);
+            if (futureValue instanceof CompletableFuture<?> future && !future.isDone()) {
+                future.whenComplete((ignored, failure) -> {
+                    if (plugin.isEnabled()) {
+                        plugin.getServer().getScheduler().runTask(plugin, request);
+                    }
+                });
+                return;
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            // Nexo's documented reload command is the compatibility fallback.
+        }
+        plugin.getServer().getScheduler().runTask(plugin, request);
     }
 
     private synchronized void installNexoPackServerInterceptor(
@@ -995,9 +1190,27 @@ public final class ResourcePackService implements Listener {
             merged.put(path, bytes);
         });
 
+        return writeZipEntries(merged);
+    }
+
+    static byte[] prepareTrpOverlay(byte[] packBytes) throws IOException {
+        Map<String, byte[]> entries = readZipEntries(packBytes, false);
+        for (String core : List.of(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh",
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh",
+            "assets/minecraft/shaders/core/item.vsh",
+            "assets/minecraft/shaders/core/item.fsh"
+        )) {
+            entries.remove(core);
+        }
+        return writeZipEntries(entries);
+    }
+
+    private static byte[] writeZipEntries(Map<String, byte[]> entries)
+        throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (ZipOutputStream output = new ZipOutputStream(bytes)) {
-            for (Map.Entry<String, byte[]> entry : merged.entrySet()) {
+            for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
                 ZipEntry zipEntry = new ZipEntry(entry.getKey());
                 zipEntry.setTime(0L);
                 output.putNextEntry(zipEntry);
@@ -1075,11 +1288,10 @@ public final class ResourcePackService implements Listener {
                 return;
             }
             plugin.getLogger().warning(
-                "Nexo did not confirm the StrobeLights pack merge after " + fallbackDelay
-                    + " ticks. Falling back to StrobeLights' standalone delivery."
-            );
-            startStandaloneDelivery(packBytes);
-        }, fallbackDelay);
+                "Nexo did not confirm the StrobeLights merge after " + fallbackDelay
+                    + " ticks. Nexo remains the only delivery owner; StrobeLights will not "
+                    + "send a separate fallback pack."
+            );        }, fallbackDelay);
     }
 
     private void requestNexoRegenerationIfIdle() {
