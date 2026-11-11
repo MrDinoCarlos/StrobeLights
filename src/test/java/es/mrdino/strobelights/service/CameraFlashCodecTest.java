@@ -4,6 +4,7 @@ import es.mrdino.strobelights.model.BlindnessLevel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.bukkit.Location;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
@@ -83,6 +84,22 @@ class CameraFlashCodecTest {
     }
 
     @Test
+    void viewerCarrierStaysNearbyWhileItsTransformRestoresAStationarySource() {
+        Location source = new Location(null, 148.25, -42.5, -311.75);
+        Location viewer = new Location(null, -507.0, 203.0, 804.0);
+
+        StrobeManager.ViewerRenderCarrier carrier =
+            StrobeManager.viewerRenderCarrier(source, viewer);
+
+        assertTrue(Math.abs(carrier.anchorX() - viewer.getX()) <= 8.0);
+        assertTrue(Math.abs(carrier.anchorY() - viewer.getY()) <= 8.0);
+        assertTrue(Math.abs(carrier.anchorZ() - viewer.getZ()) <= 8.0);
+        assertEquals(source.getX(), carrier.anchorX() + carrier.translationX(), 0.001);
+        assertEquals(source.getY(), carrier.anchorY() + carrier.translationY(), 0.001);
+        assertEquals(source.getZ(), carrier.anchorZ() + carrier.translationZ(), 0.001);
+    }
+
+    @Test
     void whiteCompatibilityLightFollowsEveryStrobePhase() {
         assertTrue(StrobeManager.shouldLightVanillaFallback(true, true, 15));
         assertEquals(false, StrobeManager.shouldLightVanillaFallback(true, false, 15));
@@ -141,6 +158,12 @@ class CameraFlashCodecTest {
         assertTrue(edge > 0.0);
         assertTrue(centered > edge);
         assertEquals(1.0, StrobeManager.flareGlareViewScale(1.0, 0.72, 0.6));
+    }
+
+    @Test
+    void doesNotContinuouslyRefreshAOneTickDistantFlareGlare() {
+        assertEquals(false, StrobeManager.shouldRefreshFlareCameraGlare(1));
+        assertTrue(StrobeManager.shouldRefreshFlareCameraGlare(2));
     }
 
     @Test
