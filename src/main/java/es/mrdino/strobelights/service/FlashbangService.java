@@ -66,6 +66,7 @@ public final class FlashbangService implements Listener {
         CustomModelDataComponent modelData = meta.getCustomModelDataComponent();
         modelData.setFloats(List.of(CUSTOM_MODEL_DATA));
         meta.setCustomModelDataComponent(modelData);
+        meta.setItemModel(new NamespacedKey(plugin, "tools/flashbang"));
         meta.displayName(Component.text(
             plugin.messages().text(viewer, "item.flashbang.name"),
             NamedTextColor.GOLD

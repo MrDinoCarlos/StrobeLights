@@ -1,6 +1,6 @@
 {
   "pack": {
     "pack_format": 84,
-    "description": "StrobeLights 0.10.23 - TRP overlap-safe RGB pipeline - Paper 26.1.2"
+    "description": "StrobeLights 0.10.37 - persistent RGB carriers and per-strobe shadows - Paper 26.1.2"
   }
 }
