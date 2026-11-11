@@ -574,7 +574,6 @@ public final class FlareService implements Listener {
             tickBurnPosition(burn);
             plugin.manager().moveFlareLight(burn.lightId, burn.location);
             plugin.manager().moveFlareGroundLight(burn.groundLightId, burn.location);
-            plugin.manager().refreshFlareCameraGlare(burn.location, burn.color.rgb);
             double remainingScale = Math.min(
                 1.0,
                 Math.max(0.0, (burn.duration - burn.elapsed) / 40.0)

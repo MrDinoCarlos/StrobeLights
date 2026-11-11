@@ -70,6 +70,7 @@
       "outtarget": "lightmap1",
       "auxtargets": [
         { "name": "DiffuseDepthSampler", "id": "minecraft:main:depth" },
+        { "name": "OcclusionDepthSampler", "id": "minecraft:main:depth" },
         { "name": "LightsSampler", "id": "lights" }
       ]
     },
@@ -89,6 +90,7 @@
       "outtarget": "lightmap3",
       "auxtargets": [
         { "name": "DiffuseDepthSampler", "id": "itemEntity:depth" },
+        { "name": "OcclusionDepthSampler", "id": "minecraft:main:depth" },
         { "name": "LightsSampler", "id": "lights" }
       ]
     },

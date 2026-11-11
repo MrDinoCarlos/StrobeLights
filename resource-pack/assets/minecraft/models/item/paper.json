@@ -28,6 +28,7 @@
     { "predicate": { "custom_model_data": 6821 }, "model": "strobelights:item/gui/color_swatch" },
     { "predicate": { "custom_model_data": 6822 }, "model": "strobelights:item/gui/no_strobes" },
     { "predicate": { "custom_model_data": 6823 }, "model": "strobelights:item/gui/groups" },
-    { "predicate": { "custom_model_data": 6824 }, "model": "strobelights:item/gui/expansion" }
+    { "predicate": { "custom_model_data": 6824 }, "model": "strobelights:item/gui/expansion" },
+    { "predicate": { "custom_model_data": 6825 }, "model": "strobelights:item/gui/shadows" }
   ]
 }

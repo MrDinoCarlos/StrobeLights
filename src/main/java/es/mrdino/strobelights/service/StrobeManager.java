@@ -33,6 +33,11 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -48,7 +53,7 @@ import org.bukkit.util.Vector;
  * shader reconstructs its 3D position from the depth buffer and applies RGB
  * illumination to every visible world pixel around that point.</p>
  */
-public final class StrobeManager {
+public final class StrobeManager implements Listener {
 
     private static final int SOURCE_MARKER_MODEL_DATA = 4_000_000;
     private static final int FLASH_MARKER_MODEL_DATA = 4_001_000;
@@ -64,6 +69,7 @@ public final class StrobeManager {
 
     private final StrobeLightsPlugin plugin;
     private final StrobeRepository repository;
+    private final TrpGraphicsCompatibility trpGraphics;
     private final Map<String, Strobe> strobes;
     private final Map<String, RuntimeState> runtime = new LinkedHashMap<>();
     private final Map<UUID, CameraFlash> cameraFlashes = new LinkedHashMap<>();
@@ -89,6 +95,9 @@ public final class StrobeManager {
     ) {
         this.plugin = plugin;
         this.repository = repository;
+        this.trpGraphics = new TrpGraphicsCompatibility(
+            () -> plugin.getServer().getPluginManager().getPlugin("TRPServerEdition")
+        );
         this.strobes = new LinkedHashMap<>(strobes);
         this.entityKey = new NamespacedKey(plugin, "strobe_marker");
         this.proxyEntityKey = new NamespacedKey(plugin, "offscreen_light_proxy");
@@ -109,6 +118,7 @@ public final class StrobeManager {
         removeOrphanedDisplays();
         removeLegacyLightBlocks();
         if (task == null) {
+            plugin.getServer().getPluginManager().registerEvents(this, plugin);
             task = plugin.getServer().getScheduler().runTaskTimer(
                 plugin,
                 (Runnable) this::tick,
@@ -119,6 +129,7 @@ public final class StrobeManager {
     }
 
     public void shutdown() {
+        HandlerList.unregisterAll(this);
         if (task != null) {
             task.cancel();
             task = null;
@@ -249,6 +260,7 @@ public final class StrobeManager {
 
     public Strobe create(String name, Location location, BlockFace face, int rgb) {
         Strobe strobe = Strobe.create(name, location, face, rgb);
+        strobe.setGeometryOcclusion(defaultGeometryOcclusion());
         strobes.put(strobe.key(), strobe);
         ensureRuntime(strobe);
         save();
@@ -257,6 +269,7 @@ public final class StrobeManager {
 
     public Strobe createDraft(String name, World world) {
         Strobe strobe = Strobe.draft(name, world);
+        strobe.setGeometryOcclusion(defaultGeometryOcclusion());
         strobes.put(strobe.key(), strobe);
         save();
         return strobe;
@@ -333,6 +346,19 @@ public final class StrobeManager {
         strobe.setExpansion(expansion);
         refreshMarkerItem(strobe);
         save();
+    }
+
+    public void setGeometryOcclusion(Strobe strobe, boolean geometryOcclusion) {
+        strobe.setGeometryOcclusion(geometryOcclusion);
+        refreshMarkerItem(strobe);
+        save();
+    }
+
+    private boolean defaultGeometryOcclusion() {
+        return plugin.getConfig().getBoolean(
+            "render.geometry-occlusion",
+            Strobe.DEFAULT_GEOMETRY_OCCLUSION
+        );
     }
 
     public void setGroup(Strobe strobe, String group) {
@@ -445,7 +471,7 @@ public final class StrobeManager {
     public boolean previewCameraFlash(Player player, Strobe strobe) {
         if (!strobe.blindness().enabled()
             || strobe.flashPower() <= 0
-            || plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+            || !canRenderRgb(player)) {
             return false;
         }
         Location source = fixedSourceLocation(strobe);
@@ -491,7 +517,7 @@ public final class StrobeManager {
         scene.source = spawnSceneFlashSource(id, scene);
         placeSceneVanillaLight(scene);
         sceneFlashes.put(id, scene);
-        updateSceneFlash(scene);
+        updateSceneFlash(id, scene);
 
         playThrowableFlashbangSound(impact);
         triggerThrowableCameraFlash(impact);
@@ -531,9 +557,8 @@ public final class StrobeManager {
         scene.source = spawnSceneFlashSource(id, scene);
         placeSceneVanillaLight(scene);
         sceneFlashes.put(id, scene);
-        updateSceneFlash(scene);
+        updateSceneFlash(id, scene);
         emitFlareFlash(explosion);
-        refreshFlareCameraGlare(explosion, rgb);
         return id;
     }
 
@@ -566,7 +591,7 @@ public final class StrobeManager {
         scene.source = spawnSceneFlashSource(id, scene);
         placeSceneVanillaLight(scene);
         sceneFlashes.put(id, scene);
-        updateSceneFlash(scene);
+        updateSceneFlash(id, scene);
         return id;
     }
 
@@ -614,7 +639,7 @@ public final class StrobeManager {
         scene.source = spawnSceneFlashSource(id, scene);
         placeSceneVanillaLight(scene);
         sceneFlashes.put(id, scene);
-        updateSceneFlash(scene);
+        updateSceneFlash(id, scene);
         return id;
     }
 
@@ -764,7 +789,7 @@ public final class StrobeManager {
             true
         );
         for (Player player : world.getPlayers()) {
-            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+            if (!canRenderRgb(player)) {
                 continue;
             }
             Location eye = player.getEyeLocation();
@@ -792,15 +817,26 @@ public final class StrobeManager {
                 }
             }
             double glareScale = distanceScale * (requireLooking ? viewScale : 1.0);
+            int glareDuration = flashbangDurationTicks(glareScale, duration);
+            // A one-tick afterimage is useful for the initial detonation, but
+            // refreshing it every burn tick makes a tiny distant glare last
+            // for the complete lifetime of the flare.
+            if (!shouldRefreshFlareCameraGlare(glareDuration)) {
+                continue;
+            }
             startCameraFlash(
                 player,
                 rgb & 0xFFFFFF,
                 BlindnessLevel.EXTREME,
                 strength,
                 glareScale,
-                flashbangDurationTicks(glareScale, duration)
+                glareDuration
             );
         }
+    }
+
+    static boolean shouldRefreshFlareCameraGlare(int durationTicks) {
+        return durationTicks >= 2;
     }
 
     static double flareGlareViewScale(
@@ -963,7 +999,7 @@ public final class StrobeManager {
             true
         );
         for (Player player : world.getPlayers()) {
-            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+            if (!canRenderRgb(player)) {
                 continue;
             }
             Location eye = player.getEyeLocation();
@@ -1078,26 +1114,27 @@ public final class StrobeManager {
         if (flash != null) {
             flash.remove();
         }
-        sceneFlashes.values().forEach(scene -> {
-            scene.sourceViewers.remove(playerId);
-        });
+        sceneFlashes.values().forEach(scene -> scene.removeViewerCarrier(playerId));
         for (RuntimeState state : runtime.values()) {
             state.removeDiscoveryLight(playerId);
+            state.removeViewerCarrier(playerId);
+            state.removeOcclusionCarrier(playerId);
             state.editorVisible.remove(playerId);
             state.sourceHidden.remove(playerId);
         }
     }
 
     public void setMarkersVisible(Player player, boolean visible) {
+        UUID playerId = player.getUniqueId();
         for (RuntimeState state : runtime.values()) {
-            if (!state.valid()) {
-                continue;
-            }
-            state.sourceHidden.remove(player.getUniqueId());
-            if (visible) {
-                player.showEntity(plugin, state.marker);
-            } else {
+            state.sourceHidden.remove(playerId);
+            if (state.valid()) {
                 player.hideEntity(plugin, state.marker);
+            }
+            if (!visible) {
+                state.removeViewerCarrier(playerId);
+                state.removeOcclusionCarrier(playerId);
+                state.removeDiscoveryLight(playerId);
             }
         }
         if (!visible) {
@@ -1105,9 +1142,7 @@ public final class StrobeManager {
             if (flash != null) {
                 flash.remove();
             }
-            sceneFlashes.values().forEach(scene -> {
-                scene.hideSource(plugin, player);
-            });
+            sceneFlashes.values().forEach(scene -> scene.removeViewerCarrier(playerId));
         }
     }
 
@@ -1141,19 +1176,26 @@ public final class StrobeManager {
             return;
         }
         World world = strobe.world();
-        if (world == null || !world.isChunkLoaded(strobe.blockX() >> 4, strobe.blockZ() >> 4)) {
+        if (world == null) {
             return;
         }
 
-        RuntimeState state = ensureRuntime(strobe);
+        boolean sourceChunkLoaded = world.isChunkLoaded(
+            strobe.blockX() >> 4,
+            strobe.blockZ() >> 4
+        );
+        RuntimeState state = sourceChunkLoaded
+            ? ensureRuntime(strobe)
+            : runtime.computeIfAbsent(strobe.key(), ignored -> new RuntimeState());
         state.failureLogged = false;
-        if (!state.valid()) {
+        if (sourceChunkLoaded && !state.valid()) {
             state.remove();
             spawnMarker(strobe, state);
             applyMarkerItem(strobe, state);
         }
-        ensureEditorHandle(strobe, state);
-        synchronizeEditorHandle(strobe, state);
+        if (sourceChunkLoaded) {
+            synchronizeEditorHandle(strobe, state);
+        }
 
         if (state.pulseTicks > 0) {
             state.pulseTicks--;
@@ -1174,14 +1216,9 @@ public final class StrobeManager {
             applyLitState(strobe, state, false);
         }
 
-        // Reconcile the real LIGHT block even when the logical phase did not
-        // change. This repairs external removals and guarantees that static
-        // fallbacks do not depend on a one-time state-transition write.
-        applyVanillaFallback(strobe, state);
-
-        // The entity itself never leaves the saved source. Display culling is
-        // disabled so the core shader can carry an off-screen point without a
-        // camera- or player-following entity.
+        // Each client receives a private carrier in its own loaded chunk. Its
+        // transform restores the exact saved source before the shader moves
+        // the transport into a safe screen lane.
         updateFixedSourceViewers(strobe, state);
 
     }
@@ -1199,9 +1236,6 @@ public final class StrobeManager {
             spawnMarker(strobe, state);
             applyMarkerItem(strobe, state);
         }
-        if (state.valid()) {
-            ensureEditorHandle(strobe, state);
-        }
         return state;
     }
 
@@ -1217,14 +1251,7 @@ public final class StrobeManager {
                 strobe.key()
             );
         });
-        if (plugin.resourcePack() != null) {
-            for (Player player : plugin.getServer().getOnlinePlayers()) {
-                if (plugin.resourcePack().isLoaded(player)) {
-                    player.showEntity(plugin, state.marker);
-                }
-            }
-        }
-        ensureEditorHandle(strobe, state);
+        // The physical source remains hidden; clients receive private carriers.
     }
 
     private static Location fixedSourceLocation(Strobe strobe) {
@@ -1265,6 +1292,104 @@ public final class StrobeManager {
         FixedRenderCarrier carrier = fixedRenderCarrier(source);
         display.teleport(fixedRenderCarrierAnchor(source, carrier));
         applyFixedRenderCarrier(display, carrier);
+    }
+
+    private ItemDisplay spawnViewerLightDisplay(
+        Player player,
+        Location source,
+        Consumer<ItemDisplay> initializer
+    ) {
+        ViewerRenderCarrier carrier = viewerRenderCarrier(source, player.getEyeLocation());
+        Location anchor = viewerRenderCarrierAnchor(source.getWorld(), carrier);
+        ItemDisplay display = anchor.getWorld().spawn(anchor, ItemDisplay.class, entity -> {
+            entity.setPersistent(false);
+            entity.setVisibleByDefault(false);
+            entity.setGravity(false);
+            entity.setInvulnerable(true);
+            entity.setSilent(true);
+            entity.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.HEAD);
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setBrightness(new Display.Brightness(15, 15));
+            entity.setShadowRadius(0.0f);
+            entity.setShadowStrength(0.0f);
+            entity.setInterpolationDelay(0);
+            entity.setInterpolationDuration(0);
+            applyViewerRenderCarrier(entity, carrier);
+            initializer.accept(entity);
+        });
+        player.showEntity(plugin, display);
+        return display;
+    }
+
+    private static void positionViewerLightDisplay(
+        ItemDisplay display,
+        Location source,
+        Player player
+    ) {
+        ViewerRenderCarrier carrier = viewerRenderCarrier(source, player.getEyeLocation());
+        display.teleport(viewerRenderCarrierAnchor(source.getWorld(), carrier));
+        applyViewerRenderCarrier(display, carrier);
+    }
+
+    static ViewerRenderCarrier viewerRenderCarrier(Location source, Location viewer) {
+        double anchorX = Math.floor(viewer.getX() / 16.0) * 16.0 + 8.0;
+        double anchorY = Math.floor(viewer.getY() / 16.0) * 16.0 + 8.0;
+        double anchorZ = Math.floor(viewer.getZ() / 16.0) * 16.0 + 8.0;
+        return new ViewerRenderCarrier(
+            anchorX,
+            anchorY,
+            anchorZ,
+            (float) (source.getX() - anchorX),
+            (float) (source.getY() - anchorY),
+            (float) (source.getZ() - anchorZ)
+        );
+    }
+
+    private static Location viewerRenderCarrierAnchor(
+        World world,
+        ViewerRenderCarrier carrier
+    ) {
+        return new Location(
+            world,
+            carrier.anchorX(),
+            carrier.anchorY(),
+            carrier.anchorZ(),
+            0.0f,
+            0.0f
+        );
+    }
+
+    private static void applyViewerRenderCarrier(
+        ItemDisplay display,
+        ViewerRenderCarrier carrier
+    ) {
+        display.setViewRange(1.0f);
+        display.setDisplayWidth(0.0f);
+        display.setDisplayHeight(0.0f);
+        display.setTransformation(new Transformation(
+            new Vector3f(
+                carrier.translationX(),
+                carrier.translationY(),
+                carrier.translationZ()
+            ),
+            new Quaternionf(),
+            new Vector3f(1.0f, 1.0f, 1.0f),
+            new Quaternionf()
+        ));
+    }
+
+    private static boolean viewerRenderCarrierChanged(
+        ItemDisplay display,
+        ViewerRenderCarrier expected
+    ) {
+        Location current = display.getLocation();
+        Vector3f translation = display.getTransformation().getTranslation();
+        return current.getX() != expected.anchorX()
+            || current.getY() != expected.anchorY()
+            || current.getZ() != expected.anchorZ()
+            || Float.compare(translation.x(), expected.translationX()) != 0
+            || Float.compare(translation.y(), expected.translationY()) != 0
+            || Float.compare(translation.z(), expected.translationZ()) != 0;
     }
 
     private FixedRenderCarrier fixedRenderCarrier(Location source) {
@@ -1398,7 +1523,7 @@ public final class StrobeManager {
 
     private void refreshMarkerItem(Strobe strobe) {
         RuntimeState state = runtime.get(strobe.key());
-        if (state != null && state.valid()) {
+        if (state != null) {
             applyMarkerItem(strobe, state);
         }
     }
@@ -1415,28 +1540,36 @@ public final class StrobeManager {
     }
 
     private void applyMarkerItem(Strobe strobe, RuntimeState state) {
-        applyVanillaFallback(strobe, state);
-        if (!state.valid()) {
-            return;
-        }
-        if (!state.lit || strobe.lightLevel() <= 0) {
-            // Minecraft 1.20.1 caches the baked model of an ItemDisplay and
-            // can keep drawing the previous custom-model-data override when
-            // the same base item is replaced by the zero-RGB carrier. AIR
-            // explicitly invalidates that client render state, so both
-            // vanilla and OptiFine observe every off phase.
-            state.marker.setItemStack(new ItemStack(Material.AIR));
-            state.marker.setBrightness(new Display.Brightness(0, 0));
-            return;
-        }
-        applyTechnicalMarker(
-            state.marker,
-            packSourceLightColor(
+        int encodedLight = state.lit && strobe.lightLevel() > 0
+            ? packSourceLightColor(
                 strobe.rgb(),
                 strobe.lightLevel(),
                 strobe.expansionCode()
             )
-        );
+            : 0;
+        if (state.valid()) {
+            applyOrClearTechnicalMarker(state.marker, encodedLight);
+        }
+        state.viewerCarriers.values().stream()
+            .filter(Entity::isValid)
+            .forEach(display -> applyOrClearTechnicalMarker(display, encodedLight));
+
+        int occlusionToken = state.lit
+            && strobe.lightLevel() > 0
+            && strobe.geometryOcclusion()
+            ? geometryOcclusionToken()
+            : 0;
+        state.occlusionCarriers.values().stream()
+            .filter(Entity::isValid)
+            .forEach(display -> applyOrClearTechnicalMarker(display, occlusionToken));
+
+        World world = strobe.world();
+        if (world != null && world.isChunkLoaded(
+            strobe.blockX() >> 4,
+            strobe.blockZ() >> 4
+        )) {
+            applyVanillaFallback(strobe, state);
+        }
     }
 
     private void applyVanillaFallback(Strobe strobe, RuntimeState state) {
@@ -1529,6 +1662,23 @@ public final class StrobeManager {
         ));
     }
 
+    private static void applyOrClearTechnicalMarker(ItemDisplay display, int encodedValue) {
+        if (encodedValue == 0) {
+            // 1.20.1 may cache the previous baked custom-model-data override.
+            // AIR invalidates that entry reliably for both vanilla and OptiFine.
+            display.setItemStack(new ItemStack(Material.AIR));
+            display.setBrightness(new Display.Brightness(0, 0));
+        } else {
+            applyTechnicalMarker(display, encodedValue);
+        }
+    }
+
+    private static int geometryOcclusionToken() {
+        // A zero-energy source with expansion code 15 uses the unchanged v5
+        // carrier protocol, so TRP Server Edition can merge it safely.
+        return packSourceLightColor(0x000000, 15, 15);
+    }
+
     static MarkerCarrier markerCarrier(int encodedValue) {
         boolean cameraFlash = isPackedCameraFlash(encodedValue);
         int transportValue;
@@ -1572,51 +1722,147 @@ public final class StrobeManager {
         return stack;
     }
 
+    private boolean canRenderRgb(Player player) {
+        return (plugin.resourcePack() == null || plugin.resourcePack().isLoaded(player))
+            && trpGraphics.allowsRgb(player.getUniqueId());
+    }
+
     private void updateFixedSourceViewers(Strobe strobe, RuntimeState state) {
         if (strobe.lightLevel() <= 0) {
-            restoreSourceMarkers(state);
+            state.clearViewerCarriers();
+            state.clearOcclusionCarriers();
             return;
         }
         Location source = fixedSourceLocation(strobe);
         if (source == null) {
-            restoreSourceMarkers(state);
+            state.clearViewerCarriers();
+            state.clearOcclusionCarriers();
             return;
         }
-        double maximumDistance = displayViewRangeBlocks() + 16.0;
+        double maximumDistance = displayViewRangeBlocks();
         double maximumDistanceSquared = maximumDistance * maximumDistance;
+        Set<UUID> retained = new HashSet<>();
         for (Player player : source.getWorld().getPlayers()) {
-            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
-                continue;
-            }
-            if (discoveryApplies(player, source)
+            UUID playerId = player.getUniqueId();
+            hideSourceMarker(player, state);
+            boolean packLoaded = canRenderRgb(player);
+            if (!packLoaded
+                || discoveryApplies(player, source)
                 || source.distanceSquared(player.getEyeLocation()) > maximumDistanceSquared) {
-                hideSourceMarker(player, state);
+                state.removeViewerCarrier(playerId);
+                state.removeOcclusionCarrier(playerId);
                 continue;
             }
-            showSourceMarker(player, state);
+            retained.add(playerId);
+            updateViewerCarrier(player, strobe, state, source);
+            updateViewerOcclusionCarrier(player, strobe, state, source);
+        }
+        state.retainViewerCarriers(retained);
+        state.retainOcclusionCarriers(retained);
+    }
+
+    private void updateViewerCarrier(
+        Player player,
+        Strobe strobe,
+        RuntimeState state,
+        Location source
+    ) {
+        UUID playerId = player.getUniqueId();
+        ItemDisplay carrier = state.viewerCarriers.get(playerId);
+        if (carrier == null || !carrier.isValid() || carrier.getWorld() != player.getWorld()) {
+            state.removeViewerCarrier(playerId);
+            carrier = spawnViewerLightDisplay(player, source, display -> {
+                applyOrClearTechnicalMarker(
+                    display,
+                    state.lit && strobe.lightLevel() > 0
+                        ? packSourceLightColor(
+                            strobe.rgb(),
+                            strobe.lightLevel(),
+                            strobe.expansionCode()
+                        )
+                        : 0
+                );
+                display.getPersistentDataContainer().set(
+                    proxyEntityKey,
+                    PersistentDataType.STRING,
+                    playerId + ":" + strobe.key()
+                );
+            });
+            state.viewerCarriers.put(playerId, carrier);
+            return;
+        }
+        ViewerRenderCarrier expected = viewerRenderCarrier(source, player.getEyeLocation());
+        if (viewerRenderCarrierChanged(carrier, expected)) {
+            positionViewerLightDisplay(carrier, source, player);
+        }
+    }
+
+    private void updateViewerOcclusionCarrier(
+        Player player,
+        Strobe strobe,
+        RuntimeState state,
+        Location source
+    ) {
+        UUID playerId = player.getUniqueId();
+        if (!strobe.geometryOcclusion()) {
+            state.removeOcclusionCarrier(playerId);
+            return;
+        }
+        ItemDisplay carrier = state.occlusionCarriers.get(playerId);
+        if (carrier == null || !carrier.isValid() || carrier.getWorld() != player.getWorld()) {
+            state.removeOcclusionCarrier(playerId);
+            carrier = spawnViewerLightDisplay(player, source, display -> {
+                applyOrClearTechnicalMarker(
+                    display,
+                    state.lit && strobe.lightLevel() > 0
+                        ? geometryOcclusionToken()
+                        : 0
+                );
+                display.getPersistentDataContainer().set(
+                    proxyEntityKey,
+                    PersistentDataType.STRING,
+                    playerId + ":shadow:" + strobe.key()
+                );
+            });
+            state.occlusionCarriers.put(playerId, carrier);
+            return;
+        }
+        ViewerRenderCarrier expected = viewerRenderCarrier(source, player.getEyeLocation());
+        if (viewerRenderCarrierChanged(carrier, expected)) {
+            positionViewerLightDisplay(carrier, source, player);
         }
     }
 
     private void tickDiscovery() {
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             boolean active = activeDiscoveryPlayers.contains(player.getUniqueId());
-            boolean packLoaded = plugin.resourcePack() == null
-                || plugin.resourcePack().isLoaded(player);
+            boolean packLoaded = canRenderRgb(player);
             for (Strobe strobe : strobes.values()) {
                 RuntimeState state = runtime.get(strobe.key());
                 if (state == null || !strobe.placed()) {
                     continue;
                 }
-                ensureEditorHandle(strobe, state);
                 Location source = fixedSourceLocation(strobe);
                 boolean nearby = active && source != null && discoveryApplies(player, source);
                 boolean visible = nearby;
+                if (visible && source.getWorld().isChunkLoaded(
+                    strobe.blockX() >> 4,
+                    strobe.blockZ() >> 4
+                )) {
+                    ensureEditorHandle(strobe, state);
+                }
                 setEditorHandleVisible(player, state, visible);
                 if (visible && packLoaded) {
                     updateDiscoveryLight(player, strobe, state, source);
                 } else {
                     state.removeDiscoveryLight(player.getUniqueId());
+                    state.removeDiscoveryOcclusionLight(player.getUniqueId());
                 }
+            }
+        }
+        for (RuntimeState state : runtime.values()) {
+            if (state.editorVisible.isEmpty()) {
+                state.removeEditorHandle();
             }
         }
     }
@@ -1638,10 +1884,11 @@ public final class StrobeManager {
     }
 
     private void setEditorHandleVisible(Player player, RuntimeState state, boolean visible) {
+        UUID playerId = player.getUniqueId();
         if (state.editorHandle == null || !state.editorHandle.isValid()) {
+            state.editorVisible.remove(playerId);
             return;
         }
-        UUID playerId = player.getUniqueId();
         if (visible && state.editorVisible.add(playerId)) {
             player.showEntity(plugin, state.editorHandle);
         } else if (!visible && state.editorVisible.remove(playerId)) {
@@ -1664,10 +1911,12 @@ public final class StrobeManager {
             light = spawnDiscoveryLight(player, strobe, impact);
             state.discoveryLights.put(playerId, light);
         } else {
-            FixedRenderCarrier carrier = fixedRenderCarrier(impact);
-            Location expectedAnchor = fixedRenderCarrierAnchor(impact, carrier);
-            if (light.getLocation().distanceSquared(expectedAnchor) > 1.0e-8) {
-                positionFixedLightDisplay(light, impact);
+            ViewerRenderCarrier carrier = viewerRenderCarrier(
+                impact,
+                player.getEyeLocation()
+            );
+            if (viewerRenderCarrierChanged(light, carrier)) {
+                positionViewerLightDisplay(light, impact, player);
             }
         }
         int minimumLevel = Math.max(1, Math.min(
@@ -1682,19 +1931,49 @@ public final class StrobeManager {
                 strobe.expansionCode()
             )
         );
+        updateDiscoveryOcclusionLight(player, strobe, state, impact);
         hideSourceMarker(player, state);
     }
 
+    private void updateDiscoveryOcclusionLight(
+        Player player,
+        Strobe strobe,
+        RuntimeState state,
+        Location source
+    ) {
+        UUID playerId = player.getUniqueId();
+        if (!strobe.geometryOcclusion()) {
+            state.removeDiscoveryOcclusionLight(playerId);
+            return;
+        }
+        ItemDisplay token = state.discoveryOcclusionLights.get(playerId);
+        if (token == null || !token.isValid() || token.getWorld() != player.getWorld()) {
+            state.removeDiscoveryOcclusionLight(playerId);
+            token = spawnViewerLightDisplay(player, source, display -> {
+                applyTechnicalMarker(display, geometryOcclusionToken());
+                display.getPersistentDataContainer().set(
+                    discoveryEntityKey,
+                    PersistentDataType.STRING,
+                    playerId + ":shadow:" + strobe.key()
+                );
+            });
+            state.discoveryOcclusionLights.put(playerId, token);
+            return;
+        }
+        ViewerRenderCarrier expected = viewerRenderCarrier(source, player.getEyeLocation());
+        if (viewerRenderCarrierChanged(token, expected)) {
+            positionViewerLightDisplay(token, source, player);
+        }
+    }
+
     private ItemDisplay spawnDiscoveryLight(Player player, Strobe strobe, Location location) {
-        ItemDisplay light = spawnFixedLightDisplay(location, display -> {
+        return spawnViewerLightDisplay(player, location, display -> {
             display.getPersistentDataContainer().set(
                 discoveryEntityKey,
                 PersistentDataType.STRING,
                 player.getUniqueId() + ":" + strobe.key()
             );
         });
-        player.showEntity(plugin, light);
-        return light;
     }
 
     private boolean isHoldingEasyArmorStandsTool(Player player) {
@@ -1729,8 +2008,8 @@ public final class StrobeManager {
 
     private double displayViewRangeBlocks() {
         return Math.max(16.0, Math.min(
-            256.0,
-            plugin.getConfig().getDouble("render.display-view-range", 192.0)
+            512.0,
+            plugin.getConfig().getDouble("render.display-view-range", 512.0)
         ));
     }
 
@@ -1738,23 +2017,6 @@ public final class StrobeManager {
         if (state.valid() && state.sourceHidden.add(player.getUniqueId())) {
             player.hideEntity(plugin, state.marker);
         }
-    }
-
-    private void showSourceMarker(Player player, RuntimeState state) {
-        if (state.valid() && state.sourceHidden.remove(player.getUniqueId())) {
-            player.showEntity(plugin, state.marker);
-        }
-    }
-
-    private void restoreSourceMarkers(RuntimeState state) {
-        for (UUID playerId : new HashSet<>(state.sourceHidden)) {
-            Player player = plugin.getServer().getPlayer(playerId);
-            if (player != null && player.isOnline()
-                && (plugin.resourcePack() == null || plugin.resourcePack().isLoaded(player))) {
-                player.showEntity(plugin, state.marker);
-            }
-        }
-        state.sourceHidden.clear();
     }
 
     private void tickSceneFlashes() {
@@ -1767,11 +2029,11 @@ public final class StrobeManager {
                 iterator.remove();
                 continue;
             }
-            updateSceneFlash(scene);
+            updateSceneFlash(entry.getKey(), scene);
         }
     }
 
-    private void updateSceneFlash(SceneFlash scene) {
+    private void updateSceneFlash(UUID sceneId, SceneFlash scene) {
         World world = scene.location.getWorld();
         if (world == null) {
             return;
@@ -1780,21 +2042,42 @@ public final class StrobeManager {
         Set<UUID> eligibleViewers = new HashSet<>();
         for (Player player : world.getPlayers()) {
             UUID playerId = player.getUniqueId();
-            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
-                scene.hideSource(plugin, player);
+            if (!canRenderRgb(player)) {
+                scene.removeViewerCarrier(playerId);
                 continue;
             }
             Location eye = player.getEyeLocation();
             Vector toLight = scene.location.toVector().subtract(eye.toVector());
             double distance = toLight.length();
             if (distance > radius) {
-                scene.hideSource(plugin, player);
+                scene.removeViewerCarrier(playerId);
                 continue;
             }
             eligibleViewers.add(playerId);
-            scene.showSource(plugin, player);
+            ItemDisplay carrier = scene.viewerCarriers.get(playerId);
+            if (carrier == null || !carrier.isValid() || carrier.getWorld() != player.getWorld()) {
+                scene.removeViewerCarrier(playerId);
+                carrier = spawnViewerLightDisplay(player, scene.location, display -> {
+                    applyTechnicalMarker(
+                        display,
+                        packSourceLightColor(
+                            scene.rgb,
+                            scene.lightLevel,
+                            scene.expansionCode
+                        )
+                    );
+                    display.getPersistentDataContainer().set(
+                        sceneFlashEntityKey,
+                        PersistentDataType.STRING,
+                        "viewer:" + sceneId + ":" + playerId
+                    );
+                });
+                scene.viewerCarriers.put(playerId, carrier);
+            } else {
+                positionViewerLightDisplay(carrier, scene.location, player);
+            }
         }
-        scene.retainSourceViewers(plugin, eligibleViewers);
+        scene.retainViewerCarriers(eligibleViewers);
     }
 
     private ItemDisplay spawnSceneFlashSource(UUID id, SceneFlash scene) {
@@ -1956,7 +2239,7 @@ public final class StrobeManager {
             plugin.getConfig().getBoolean("blindness.require-looking-at-light", true)
         );
         for (Player player : world.getPlayers()) {
-            if (plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+            if (!canRenderRgb(player)) {
                 continue;
             }
             Location eye = player.getEyeLocation();
@@ -2004,6 +2287,9 @@ public final class StrobeManager {
         double strengthScale,
         int durationTicks
     ) {
+        if (!canRenderRgb(player)) {
+            return;
+        }
         double peakStrength = Math.min(
             1.0,
             level.screenStrength() * flashPower / 100.0
@@ -2032,7 +2318,7 @@ public final class StrobeManager {
             if (player == null
                 || !player.isOnline()
                 || flash.remainingTicks <= 0
-                || plugin.resourcePack() != null && !plugin.resourcePack().isLoaded(player)) {
+                || !canRenderRgb(player)) {
                 flash.remove();
                 iterator.remove();
                 continue;
@@ -2220,45 +2506,34 @@ public final class StrobeManager {
         return Double.POSITIVE_INFINITY;
     }
 
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onEntitiesLoad(EntitiesLoadEvent event) {
+        removeManagedDisplays(event.getEntities());
+    }
+
     private void removeOrphanedDisplays() {
         for (World world : plugin.getServer().getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                if (entity.getPersistentDataContainer().has(entityKey, PersistentDataType.STRING)) {
-                    entity.remove();
-                } else if (entity.getPersistentDataContainer().has(
-                    proxyEntityKey,
-                    PersistentDataType.STRING
-                )) {
-                    entity.remove();
-                } else if (entity.getPersistentDataContainer().has(
-                    flashEntityKey,
-                    PersistentDataType.STRING
-                )) {
-                    entity.remove();
-                } else if (entity.getPersistentDataContainer().has(
-                    sceneFlashEntityKey,
-                    PersistentDataType.STRING
-                )) {
-                    entity.remove();
-                } else if (entity.getPersistentDataContainer().has(
-                    discoveryEntityKey,
-                    PersistentDataType.STRING
-                )) {
-                    entity.remove();
-                } else if (entity.getPersistentDataContainer().has(
-                    editorEntityKey,
-                    PersistentDataType.STRING
-                )) {
-                    entity.remove();
-                } else if (entity.getPersistentDataContainer().has(
-                    legacyEntityKey,
-                    PersistentDataType.STRING
-                )) {
-                    // Cleans the visible cube/star entities from the rejected 0.1 test build.
-                    entity.remove();
-                }
+            removeManagedDisplays(world.getEntities());
+        }
+    }
+
+    private void removeManagedDisplays(Iterable<? extends Entity> entities) {
+        for (Entity entity : entities) {
+            if (isManagedDisplay(entity)) {
+                entity.remove();
             }
         }
+    }
+
+    private boolean isManagedDisplay(Entity entity) {
+        var data = entity.getPersistentDataContainer();
+        return data.has(entityKey, PersistentDataType.STRING)
+            || data.has(proxyEntityKey, PersistentDataType.STRING)
+            || data.has(flashEntityKey, PersistentDataType.STRING)
+            || data.has(sceneFlashEntityKey, PersistentDataType.STRING)
+            || data.has(discoveryEntityKey, PersistentDataType.STRING)
+            || data.has(editorEntityKey, PersistentDataType.STRING)
+            || data.has(legacyEntityKey, PersistentDataType.STRING);
     }
 
     private void removeLegacyLightBlocks() {
@@ -2292,7 +2567,10 @@ public final class StrobeManager {
         private ItemDisplay marker;
         private ItemDisplay editorHandle;
         private Location editorAnchor;
+        private final Map<UUID, ItemDisplay> viewerCarriers = new LinkedHashMap<>();
+        private final Map<UUID, ItemDisplay> occlusionCarriers = new LinkedHashMap<>();
         private final Map<UUID, ItemDisplay> discoveryLights = new LinkedHashMap<>();
+        private final Map<UUID, ItemDisplay> discoveryOcclusionLights = new LinkedHashMap<>();
         private final Set<UUID> sourceHidden = new HashSet<>();
         private final Set<UUID> editorVisible = new HashSet<>();
         private Block vanillaLight;
@@ -2309,12 +2587,19 @@ public final class StrobeManager {
         private void remove() {
             clearVanillaLight();
             clearDiscoveryLights();
+            clearViewerCarriers();
+            clearOcclusionCarriers();
             sourceHidden.clear();
             editorVisible.clear();
             if (marker != null) {
                 marker.remove();
                 marker = null;
             }
+            removeEditorHandle();
+        }
+
+        private void removeEditorHandle() {
+            editorVisible.clear();
             if (editorHandle != null) {
                 editorHandle.remove();
                 editorHandle = null;
@@ -2335,11 +2620,63 @@ public final class StrobeManager {
             if (light != null) {
                 light.remove();
             }
+            removeDiscoveryOcclusionLight(playerId);
+        }
+
+        private void removeDiscoveryOcclusionLight(UUID playerId) {
+            ItemDisplay token = discoveryOcclusionLights.remove(playerId);
+            if (token != null) {
+                token.remove();
+            }
+        }
+
+        private void removeViewerCarrier(UUID playerId) {
+            ItemDisplay carrier = viewerCarriers.remove(playerId);
+            if (carrier != null) {
+                carrier.remove();
+            }
+        }
+
+        private void retainViewerCarriers(Set<UUID> retained) {
+            for (UUID playerId : new HashSet<>(viewerCarriers.keySet())) {
+                if (!retained.contains(playerId)) {
+                    removeViewerCarrier(playerId);
+                }
+            }
+        }
+
+        private void clearViewerCarriers() {
+            viewerCarriers.values().forEach(Entity::remove);
+            viewerCarriers.clear();
+        }
+
+        private void removeOcclusionCarrier(UUID playerId) {
+            ItemDisplay carrier = occlusionCarriers.remove(playerId);
+            if (carrier != null) {
+                carrier.remove();
+            }
+        }
+
+        private void retainOcclusionCarriers(Set<UUID> retained) {
+            for (UUID playerId : new HashSet<>(occlusionCarriers.keySet())) {
+                if (!retained.contains(playerId)) {
+                    removeOcclusionCarrier(playerId);
+                }
+            }
+        }
+
+        private void clearOcclusionCarriers() {
+            occlusionCarriers.values().forEach(Entity::remove);
+            occlusionCarriers.clear();
+            discoveryOcclusionLights.values().forEach(Entity::remove);
+            discoveryOcclusionLights.clear();
         }
 
         private void clearDiscoveryLights() {
             discoveryLights.values().forEach(Entity::remove);
             discoveryLights.clear();
+            discoveryOcclusionLights.values().forEach(Entity::remove);
+            discoveryOcclusionLights.clear();
         }
     }
 
@@ -2355,13 +2692,23 @@ public final class StrobeManager {
     ) {
     }
 
+    static record ViewerRenderCarrier(
+        double anchorX,
+        double anchorY,
+        double anchorZ,
+        float translationX,
+        float translationY,
+        float translationZ
+    ) {
+    }
+
     private static final class SceneFlash {
         private Location location;
         private final int rgb;
         private final int lightLevel;
         private final int expansionCode;
         private final double viewRange;
-        private final Set<UUID> sourceViewers = new HashSet<>();
+        private final Map<UUID, ItemDisplay> viewerCarriers = new LinkedHashMap<>();
         private int remainingTicks;
         private ItemDisplay source;
         private Block vanillaLight;
@@ -2383,34 +2730,24 @@ public final class StrobeManager {
             this.viewRange = Math.max(1.0, viewRange);
         }
 
-        private void showSource(StrobeLightsPlugin plugin, Player player) {
-            if (source != null && source.isValid() && sourceViewers.add(player.getUniqueId())) {
-                player.showEntity(plugin, source);
+        private void removeViewerCarrier(UUID playerId) {
+            ItemDisplay carrier = viewerCarriers.remove(playerId);
+            if (carrier != null) {
+                carrier.remove();
             }
         }
 
-        private void hideSource(StrobeLightsPlugin plugin, Player player) {
-            if (source != null && sourceViewers.remove(player.getUniqueId())) {
-                player.hideEntity(plugin, source);
-            }
-        }
-
-        private void retainSourceViewers(StrobeLightsPlugin plugin, Set<UUID> retained) {
-            for (UUID playerId : new HashSet<>(sourceViewers)) {
-                if (retained.contains(playerId)) {
-                    continue;
-                }
-                Player player = plugin.getServer().getPlayer(playerId);
-                if (player != null && player.isOnline()) {
-                    hideSource(plugin, player);
-                } else {
-                    sourceViewers.remove(playerId);
+        private void retainViewerCarriers(Set<UUID> retained) {
+            for (UUID playerId : new HashSet<>(viewerCarriers.keySet())) {
+                if (!retained.contains(playerId)) {
+                    removeViewerCarrier(playerId);
                 }
             }
         }
 
         private void remove() {
-            sourceViewers.clear();
+            viewerCarriers.values().forEach(Entity::remove);
+            viewerCarriers.clear();
             if (source != null) {
                 source.remove();
                 source = null;

@@ -37,8 +37,8 @@ resource-pack:
   loaded: "StrobeLights : pack {revision} chargé. Fabuleux active le RGB ; les shaderpacks externes peuvent le bloquer."
   prompt: "StrobeLights {revision} : lumière 3D et flash caméra RGB."
   compatibility:
-    optifine: "OptiFine 1.20.1 : utilisez Fabuleux s'il est disponible et désactivez les shaderpacks externes ; sinon l'éclairage blanc de secours reste actif."
-    fabulous-hint: "RGB complet absent ? Activez Fabuleux si votre client le propose et désactivez les shaderpacks externes."
+    optifine: "OptiFine prêt : utilisez Fabuleux et désactivez les shaderpacks externes pour le RGB complet."
+    fabulous-hint: "RGB complet absent ? Activez Fabuleux et désactivez les shaderpacks externes."
   unconfigured:
     console: "CONFIGURATION STROBELIGHTS REQUISE : resource-pack.public-url utilise encore l'adresse par défaut ({url}). Configurez l'URL publique du serveur dans config.yml."
     title: "StrobeLights n'est pas configuré"
@@ -113,6 +113,12 @@ gui:
       title: "Taille de lumière RGB"
       value: "Expansion actuelle : {scale}"
       shift: "Maj : changer de 1.00× · plage 0.25×–4.00×"
+    shadows:
+      title: "Ombres géométriques"
+      enabled: "Actuel : ACTIVÉES · les blocs arrêtent la lumière RGB"
+      disabled: "Actuel : DÉSACTIVÉES · la lumière traverse les blocs"
+      toggle: "Clic : basculer pour ce strobe"
+      cost: "Le mode activé utilise davantage le GPU"
     group:
       title: "Groupe"
       value: "Groupe actuel : {group}"
@@ -183,6 +189,8 @@ gui:
     static: "Rafraîchissement : STATIQUE · lumière continue"
     intensity: "Intensité RGB : {level}/15"
     expansion: "Taille de lumière RGB : {scale}"
+    shadows-enabled: "Ombres géométriques : ACTIVÉES"
+    shadows-disabled: "Ombres géométriques : DÉSACTIVÉES"
     group: "Groupe : {group}"
     screen-flash: "Flash d'écran : {level}"
     flash-power: "Puissance flash RGB : {power}%"
@@ -324,7 +332,7 @@ command:
   not-found: "Le strobe '{name}' n'existe pas. Utilisez /strobe list."
   reloaded: "Configuration, langues et strobes rechargés ({count})."
   help:
-    title: "Commandes pour Paper 1.20.1"
+    title: "Commandes pour Paper 1.21.11"
     gui: "ouvre l'interface complète"
     create: "place sur le bloc visé ou à votre position actuelle"
     refresh: "ticks par phase"

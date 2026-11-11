@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "es.mrdino"
-version = "0.10.23"
+version = "0.10.37"
 
 val minecraftVersion = "1.20.1"
 val paperApiVersion = "1.20.1-R0.1-SNAPSHOT"
@@ -22,6 +22,7 @@ dependencies {
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.mockito:mockito-core:5.23.0")
     testImplementation("io.papermc.paper:paper-api:$paperApiVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -46,11 +47,12 @@ val generatedLegacyCarrierPack = layout.buildDirectory.dir(
 )
 
 val generateLegacyCarrierPack = tasks.register("generateLegacyCarrierPack") {
-    inputs.property("carrierEncodingVersion", 4)
+    inputs.property("carrierEncodingVersion", 6)
     outputs.dir(generatedLegacyCarrierPack)
 
     doLast {
         val packRoot = generatedLegacyCarrierPack.get().asFile
+        packRoot.deleteRecursively()
         val itemModelDirectory = packRoot.resolve(
             "assets/strobelights/models/item/carrier"
         )
@@ -121,7 +123,6 @@ val generateLegacyCarrierPack = tasks.register("generateLegacyCarrierPack") {
             overrides +=
                 """    { "predicate": { "custom_model_data": ${4_001_000 + highByte} }, "model": "strobelights:item/carrier/flash_$suffix" }"""
         }
-
         val rootModelDirectory = packRoot.resolve(
             "assets/minecraft/models/item"
         )

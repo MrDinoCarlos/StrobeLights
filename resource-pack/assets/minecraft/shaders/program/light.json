@@ -3,6 +3,7 @@
     "fragment": "light",
     "samplers": [
         { "name": "DiffuseDepthSampler" },
+        { "name": "OcclusionDepthSampler" },
         { "name": "LightsSampler" }
     ],
     "uniforms": [

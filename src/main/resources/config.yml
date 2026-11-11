@@ -4,20 +4,19 @@
 # ==============================================================================
 # Plugin:      StrobeLights
 # Author:      MrDino
-# Version:     0.10.23
+# Version:     0.10.37
 # Credits:     BradleyQ / Light Painter (3D screen-space lighting foundation)
 # Website:     https://mrdino.es/wiki/category/strobelights/
 # Discord:     https://discord.gg/ddyfucfZpy
 # License:     See THIRD_PARTY_NOTICES.md and the bundled pack license
 # ==============================================================================
-# Vanilla Fabulous: full 3D RGB lighting and camera flash.
-# OptiFine 1.20.1 gets full RGB only if that installation exposes Fabulous;
-# Fast/Fancy, external shaderpacks and replaced pipelines use the invisible
-# vanilla white LIGHT fallback while flashbang gameplay remains functional.
+# Vanilla or OptiFine with Fabulous: full 3D RGB lighting and camera flash.
+# OptiFine shaderpacks must be OFF; Fast/Fancy or replaced render pipelines use
+# the invisible vanilla white LIGHT fallback.
 
 # Internal schema used to migrate defaults from older releases without deleting
 # administrator customizations.
-config-version: 8
+config-version: 10
 
 branding:
   website: 'https://mrdino.es/wiki/category/strobelights/'
@@ -30,6 +29,9 @@ language:
 
 resource-pack:
   enabled: true
+  # AUTO detects Nexo. With TRP installed, StrobeLights registers its namespaced
+  # assets in TRPServerEdition.zip and Nexo alone builds, hosts and sends the pack.
+  mode: AUTO
   required: true
   send-delay-ticks: 10
 
@@ -49,11 +51,16 @@ resource-pack:
     bind-address: '0.0.0.0'
     port: 8250
 
-  # When Nexo is installed, StrobeLights first asks TRP for a verified hybrid
-  # ZIP, then merges TRP + StrobeLights into Nexo's generated client pack. Nexo
-  # remains the only plugin that sends that final three-way pack to players.
+  # With TRP installed, StrobeLights joins TRP's required Nexo MultiPack
+  # template so both shader pipelines remain compatible. Without TRP, Nexo
+  # 1.27+ receives a standalone StrobeLights template automatically.
   nexo-integration:
     enabled: true
+    multipack:
+      template-id: 'strobelights'
+      pack-name: 'StrobeLights.zip'
+      required: true
+      default: true
     # Check Nexo after startup. An active Nexo generation is never interrupted.
     regeneration-delay-ticks: 40
     # If Nexo never fires its post-generation event, restore standalone delivery.
@@ -61,20 +68,19 @@ resource-pack:
 
 client-compatibility-notices:
   # One short chat notice after the pack loads. A client brand containing
-  # OptiFine/OptiFabric gets a conditional Fabulous/fallback reminder. Minecraft
-  # does not report its graphics mode, so every other client receives a hint
-  # that accounts for clients where Fabulous is not available.
+  # OptiFine/OptiFabric gets the specific Fabulous/no-shaderpack reminder. Minecraft
+  # does not report its graphics mode, so every other client receives the
+  # conditional Fabulous/no-shaderpack hint without claiming detection.
   enabled: false
   delay-ticks: 20
 
 render:
-  # 192 blocks, matching the flare visual. The technical display remains at
-  # the exact saved source and disables client frustum culling, so it can be
-  # rendered from above, below and every side without following the camera.
-  display-view-range: 192.0
-  # RGB sources stay active above, below, on every side and outside the frame.
-  # The RGB pass ignores intervening block geometry, so surfaces inside the
-  # radius receive smooth light without hard shadows or wall collision.
+  # Maximum RGB source distance. Each player receives a private technical carrier
+  # in their loaded chunk, while its transform preserves the exact saved source.
+  display-view-range: 512.0
+  # Default for new strobes and old strobes without a saved per-strobe value.
+  # The GUI can then enable or disable geometry shadows independently per strobe.
+  geometry-occlusion: false
 
 timing:
   # GUI: normal click changes 1 tick, 20 above 200; Shift changes 100.
@@ -90,7 +96,7 @@ discovery:
   minimum-light-level: 10
 
 easy-armor-stands:
-  # Soft integration with EasyArmorStands v2 on Paper 1.20.1.
+  # Soft integration with EasyArmorStands v2 on Paper 1.21.11.
   # Holding the /eas give tool automatically enables discovery. Moving a
   # StrobeLights handle moves the exact invisible light point.
   enabled: true
