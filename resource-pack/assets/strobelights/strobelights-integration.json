@@ -1,5 +1,6 @@
 {
-  "version": "0.10.23",
+  "version": "0.10.38",
+  "stable_source_protocol": "slots3x3_depth_v1",
   "render_pipeline": "light_painter_rgb",
   "marker_protocol": "typed_bitgrid_3x3_v5"
 }

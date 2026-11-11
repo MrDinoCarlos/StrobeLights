@@ -38,6 +38,15 @@ class StrobeOrganizationTest {
         assertEquals(Strobe.DEFAULT_GROUP, strobe.group());
     }
 
+    @Test
+    void geometryOcclusionIsStoredPerStrobeAndDefaultsToClassicLighting() {
+        Strobe strobe = strobe(1.0, "");
+
+        assertFalse(strobe.geometryOcclusion());
+        strobe.setGeometryOcclusion(true);
+        assertTrue(strobe.geometryOcclusion());
+    }
+
     private static Strobe strobe(double expansion, String group) {
         return new Strobe(
             "test",

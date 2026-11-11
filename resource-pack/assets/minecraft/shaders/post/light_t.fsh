@@ -1,6 +1,7 @@
 #version 150
 
 #moj_import <minecraft:utils.glsl>
+#moj_import <strobelights:stable_slot_common.glsl>
 
 uniform sampler2D DiffuseDepthSampler;
 uniform sampler2D LightsSampler;
@@ -43,7 +44,8 @@ bool isCameraFlash(int encodedValue) {
 }
 
 bool isOffscreenLight(int encodedValue) {
-    return (encodedValue >> 23) == 0;
+    int mode = (encodedValue >> 20) & 7;
+    return (encodedValue >> 23) == 0 && mode >= 1 && mode <= 6;
 }
 
 vec3 offscreenLightColor(int encodedValue) {
@@ -104,6 +106,94 @@ vec3 reconstructOffscreenLight(vec3 proxyCoord, int encodedValue) {
     );
 }
 
+bool hasGeometryOcclusionToken(vec3 sourcePosition) {
+    for (int tokenIndex = 0; tokenIndex < int(count); tokenIndex += 1) {
+        float tokenMetadata = texture(
+            LightsSampler,
+            (vec2(float(tokenIndex), 5.0) + 0.5) * oneTexelAux1
+        ).r;
+        if (tokenMetadata < 0.5) {
+            continue;
+        }
+        int tokenExpansion = int(floor(texture(
+            LightsSampler,
+            (vec2(float(tokenIndex), 4.0) + 0.5) * oneTexelAux1
+        ).r * 15.0 + 0.5));
+        if (tokenExpansion != 15) {
+            continue;
+        }
+        vec3 tokenPayload = texture(
+            LightsSampler,
+            (vec2(float(tokenIndex), 3.0) + 0.5) * oneTexelAux1
+        ).rgb;
+        int tokenValue = markerValue(tokenPayload);
+        if (!isOffscreenLight(tokenValue)
+            || max(max(offscreenLightColor(tokenValue).r,
+                offscreenLightColor(tokenValue).g),
+                offscreenLightColor(tokenValue).b) > 0.0001) {
+            continue;
+        }
+        vec3 tokenPosition = vec3(
+            decodeInt(texture(LightsSampler,
+                (vec2(float(tokenIndex), 0.0) + 0.5) * oneTexelAux1)),
+            decodeInt(texture(LightsSampler,
+                (vec2(float(tokenIndex), 1.0) + 0.5) * oneTexelAux1)),
+            decodeInt(texture(LightsSampler,
+                (vec2(float(tokenIndex), 2.0) + 0.5) * oneTexelAux1))
+        ) / FIXEDPOINT;
+        tokenPosition = reconstructOffscreenLight(tokenPosition, tokenValue);
+        if (distance(tokenPosition, sourcePosition) < 0.05) {
+            return true;
+        }
+    }
+    return false;
+}
+
+vec2 projectLightRayPosition(vec3 position, float projectionK) {
+    return position.xy / max(position.z * projectionK, 0.00001)
+        * vec2(1.0 / aspectRatio, 1.0) + 0.5;
+}
+
+float screenSpaceVisibility(
+    vec3 lightPosition,
+    vec3 surfacePosition,
+    float projectionK,
+    bool trpLight
+) {
+    float visibility = 1.0;
+    vec2 lightUv = projectLightRayPosition(lightPosition, projectionK);
+    vec2 surfaceUv = projectLightRayPosition(surfacePosition, projectionK);
+    float rayLengthPixels = length((surfaceUv - lightUv) / oneTexel);
+    int raySteps = trpLight ? 6
+        : clamp(int(ceil(rayLengthPixels / 6.0)), 12, 32);
+    for (int rayStep = 1; rayStep <= 32; rayStep++) {
+        if (rayStep > raySteps) {
+            break;
+        }
+        float fraction = float(rayStep) / float(raySteps + 1);
+        vec3 rayPosition = mix(lightPosition, surfacePosition, fraction);
+        if (rayPosition.z <= 0.05) {
+            continue;
+        }
+        vec2 sampleUv = projectLightRayPosition(rayPosition, projectionK);
+        if (any(lessThan(sampleUv, vec2(0.0)))
+            || any(greaterThan(sampleUv, vec2(1.0)))) {
+            continue;
+        }
+        float sceneDepth = LinearizeDepth(texture(CompareDepthSampler, sampleUv).r);
+        float depthBias = max(0.10, rayPosition.z * 0.0025);
+        visibility = min(
+            visibility,
+            smoothstep(
+                rayPosition.z - depthBias,
+                rayPosition.z + depthBias,
+                sceneDepth
+            )
+        );
+    }
+    return visibility;
+}
+
 void main() {
     outColor = vec4(0.0);
     float oDepth = texture(DiffuseDepthSampler, texCoord).r;
@@ -134,15 +224,29 @@ void main() {
             if (isCameraFlash(encodedValue)) {
                 continue;
             }
-            bool offscreenLight = isOffscreenLight(encodedValue);
+            bool stableSource = strobeStableMetadata(sourceMetadata);
+            bool offscreenLight = !stableSource && isOffscreenLight(encodedValue);
+            if (trpLight && !offscreenLight) {
+                continue;
+            }
             ivec2 projectionBytes = ivec2(floor(texture(LightsSampler,
                 (vec2(float(i), 6.0) + 0.5) * oneTexelAux1).rg * 255.0 + 0.5));
             float markerConversionK = decodeExactProjectionK(
                 (projectionBytes.r << 8) | projectionBytes.g);
-            if (offscreenLight) {
+            if (stableSource) {
+                lightColor = strobeStableColor(encodedValue);
+            } else if (offscreenLight) {
                 lightWorldCoord = reconstructOffscreenLight(lightWorldCoord, encodedValue);
                 lightColor = offscreenLightColor(encodedValue);
             }
+            bool geometryToken = !trpLight
+                && expansionCode == 15
+                && max(max(lightColor.r, lightColor.g), lightColor.b) <= 0.0001;
+            if (geometryToken) {
+                continue;
+            }
+            bool geometryOcclusion = trpLight
+                || (!stableSource && hasGeometryOcclusionToken(lightWorldCoord));
             vec3 worldCoord = vec3(
                 screenCoord * markerConversionK * depth,
                 depth
@@ -156,7 +260,12 @@ void main() {
             float falloffPower;
             float lightBoost;
             vec3 emittedColor;
-            if (trpLight) {
+            if (stableSource) {
+                lightRadius = strobeStableRadius(encodedValue);
+                emittedColor = lightColor;
+                falloffPower = 2.0;
+                lightBoost = 0.5;
+            } else if (trpLight) {
                 int radiusLowCode = int(clamp(
                     floor(sourceMetadata * 255.0 + 0.5) - 1.0,
                     0.0,
@@ -188,8 +297,12 @@ void main() {
                     clamp(1.0 - lightDist / lightRadius, 0.0, 1.0),
                     falloffPower
                 );
+                float occlusion = geometryOcclusion
+                    ? screenSpaceVisibility(
+                        lightWorldCoord, worldCoord, markerConversionK, trpLight
+                    ) : 1.0;
                 aggColor.rgb += radialFalloff * emittedColor * lightBoost
-                    * rangeFade;
+                    * rangeFade * occlusion;
             }
         }
         outColor.rgb = aggColor.rgb;

@@ -3,6 +3,7 @@
     "fragment": "minecraft:post/light",
     "samplers": [
         { "name": "DiffuseDepthSampler" },
+        { "name": "OcclusionDepthSampler" },
         { "name": "LightsSampler" }
     ],
     "uniforms": [

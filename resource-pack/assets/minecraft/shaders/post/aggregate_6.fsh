@@ -1,6 +1,7 @@
 #version 150
 
 #moj_import <minecraft:utils.glsl>
+#moj_import <strobelights:stable_slot_common.glsl>
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D ItemEntitySampler;
@@ -41,7 +42,8 @@ int markerValue(vec3 color) {
 }
 
 bool isOffscreenLight(int encodedValue) {
-    return (encodedValue >> 23) == 0;
+    int mode = (encodedValue >> 20) & 7;
+    return (encodedValue >> 23) == 0 && mode >= 1 && mode <= 6;
 }
 
 void main() {
@@ -164,9 +166,10 @@ void main() {
         vec2 sourceNdc = samplepos * 2.0 - 1.0;
         samplepos = (samplepos - vec2(0.5)) * vec2(inAspectRatio, 1.0);
         int encodedValue = markerValue(sampleColor.rgb);
+        bool stableSource = strobeStableMetadata(sampleColor.a);
         float markerConversionK = conversionK;
         int expansionCode = 3;
-        if (isOffscreenLight(encodedValue)) {
+        if (!stableSource && isOffscreenLight(encodedValue)) {
             int projectionCode = (encodedValue >> 16) & 15;
             expansionCode = (encodedValue >> 12) & 15;
             markerConversionK = decodeProjectionK(projectionCode);
@@ -175,7 +178,17 @@ void main() {
             samplepos * markerConversionK * lightDepth,
             lightDepth
         );
-        if (isOffscreenLight(encodedValue)) {
+        if (stableSource) {
+            vec2 pixelSize = 1.0 / vec2(textureSize(ItemEntitySampler, 0));
+            vec2 center = vec2(px + 0.5, py + 0.5) * inOneTexel;
+            lightWorldCoord = vec3(
+                strobeStablePosition(texture(ItemEntitySampler, center + vec2(0.0, -1.0) * pixelSize).rgb),
+                strobeStablePosition(texture(ItemEntitySampler, center + vec2(1.0, -1.0) * pixelSize).rgb),
+                strobeStablePosition(texture(ItemEntitySampler, center + vec2(-1.0, 0.0) * pixelSize).rgb));
+            ivec3 projectionBytes = ivec3(floor(texture(ItemEntitySampler, center + vec2(1.0, 0.0) * pixelSize).rgb * 255.0 + 0.5));
+            projectionCode16 = (projectionBytes.r << 8) | projectionBytes.g;
+            expansionCode = (encodedValue >> 16) & 15;
+        } else if (isOffscreenLight(encodedValue)) {
             bool trpLight = sampleColor.a > 0.0 && sampleColor.a < 0.5;
             float lane = trpLight ? 0.45 : -0.45;
             lightWorldCoord = vec3((sourceNdc.x - lane) / 0.75,

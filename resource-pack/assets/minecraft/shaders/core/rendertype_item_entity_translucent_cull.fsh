@@ -2,6 +2,7 @@
 
 #moj_import <minecraft:fog.glsl>
 #moj_import <minecraft:utils.glsl>
+#moj_import <strobelights:stable_slot_fragment.glsl>
 
 uniform sampler2D Sampler0;
 
@@ -31,6 +32,7 @@ int markerValue(vec3 color) {
 }
 
 void main() {
+    if (strobeStableMarker > 0.5) { strobeStableSlotFragment(fragColor, ProjMat); return; }
     bool gui = isGUI(ProjMat);
 
     

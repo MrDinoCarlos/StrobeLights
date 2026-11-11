@@ -3,6 +3,7 @@
 #moj_import <minecraft:light.glsl>
 #moj_import <minecraft:fog.glsl>
 #moj_import <minecraft:utils.glsl>
+#moj_import <strobelights:stable_slot_vertex.glsl>
 
 in vec3 Position;
 in vec4 Color;
@@ -151,6 +152,7 @@ vec3 packOffscreenColor(
 }
 
 void main() {
+    if (strobeStableSlotVertex(Position, Color, UV0, Sampler0, ProjMat, ModelViewMat)) return;
     vertexDistance = fog_distance(Position, FogShape);
     vertexColor = minecraft_mix_light(Light0_Direction, Light1_Direction, Normal, Color) * texelFetch(Sampler2, UV2 / 16, 0);
     texCoord0 = UV0;
@@ -208,6 +210,7 @@ void main() {
             );
         }
         markerPayload = vertexColor;
+        markerPayload.a = 1.0;
 
         if (gl_VertexID % 4 == 0) {
             tmp.xy += vec2(-HALFMARKER, HALFMARKER);

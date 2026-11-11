@@ -1,6 +1,7 @@
 #version 150
 
 #moj_import <minecraft:utils.glsl>
+#moj_import <strobelights:stable_slot_packet.glsl>
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D DiffuseDepthSampler;
@@ -74,6 +75,12 @@ bool validTechnicalCenter(sampler2D sampler, vec2 center, vec2 pixelSize) {
 
 bool technicalMarkerPixel(sampler2D sampler, vec2 coord) {
     ivec4 current = markerBytes(sampler, coord);
+    if (current.a == 255) {
+        vec2 pixel = 1.0 / vec2(textureSize(sampler, 0));
+        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++)
+            if (strobeStablePacket(sampler, coord + vec2(float(x), float(y)) * pixel)) return true;
+        return false;
+    }
     // Fast path for ordinary near-camera item geometry.
     if (current.a > 23 || any(greaterThan(current.rgb, ivec3(10)))) {
         return false;

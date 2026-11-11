@@ -1,6 +1,7 @@
 #version 150
 
 #moj_import <minecraft:utils.glsl>
+#moj_import <strobelights:stable_slot_packet.glsl>
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D DiffuseDepthSampler;
@@ -20,6 +21,12 @@ void main() {
             ivec4 anchorBytes = ivec4(floor(
                 texture(DiffuseSampler, texCoord) * 255.0 + 0.5
             ));
+            if (strobeStablePacket(DiffuseSampler, texCoord)) {
+                vec2 pixel = 1.0 / vec2(textureSize(DiffuseSampler, 0));
+                int packetValue = strobeStableInteger(texture(DiffuseSampler, texCoord + vec2(-1.0, -1.0) * pixel).rgb);
+                outColor = vec4(strobeStableRawBytes(strobeStableSourceValue(packetValue)), 0.75);
+                return;
+            }
             bool strobeCarrier = abs(anchorBytes.a - 5) <= 1
                 && all(lessThanEqual(abs(anchorBytes.rgb - ivec3(2)), ivec3(1)));
             bool trpCarrier = anchorBytes.a >= 7 && anchorBytes.a <= 22;
@@ -59,10 +66,11 @@ void main() {
                 }
             }
             if (validCarrier) {
-                // Alpha 1 is a native StrobeLights source. TRP uses the sixteen
-                // non-zero byte values to transport the low radius nibble.
+                // Native metadata stays at 1.0. TRP keeps its sixteen low
+                // values for its independent logarithmic radius payload.
                 float sourceMetadata = strobeCarrier
-                    ? 1.0 : float(anchorBytes.a - 6) / 255.0;
+                    ? 1.0
+                    : float(anchorBytes.a - 6) / 255.0;
                 outColor = vec4(
                     float((encodedValue >> 16) & 255),
                     float((encodedValue >> 8) & 255),
