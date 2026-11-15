@@ -10,7 +10,8 @@ class FrameProjectionTest {
         for (boolean zeroToOne : new boolean[] {false, true}) {
             for (int fov : new int[] {30, 70, 110}) {
                 for (int far : new int[] {512, 1024, 2048}) {
-                    Matrix4f projection = new Matrix4f().perspective((float) Math.toRadians(fov), 16f / 9f, 0.05f, far, zeroToOne);
+                    // Minecraft 26.3 reverses Z: near depth is one, far/sky is zero.
+                    Matrix4f projection = new Matrix4f().perspective((float) Math.toRadians(fov), 16f / 9f, far, 0.05f, zeroToOne);
                     // Include a shifted frustum, as used by jittered projections.
                     projection.m20(0.001f).m21(-0.002f);
                     for (float distance : new float[] {0.2f, 2f, 18f, 128f, 400f}) {
@@ -20,6 +21,7 @@ class FrameProjectionTest {
                         float ndcY = clip.y / clip.w;
                         float ndcZ = clip.z / clip.w;
                         float depth = zeroToOne ? ndcZ : ndcZ * 0.5f + 0.5f;
+                        assertTrue(depth > 0f && depth < 1f);
                         float device = zeroToOne ? depth : depth * 2f - 1f;
                         float z = -projection.m32() / (device + projection.m22());
                         float x = (ndcX + projection.m20()) * (-z) / projection.m00();

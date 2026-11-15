@@ -34,7 +34,7 @@ color:
   brown: "Braun"
   black: "Schwarz"
 resource-pack:
-  loaded: "StrobeLights: Pack {revision} geladen. Fabelhaft aktiviert RGB; externe Shaderpacks können es blockieren."
+  loaded: "StrobeLights: Paket {revision} geladen. RGB nutzt die passende Rendering-Pipeline des Clients."
   prompt: "StrobeLights {revision}: 3D-Licht und RGB-Kamerablitz."
   compatibility:
     optifine: "OptiFine bereit: Fabelhaft verwenden und externe Shaderpacks für volles RGB deaktivieren."

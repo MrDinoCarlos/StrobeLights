@@ -20,3 +20,6 @@
 - GLSL compile validation is separate from an actual client visual test. Document
   which was performed; do not claim GPU/OptiFine/TRP/Nexo runtime validation from
   Java unit tests alone.
+- The 26.3 renderer uses reversed-Z (clear depth zero, GREATER, near depth one).
+  After GLSL expansion, run `gpuTest263` to check real capture/composition pixels.
+  This hidden OpenGL regression is not a full Minecraft/mod compatibility test.

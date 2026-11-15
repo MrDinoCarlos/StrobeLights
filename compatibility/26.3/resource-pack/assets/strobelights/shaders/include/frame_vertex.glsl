@@ -29,11 +29,9 @@ bool strobeFrameVertex(vec3 position, vec4 tint, vec2 uv, ivec2 brightness, samp
     vec2 uvCorner = corner == 0 ? vec2(0, 0) : corner == 1 ? vec2(0, 1)
         : corner == 2 ? vec2(1, 1) : vec2(1, 0);
     vec2 pixel = vec2(float(slot * 5), 0.0) + vec2(uvCorner.x, 1.0 - uvCorner.y) * vec2(5.0, 7.0);
-    #ifdef RENDERPEARL_DEPTH_IS_ZERO_TO_ONE
-    float nearDepth = 0.000001;
-    #else
-    float nearDepth = -0.999998;
-    #endif
+    // RenderPearl clears depth to zero and uses GREATER: near is one for
+    // BOTH clip-depth conventions. Zero would put packets behind the terrain.
+    float nearDepth = 0.999999;
     gl_Position = vec4(pixel / ScreenSize * 2.0 - 1.0, nearDepth, 1.0);
     return true;
 }

@@ -58,7 +58,7 @@ class ShaderPackContractTest {
             "assets/strobelights/strobelights-integration.json"
         );
         assertTrue(Files.isRegularFile(integration));
-        assertContains(integration, "\"version\": \"0.10.41\"");
+        assertContains(integration, "\"version\": \"0.10.42\"");
         assertContains(integration, "\"render_pipeline\": \"light_painter_rgb\"");
         assertContains(integration, "\"marker_protocol\": \"typed_guarded_5px_v5\"");
     }

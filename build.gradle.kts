@@ -5,7 +5,7 @@ import org.gradle.jvm.toolchain.JavaLanguageVersion
 plugins { id("java") }
 
 group = "es.mrdino"
-version = "0.10.41"
+version = "0.10.42"
 
 repositories {
     mavenCentral()
@@ -224,3 +224,35 @@ val verifyExports = tasks.register("verifyExports") {
 }
 exportJars.configure { mustRunAfter(testTasks) }
 tasks.check { dependsOn(verifyExports) }
+
+// Run after validate_26_3_shaders.py has expanded the shaders. This executes
+// capture -> lighting -> composition in a hidden OpenGL context, not just a compiler.
+val gpuSources = sourceSets.create("gpuRegression") {
+    java.srcDir("scripts/gpu")
+}
+val gpuNativePlatform = when {
+    System.getProperty("os.name").startsWith("Windows") -> "natives-windows"
+    System.getProperty("os.name").startsWith("Mac") -> "natives-macos"
+    else -> "natives-linux"
+} + if (System.getProperty("os.arch") in listOf("aarch64", "arm64")) "-arm64" else ""
+dependencies {
+    listOf("lwjgl", "lwjgl-opengl", "lwjgl-sdl").forEach { module ->
+        add(gpuSources.implementationConfigurationName, "org.lwjgl:$module:3.4.3")
+        add(gpuSources.runtimeOnlyConfigurationName, "org.lwjgl:$module:3.4.3:$gpuNativePlatform")
+    }
+    add(gpuSources.implementationConfigurationName, "org.joml:joml:1.10.9")
+}
+tasks.register<JavaExec>("gpuTest263") {
+    group = "verification"
+    description = "Executes 26.3 RGB shaders on the GPU with reversed-Z and verifies actual pixel colors."
+    classpath = gpuSources.runtimeClasspath
+    mainClass = "FrameRendererGpuTest"
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    args(layout.buildDirectory.dir("shader-validation").get().asFile.absolutePath)
+    doFirst {
+        check(layout.buildDirectory.file("shader-validation/item-opengl-0.vert").get().asFile.exists()) {
+            "Run scripts/validate_26_3_shaders.py first to prepare the shader sources."
+        }
+    }
+}

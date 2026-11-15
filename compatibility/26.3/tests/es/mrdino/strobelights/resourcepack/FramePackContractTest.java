@@ -60,4 +60,17 @@ class FramePackContractTest {
         byte[] overlay = ResourcePackService.prepareTrpOverlay(bytes.toByteArray());
         assertTrue(ResourcePackService.containsExactNexoRenderPipeline(overlay, bytes.toByteArray()));
     }
+
+    @Test void opaqueCarrierKeepsItsSignatureWhenAtlasSpritesAreResized() throws Exception {
+        var source = javax.imageio.ImageIO.read(PACK.resolve(
+            "assets/strobelights/textures/item/internal/frame_carrier.png").toFile());
+        assertEquals(0xFF25D353, source.getRGB(0, 0));
+        for (int size : new int[] {16, 32, 64, 128}) {
+            var resized = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var graphics = resized.createGraphics();
+            try { graphics.drawImage(source, 0, 0, size, size, null); }
+            finally { graphics.dispose(); }
+            assertEquals(0xFF25D353, resized.getRGB(size / 2, size / 2));
+        }
+    }
 }

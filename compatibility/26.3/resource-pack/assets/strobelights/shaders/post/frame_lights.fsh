@@ -23,7 +23,7 @@ float visibility(vec3 light, vec3 surface) {
         vec2 uv = (ray.xy * frameProjection.xy / (-ray.z) - frameOffset.xy) * 0.5 + 0.5;
         if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) continue;
         float depth = texture(DepthSampler, uv).r;
-        if (depth >= 0.999999) continue;
+        if (depth <= 0.0) continue;
         vec3 blocker = viewPosition(uv, depth);
         float behind = blocker.z - ray.z;
         if (behind > 0.08 && behind < 1.5) return 0.12;
@@ -44,7 +44,7 @@ void main() {
                 flash = strength;
                 flashColor = vec3(float((value >> 9u) & 15u), float((value >> 5u) & 15u), float((value >> 1u) & 15u)) / 15.0;
             }
-        } else if (strobeSource(value) && depth < 0.999999) {
+        } else if (strobeSource(value) && depth > 0.0) {
             vec3 color = vec3(float((value >> 12u) & 15u), float((value >> 8u) & 15u), float((value >> 4u) & 15u)) / 15.0;
             float energy = max(max(color.r, color.g), color.b);
             float size = float(((value >> 16u) & 15u) + 1u) * 0.25;

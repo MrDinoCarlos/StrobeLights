@@ -6,16 +6,23 @@ matching pack from the server version at startup.
 
 | Export | Maintained server/client versions | Java |
 | --- | --- | --- |
-| `StrobeLights-0.10.41+mc.v.1.20.X.jar` | 1.20.1 | 17 |
-| `StrobeLights-0.10.41+mc.v.1.21.X.jar` | 1.21.4, 1.21.10, 1.21.11 | 21 |
-| `StrobeLights-0.10.41+mc.v.26.1.X.jar` | 26.1.2 | 25 |
-| `StrobeLights-0.10.41+mc.v.26.2.X.jar` | 26.2 | 25 |
-| `StrobeLights-0.10.41+mc.v.26.3.X.jar` | 26.3 | 25 |
+| `StrobeLights-0.10.42+mc.v.1.20.X.jar` | 1.20.1 | 17 |
+| `StrobeLights-0.10.42+mc.v.1.21.X.jar` | 1.21.4, 1.21.10, 1.21.11 | 21 |
+| `StrobeLights-0.10.42+mc.v.26.1.X.jar` | 26.1.2 | 25 |
+| `StrobeLights-0.10.42+mc.v.26.2.X.jar` | 26.2 | 25 |
+| `StrobeLights-0.10.42+mc.v.26.3.X.jar` | 26.3 | 25 |
 
 `X` groups exports; it does not claim untested patch compatibility. Other
 versions are rejected explicitly rather than receiving an incompatible pack.
 Client versions must match the server's resource-pack ABI. ViaVersion does not
 make shader packs interchangeable.
+
+Version **0.10.42 fixes missing RGB on 26.3**: its world renderer uses reversed-Z
+(depth cleared to zero, `GREATER` comparison). The carrier now writes near depth
+one and the lighting treats zero as sky. An offscreen GPU regression executes
+the actual item shader, lighting batches and composition, checking magenta,
+red, green, blue and sky with both depth conventions. See
+[the fix and GPU verification](docs/RGB-26.3-FIX.md).
 
 Minecraft **26.3 has a separate RGB renderer** using the always-on
 `minecraft:end_of_frame` effect and OIT-aware item shaders. It does not use the
@@ -446,11 +453,11 @@ exactly five plugin JARs to **`build/exports/`**. The export directory is synced
 so another plugin release replaces the previous five files.
 
 ```text
-StrobeLights-0.10.41+mc.v.1.20.X.jar
-StrobeLights-0.10.41+mc.v.1.21.X.jar
-StrobeLights-0.10.41+mc.v.26.1.X.jar
-StrobeLights-0.10.41+mc.v.26.2.X.jar
-StrobeLights-0.10.41+mc.v.26.3.X.jar
+StrobeLights-0.10.42+mc.v.1.20.X.jar
+StrobeLights-0.10.42+mc.v.1.21.X.jar
+StrobeLights-0.10.42+mc.v.26.1.X.jar
+StrobeLights-0.10.42+mc.v.26.2.X.jar
+StrobeLights-0.10.42+mc.v.26.3.X.jar
 ```
 
 Standalone ZIPs are optional: `./gradlew exportResourcePack` writes them to
@@ -459,6 +466,7 @@ Build intermediates in `build/intermediates/` are not release downloads.
 
 GitHub Actions runs all API suites plus the separate 26.3 GLSL validation job.
 The `StrobeLights-family-jars` artifact contains only the five family JARs.
+The shader job also runs `gpuTest263` using a hidden Mesa/OpenGL context.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

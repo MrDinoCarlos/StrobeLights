@@ -34,7 +34,7 @@ color:
   brown: "Marrone"
   black: "Nero"
 resource-pack:
-  loaded: "StrobeLights: pack {revision} caricato. Favolosa abilita RGB; gli shaderpack esterni possono bloccarlo."
+  loaded: "StrobeLights: pacchetto {revision} caricato. RGB usa il rendering compatibile del client."
   prompt: "StrobeLights {revision}: luce 3D e flash RGB della telecamera."
   compatibility:
     optifine: "OptiFine pronto: usa Favolosa e disattiva gli shaderpack esterni per il RGB completo."

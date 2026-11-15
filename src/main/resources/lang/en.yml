@@ -39,7 +39,7 @@ color:
   black: "Black"
 
 resource-pack:
-  loaded: "StrobeLights: pack {revision} loaded. Fabulous enables RGB; external shaderpacks may block it."
+  loaded: "StrobeLights: pack {revision} loaded. RGB uses the matching client rendering pipeline."
   prompt: "StrobeLights {revision}: 3D light and RGB camera flash."
   compatibility:
     optifine: "OptiFine ready: use Fabulous and disable external shaderpacks for full RGB."

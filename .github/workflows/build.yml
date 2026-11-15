@@ -39,7 +39,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
       - name: Install GLSL validator
-        run: sudo apt-get update && sudo apt-get install -y glslang-tools
+        run: sudo apt-get update && sudo apt-get install -y glslang-tools xvfb libgl1-mesa-dri
       - name: Compile and link the 26.3 shader variants
         run: python3 scripts/validate_26_3_shaders.py --vanilla-dir build/vanilla-26.3 --download-vanilla --glslang /usr/bin/glslangValidator
+      - name: Verify RGB pixels with the reversed-Z world depth test
+        env:
+          LIBGL_ALWAYS_SOFTWARE: 'true'
+        run: xvfb-run -a bash gradlew gpuTest263 --console=plain
