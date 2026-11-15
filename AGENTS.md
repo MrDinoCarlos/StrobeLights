@@ -23,8 +23,10 @@
 - The 26.3 renderer uses reversed-Z (clear depth zero, GREATER, near depth one).
   After GLSL expansion, run `gpuTest263` to check real capture/composition pixels.
   This hidden OpenGL regression is not a full Minecraft/mod compatibility test.
-- The 26.3 point carrier relies on CPU-transformed `Position`. Keep all four
-  model vertices coincident; a literal model-local center loses the real source.
+- The 26.3 carrier relies on CPU-transformed `Position`. Its baked model MUST
+  have a nonzero face: Minecraft drops point elements before the vertex shader.
+  Collapse the valid quad using the HEAD display scale so all four CPU positions
+  coincide at the source. A literal model-local center loses the real source.
 - Keep 26.3 native slots 0..63 separate from stable integration slots 64..191.
   XmasLights supplies its slot in the tint payload, not display brightness.
   Preserve the external `slots3x3_depth_v1` input ABI while transporting it through

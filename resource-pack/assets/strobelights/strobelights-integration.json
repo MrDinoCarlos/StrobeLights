@@ -1,5 +1,5 @@
 {
-  "version": "0.10.43",
+  "version": "0.10.44",
   "stable_source_optifine_atlas": true,
   "stable_source_protocol": "slots3x3_depth_v1",
   "render_pipeline": "light_painter_rgb",

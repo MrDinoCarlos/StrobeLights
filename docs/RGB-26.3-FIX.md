@@ -1,4 +1,9 @@
-# Corrección del RGB en 26.3 — 0.10.42
+# Correcciones del RGB en 26.3 — 0.10.42 a 0.10.44
+
+Las correcciones de profundidad y posición descritas aquí eran necesarias, pero
+las pruebas GPU iniciales omitían el horneado del modelo de Minecraft. 0.10.44
+corrige ese fallo adicional y verifica el color en un cliente real; ver
+[el modelo y las mediciones](CARRIER-26.3-FIX.md).
 
 La luz guardada como `#FF00FF` aparecía blanca: únicamente se veía el bloque
 LIGHT de respaldo. Se comprobó que el cliente había recibido el ZIP de 26.3
@@ -16,15 +21,16 @@ Los pipelines de las versiones anteriores no cambian.
 
 También se corrigió la posición: `VertexConsumer.putBakedQuad` aplica el pose
 del item en la CPU. El shader debe usar `Position`, no el centro literal
-`[0.5,0.5,0.5]`. El modelo técnico tiene cuatro vértices coincidentes en `[8,8,8]`;
-Minecraft conserva ese quad y el vertex shader lo expande en su slot de pantalla.
-Así todos los fragmentos transportan exactamente la misma posición, incluso
-entre triángulos, sin mezclar bits de vértices distintos.
+`[0.5,0.5,0.5]`. La solución inicial de usar un elemento puntual era incorrecta:
+`UnbakedCuboidGeometry` lo descarta y el item queda sin caras. Desde 0.10.44 el
+modelo contiene una cara válida; la escala HEAD cero la reduce al punto de la
+fuente en la CPU, después del horneado. Así todos los fragmentos transportan
+exactamente la misma posición, sin mezclar bits de vértices distintos.
 
 ## Comprobación ejecutable
 
 `scripts/gpu/FrameRendererGpuTest.java` crea un contexto OpenGL oculto y ejecuta
-los shaders reales: captura del item, ocho lotes de iluminación y composición.
+los shaders reales: captura del item, lotes de iluminación y composición.
 Coloca una superficie delante del punto de transporte y aplica la misma
 comparación de profundidad que Minecraft 26.3.
 
@@ -63,7 +69,7 @@ una prueba dentro de OptiFine, Iris o Sodium durante esta corrección.
 
 ## Actualización
 
-Los cinco exports mantienen sus rangos separados y pasan a 0.10.42. Sustituir
+Los cinco exports mantienen sus rangos separados y pasan a 0.10.44. Sustituir
 el JAR antiguo del servidor por el de su rango y reiniciar; el nuevo contenido
 del pack cambia el SHA-1 y se vuelve a descargar. No dejar ambos JAR en plugins.
 La configuración de las luces y los datos guardados se conservan.

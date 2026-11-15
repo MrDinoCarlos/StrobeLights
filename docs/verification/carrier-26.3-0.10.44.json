@@ -1,0 +1,95 @@
+{
+  "minecraft": "26.3",
+  "paper": "26.3-223",
+  "strobe": "0.10.44",
+  "client": "vanilla",
+  "backend": "OpenGL",
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "framebuffer": [
+    640,
+    360
+  ],
+  "jar_sha256": "0da0906bd92dec063c41285cf1c9b4dd6b1735c943a7269dbb4b6005084b951e",
+  "pack_sha1": "0b752eb3f5590584adc67e8318fbc8de5a934db9",
+  "baseline_0_10_43": {
+    "baked_faces": 0,
+    "valid_packets": 0,
+    "before_rgb": [
+      25,
+      26,
+      47
+    ],
+    "after_rgb": [
+      25,
+      26,
+      47
+    ]
+  },
+  "corrected_packet_observations": 56,
+  "cases": [
+    {
+      "improved_transparency": true,
+      "source_color": "red",
+      "after_rgb": [
+        83,
+        16,
+        28
+      ]
+    },
+    {
+      "improved_transparency": true,
+      "source_color": "green",
+      "after_rgb": [
+        15,
+        86,
+        28
+      ]
+    },
+    {
+      "improved_transparency": true,
+      "source_color": "blue",
+      "after_rgb": [
+        15,
+        16,
+        115
+      ]
+    },
+    {
+      "improved_transparency": true,
+      "source_color": "magenta",
+      "after_rgb": [
+        83,
+        16,
+        116
+      ]
+    },
+    {
+      "improved_transparency": false,
+      "source_color": "red",
+      "after_rgb": [
+        83,
+        16,
+        28
+      ]
+    },
+    {
+      "improved_transparency": false,
+      "source_color": "green",
+      "after_rgb": [
+        15,
+        86,
+        28
+      ]
+    },
+    {
+      "improved_transparency": false,
+      "source_color": "blue",
+      "after_rgb": [
+        15,
+        16,
+        115
+      ]
+    }
+  ],
+  "other_renderer_clients_tested": []
+}

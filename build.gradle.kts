@@ -5,7 +5,7 @@ import org.gradle.jvm.toolchain.JavaLanguageVersion
 plugins { id("java") }
 
 group = "es.mrdino"
-version = "0.10.43"
+version = "0.10.44"
 
 repositories {
     mavenCentral()
@@ -241,6 +241,7 @@ dependencies {
         add(gpuSources.runtimeOnlyConfigurationName, "org.lwjgl:$module:3.4.3:$gpuNativePlatform")
     }
     add(gpuSources.implementationConfigurationName, "org.joml:joml:1.10.9")
+    add(gpuSources.implementationConfigurationName, "com.google.code.gson:gson:2.11.0")
 }
 tasks.register<JavaExec>("gpuTest263") {
     group = "verification"

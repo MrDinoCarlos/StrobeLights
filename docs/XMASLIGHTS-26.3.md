@@ -6,7 +6,10 @@ recién instalado. El bridge aceptaba únicamente las versiones 0.10.38 a
 decodificaba fuentes nativas y flashes: quitar la lista de versiones no habría
 producido iluminación RGB.
 
-La pareja corregida es **StrobeLights 0.10.43 + XmasLights 2.9.2**. XmasLights
+Usar **StrobeLights 0.10.44 + XmasLights 2.9.2**. La versión 0.10.43 corrigió
+el contrato de integración, pero su modelo puntual quedaba sin caras al hornearse
+en Minecraft. 0.10.44 corrige ese fallo y verifica RGB en el cliente real:
+[detalle del modelo](CARRIER-26.3-FIX.md). XmasLights
 valida el contrato del ZIP de la versión de Minecraft y su modelo/tinte real,
 sin una lista de versiones del plugin. Los packs incompatibles siguen rechazados.
 El antiguo ajuste `allow-untested-version` queda obsoleto; nunca evita la
@@ -31,7 +34,7 @@ acumulan la integración en dos targets alternos a 640×360, codificando el rang
 HDR en RGB/alpha. La composición utiliza diez samplers, por debajo del mínimo
 OpenGL de dieciséis. No se crean strobes persistentes, círculos ni TextDisplay.
 
-## Verificación de esta entrega
+## Verificación de la integración introducida en 0.10.43
 
 - **583 pruebas Java** de StrobeLights en las siete APIs, sin fallos ni omisiones;
   verificación de los cinco JAR y sus packs por familia.
@@ -62,14 +65,16 @@ empleó un bot 1.21.4 traducido por ViaVersion/ViaBackwards 5.12.2, exclusivamen
 en el servidor aislado. Comprueba la entrega del pack 26.3 y las entidades reales,
 no la ejecución gráfica en un cliente 1.21.4. Los shaders de 26.3 se prueban
 por separado en GPU. Esos plugins de traducción **no son un requisito de uso**.
-No se ha realizado una sesión visual de Minecraft 26.3 ni una validación completa
+Estas comprobaciones de 0.10.43 no incluían la ejecución del cliente Minecraft.
+Las mediciones adicionales del cliente real de 0.10.44 están en el documento
+enlazado arriba. No hay una validación completa
 con OptiFine, Iris, Sodium, TRP o Nexo; sigue pendiente medir aspecto/rendimiento
 de las cadenas densas dentro del juego.
 
 ## Instalación
 
 Detener Paper, sustituir **los dos JAR**, conservando las carpetas de datos, e
-iniciar. Para 26.3 usar `StrobeLights-0.10.43+mc.v.26.3.X.jar` y
+iniciar. Para 26.3 usar `StrobeLights-0.10.44+mc.v.26.3.X.jar` y
 `XmasLights-2.9.2+mc.v.26.3.X.jar`. No dejar las copias anteriores en `plugins/`.
 Aceptar el nuevo pack de StrobeLights al entrar: su hash cambia con los shaders.
 Las luces guardadas se conservan. Los cinco exports de StrobeLights mantienen

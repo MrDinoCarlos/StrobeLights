@@ -1,5 +1,5 @@
 {
-  "version": "0.10.43",
+  "version": "0.10.44",
   "render_pipeline": "end_of_frame_rgb",
   "marker_protocol": "frame_slots_5x7_v1",
   "rgb_supported": true,

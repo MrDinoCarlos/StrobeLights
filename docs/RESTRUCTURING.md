@@ -95,6 +95,12 @@ Limitaciones del port que deben revisarse dentro del juego:
   compatible. La integración real con TRP/Nexo en 26.3 requiere sus versiones
   correspondientes; las pruebas de ZIP no equivalen a arrancar esos plugins.
 
+0.10.44 corrige además el modelo descartado durante el horneado. Se han medido
+rojo, verde y azul dentro de Minecraft vanilla 26.3/OpenGL, con transparencia
+mejorada activada y desactivada. Ver [el fallo del modelo y los resultados](CARRIER-26.3-FIX.md).
+Esto amplía la verificación original de la migración; no certifica todos los
+renderizadores ni shaderpacks externos.
+
 ## Comprobaciones y comandos
 
 ```text

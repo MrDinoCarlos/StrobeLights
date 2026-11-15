@@ -91,12 +91,25 @@ class FramePackContractTest {
         }
     }
 
-    @Test void pointCarrierPreservesOneCpuTransformedPositionForEveryPacketPixel() throws Exception {
+    @Test void carrierSurvivesModelBakingThenCollapsesToOneCpuSourcePosition() throws Exception {
         var model = JsonParser.parseString(Files.readString(PACK.resolve(
             "assets/strobelights/models/item/strobe_rgb_carrier.json"))).getAsJsonObject();
         var element = model.getAsJsonArray("elements").get(0).getAsJsonObject();
-        assertEquals(element.get("from"), element.get("to"));
-        assertEquals("[8,8,8]", element.get("from").toString());
+        var from = element.getAsJsonArray("from");
+        var to = element.getAsJsonArray("to");
+        // UnbakedCuboidGeometry discards UP faces with zero X or Z extent.
+        assertTrue(to.get(0).getAsFloat() > from.get(0).getAsFloat());
+        assertTrue(to.get(2).getAsFloat() > from.get(2).getAsFloat());
         assertTrue(element.getAsJsonObject("faces").has("up"));
+        var scale = model.getAsJsonObject("display").getAsJsonObject("head").getAsJsonArray("scale");
+        var pose = new org.joml.Matrix4f().translate(3.25f, -6.5f, -9.0f)
+            .scale(scale.get(0).getAsFloat(), scale.get(1).getAsFloat(), scale.get(2).getAsFloat())
+            .translate(-0.5f, -0.5f, -0.5f);
+        for (float x : new float[] {from.get(0).getAsFloat(), to.get(0).getAsFloat()}) {
+            for (float z : new float[] {from.get(2).getAsFloat(), to.get(2).getAsFloat()}) {
+                var position = pose.transformPosition(x / 16, to.get(1).getAsFloat() / 16, z / 16, new org.joml.Vector3f());
+                assertEquals(new org.joml.Vector3f(3.25f, -6.5f, -9.0f), position);
+            }
+        }
     }
 }

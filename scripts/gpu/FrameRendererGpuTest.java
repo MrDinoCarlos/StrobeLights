@@ -2,6 +2,7 @@ import java.nio.*;
 import java.nio.file.*;
 import java.util.*;
 import org.joml.Matrix4f;
+import com.google.gson.JsonParser;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL;
 import static org.lwjgl.opengl.GL33C.*;
@@ -17,6 +18,39 @@ class FrameRendererGpuTest {
     static final int W = 640, H = 360;
     static Path sources;
     static int nextBinding;
+    static int positionBuffer;
+
+    static void carrierVertices(float sourceZ) throws Exception {
+        var model = JsonParser.parseString(Files.readString(Path.of(
+            "compatibility/26.3/resource-pack/assets/strobelights/models/item/strobe_rgb_carrier.json"))).getAsJsonObject();
+        var element = model.getAsJsonArray("elements").get(0).getAsJsonObject();
+        var from = element.getAsJsonArray("from");
+        var to = element.getAsJsonArray("to");
+        // Minecraft's UnbakedCuboidGeometry removes an UP face with zero X/Z area.
+        // A GPU test which injects a constant attribute misses that model-baking failure.
+        if (from.get(0).getAsFloat() == to.get(0).getAsFloat()
+            || from.get(2).getAsFloat() == to.get(2).getAsFloat())
+            throw new AssertionError("Minecraft discards this zero-area carrier before the shader runs");
+        var scale = model.getAsJsonObject("display").getAsJsonObject("head").getAsJsonArray("scale");
+        var pose = new Matrix4f().translate(0, 0, sourceZ)
+            .scale(scale.get(0).getAsFloat(), scale.get(1).getAsFloat(), scale.get(2).getAsFloat())
+            .translate(-.5f, -.5f, -.5f);
+        FloatBuffer positions = BufferUtils.createFloatBuffer(12);
+        for (int[] corner : new int[][] {{0, 0}, {0, 1}, {1, 1}, {1, 0}}) {
+            float x = (corner[0] == 0 ? from : to).get(0).getAsFloat() / 16;
+            float z = (corner[1] == 0 ? from : to).get(2).getAsFloat() / 16;
+            var point = pose.transformPosition(x, to.get(1).getAsFloat() / 16, z, new org.joml.Vector3f());
+            if (point.x != 0 || point.y != 0 || point.z != sourceZ)
+                throw new AssertionError("Carrier pose must collapse every baked vertex to its source: " + point);
+            positions.put(point.x).put(point.y).put(point.z);
+        }
+        positions.flip();
+        if (positionBuffer == 0) positionBuffer = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
+        glBufferData(GL_ARRAY_BUFFER, positions, GL_STREAM_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, 12, 0L);
+        glEnableVertexAttribArray(0);
+    }
 
     static int program(String name, boolean zeroToOne) throws Exception {
         int program = glCreateProgram();
@@ -146,7 +180,7 @@ class FrameRendererGpuTest {
         // VertexConsumer.putBakedQuad applies the item's pose on the CPU.
         // The shader receives the source point in Position, not model-local .5.
         float sourceZ = stableSlot >= 0 ? -9 : -5;
-        glVertexAttrib3f(0, 0, 0, sourceZ);
+        carrierVertices(sourceZ);
         glVertexAttrib4f(1, (value >> 16 & 255) / 255f, (value >> 8 & 255) / 255f, (value & 255) / 255f, 1);
         glVertexAttrib2f(2, .5f, .5f);
         glVertexAttribI2i(3, 0, 0);
@@ -164,7 +198,7 @@ class FrameRendererGpuTest {
 
         if (mixed) {
             int blue = stablePayload(127, 0x0000FF);
-            glVertexAttrib3f(0, 0, 0, -9);
+            carrierVertices(-9);
             glVertexAttrib4f(1, (blue >> 16 & 255) / 255f, (blue >> 8 & 255) / 255f, (blue & 255) / 255f, 1);
             glVertexAttribI2i(4, 240, 240);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0L);
