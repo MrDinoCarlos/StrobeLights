@@ -12,7 +12,9 @@
 - Minecraft 26.3 uses `end_of_frame`, explicit shader locations, `#include` and
   OIT-aware item hooks. Do not reintroduce its removed transparency post chain.
 - `gradlew build` must pass the seven API test suites and `verifyExports`.
-  Export exactly three family JARs to `build/exports`, with matching embedded packs.
+  Export exactly five family JARs to `build/exports`: `1.20.X`, `1.21.X`,
+  `26.1.X`, `26.2.X` and `26.3.X`, with matching embedded packs.
+  Never combine the 26.x releases into a single `26.X` JAR.
 - Family filenames do not imply support for every patch. Add and test an explicit
   `MinecraftProfile` before claiming another server/client version.
 - GLSL compile validation is separate from an actual client visual test. Document

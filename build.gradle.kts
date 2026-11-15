@@ -25,9 +25,9 @@ val targets = listOf(
     Target("1.21.4", "1.21.4-R0.1-SNAPSHOT", 21, "1.21.X"),
     Target("1.21.10", "1.21.10-R0.1-SNAPSHOT", 21, "1.21.X"),
     Target("1.21.11", "1.21.11-R0.1-SNAPSHOT", 21, "1.21.X"),
-    Target("26.1.2", "26.1.2.build.74-stable", 25, "26.X"),
-    Target("26.2", "26.2.build.121-stable", 25, "26.X"),
-    Target("26.3", "26.3.build.252-stable", 25, "26.X")
+    Target("26.1.2", "26.1.2.build.74-stable", 25, "26.1.X"),
+    Target("26.2", "26.2.build.121-stable", 25, "26.2.X"),
+    Target("26.3", "26.3.build.252-stable", 25, "26.3.X")
 )
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
@@ -151,7 +151,7 @@ targets.forEach { target ->
         jvmArgs("-XX:+EnableDynamicAgentLoading")
     }
     testTasks.add(testTask)
-    if (target.minecraft in listOf("1.20.1", "1.21.4", "26.1.2")) {
+    if (target == targets.first { it.family == target.family }) {
         val family = targets.filter { it.family == target.family }
         val jarTask = if (defaultTarget) tasks.named<Jar>("jar") else tasks.register<Jar>("jar${target.key}")
         jarTask.configure {
@@ -201,7 +201,7 @@ val verifyExports = tasks.register("verifyExports") {
     inputs.files(familyJars.map { it.flatMap { task -> task.archiveFile } })
     doLast {
         val exports = layout.buildDirectory.dir("exports").get().asFile.listFiles()!!.filter { it.extension == "jar" }
-        check(exports.size == 3) { "Expected exactly three family JARs" }
+        check(exports.size == targets.map { it.family }.distinct().size) { "Expected one JAR per Minecraft family" }
         targets.groupBy { it.family }.forEach { (family, members) ->
             val jar = exports.single { it.name.endsWith("+mc.v.$family.jar") }
             ZipFile(jar).use { zip ->

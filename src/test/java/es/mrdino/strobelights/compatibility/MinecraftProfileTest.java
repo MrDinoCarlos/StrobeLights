@@ -11,7 +11,9 @@ class MinecraftProfileTest {
             assertTrue(profile.supportsRgb());
         }
         assertEquals("1.21.X", MinecraftProfile.forVersion("1.21.11").family());
-        assertEquals("26.X", MinecraftProfile.forVersion("26.3").family());
+        assertEquals("26.1.X", MinecraftProfile.forVersion("26.1.2").family());
+        assertEquals("26.2.X", MinecraftProfile.forVersion("26.2").family());
+        assertEquals("26.3.X", MinecraftProfile.forVersion("26.3").family());
     }
 
     @Test void rejectsUntestedVersionsInsteadOfSendingTheWrongShaders() {

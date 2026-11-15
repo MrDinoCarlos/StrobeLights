@@ -17,7 +17,9 @@ El desarrollo continúa en `main`, desde este proyecto unificado.
 | --- | --- | --- | --- |
 | `1.20.X` | 1.20.1 | 17 | 1.20 |
 | `1.21.X` | 1.21.4, 1.21.10, 1.21.11 | 21 | 1.21.4 |
-| `26.X` | 26.1.2, 26.2, 26.3 | 25 | 26.1 |
+| `26.1.X` | 26.1.2 | 25 | 26.1 |
+| `26.2.X` | 26.2 | 25 | 26.2 |
+| `26.3.X` | 26.3 | 25 | 26.3 |
 
 El sufijo agrupa los archivos de distribución. No implica compatibilidad con
 parches que no estaban mantenidos, como 1.20.6 o 1.21.5, ni con futuras versiones.
@@ -91,9 +93,9 @@ Limitaciones del port que deben revisarse dentro del juego:
 gradlew.bat clean build
 ```
 
-Ejecuta las suites de siete APIs y comprueba que los tres JAR contienen
+Ejecuta las suites de siete APIs y comprueba que los cinco JAR contienen
 únicamente los ZIP de su familia, el descriptor correcto y bytecode de Java
-17/21/25. `build/exports` se sincroniza: solo conserva los tres exports actuales.
+17/21/25. `build/exports` se sincroniza: solo conserva los cinco exports actuales.
 No instala nada en un servidor ni crea una release pública.
 
 ```text

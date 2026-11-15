@@ -6,9 +6,9 @@ public enum MinecraftProfile {
     MC_1_21_4("1.21.4", "1.21.X", true, false),
     MC_1_21_10("1.21.10", "1.21.X", true, false),
     MC_1_21_11("1.21.11", "1.21.X", true, true),
-    MC_26_1_2("26.1.2", "26.X", true, false),
-    MC_26_2("26.2", "26.X", true, false),
-    MC_26_3("26.3", "26.X", true, false);
+    MC_26_1_2("26.1.2", "26.1.X", true, false),
+    MC_26_2("26.2", "26.2.X", true, false),
+    MC_26_3("26.3", "26.3.X", true, false);
 
     private final String version;
     private final String family;

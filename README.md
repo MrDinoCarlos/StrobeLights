@@ -8,7 +8,9 @@ matching pack from the server version at startup.
 | --- | --- | --- |
 | `StrobeLights-0.10.41+mc.v.1.20.X.jar` | 1.20.1 | 17 |
 | `StrobeLights-0.10.41+mc.v.1.21.X.jar` | 1.21.4, 1.21.10, 1.21.11 | 21 |
-| `StrobeLights-0.10.41+mc.v.26.X.jar` | 26.1.2, 26.2, 26.3 | 25 |
+| `StrobeLights-0.10.41+mc.v.26.1.X.jar` | 26.1.2 | 25 |
+| `StrobeLights-0.10.41+mc.v.26.2.X.jar` | 26.2 | 25 |
+| `StrobeLights-0.10.41+mc.v.26.3.X.jar` | 26.3 | 25 |
 
 `X` groups exports; it does not claim untested patch compatibility. Other
 versions are rejected explicitly rather than receiving an incompatible pack.
@@ -440,13 +442,15 @@ Install JDKs 17, 21 and 25. Run the wrapper with Java 17 or newer:
 
 On Windows use `gradlew.bat clean build`. This compiles and tests all seven
 Paper APIs, checks family descriptors/bytecode/embedded packs and exports
-exactly three plugin JARs to **`build/exports/`**. The export directory is synced,
-so another plugin release replaces the previous three files.
+exactly five plugin JARs to **`build/exports/`**. The export directory is synced,
+so another plugin release replaces the previous five files.
 
 ```text
 StrobeLights-0.10.41+mc.v.1.20.X.jar
 StrobeLights-0.10.41+mc.v.1.21.X.jar
-StrobeLights-0.10.41+mc.v.26.X.jar
+StrobeLights-0.10.41+mc.v.26.1.X.jar
+StrobeLights-0.10.41+mc.v.26.2.X.jar
+StrobeLights-0.10.41+mc.v.26.3.X.jar
 ```
 
 Standalone ZIPs are optional: `./gradlew exportResourcePack` writes them to
@@ -454,7 +458,7 @@ Standalone ZIPs are optional: `./gradlew exportResourcePack` writes them to
 Build intermediates in `build/intermediates/` are not release downloads.
 
 GitHub Actions runs all API suites plus the separate 26.3 GLSL validation job.
-The `StrobeLights-family-jars` artifact contains only the three family JARs.
+The `StrobeLights-family-jars` artifact contains only the five family JARs.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
