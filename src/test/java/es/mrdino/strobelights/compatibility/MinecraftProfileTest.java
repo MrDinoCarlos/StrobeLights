@@ -4,6 +4,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 class MinecraftProfileTest {
+    @Test void frameRendererAdvertisesStableSourcesWithoutConsultingTrp() {
+        var plugin = org.mockito.Mockito.mock(es.mrdino.strobelights.StrobeLightsPlugin.class);
+        org.mockito.Mockito.when(plugin.minecraftProfile()).thenReturn(MinecraftProfile.MC_26_3);
+        org.mockito.Mockito.doCallRealMethod().when(plugin).stableSourceProtocol();
+        assertEquals(1, plugin.stableSourceProtocol());
+        org.mockito.Mockito.verify(plugin, org.mockito.Mockito.never()).getServer();
+    }
+
     @Test void selectsEachMaintainedPackWithoutCrossingAnAbiBoundary() {
         for (MinecraftProfile profile : MinecraftProfile.values()) {
             assertSame(profile, MinecraftProfile.forVersion(profile.version()));

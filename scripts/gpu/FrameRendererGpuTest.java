@@ -89,16 +89,22 @@ class FrameRendererGpuTest {
         return new int[] {bytes.get(0) & 255, bytes.get(1) & 255, bytes.get(2) & 255};
     }
 
-    static int packetWord(int index) {
-        int[] rgb = pixel(index % 5, index / 5);
+    static int packetWord(int slot, int index) {
+        int[] rgb = pixel((slot % 64) * 5 + index % 5, (slot / 64) * 7 + index / 5);
         return Math.round(rgb[0] / 17f) | Math.round(rgb[1] / 17f) << 4 | Math.round(rgb[2] / 17f) << 8;
     }
 
-    static float packetFloat(int first) {
-        return Float.intBitsToFloat(packetWord(first) | packetWord(first + 1) << 12 | (packetWord(first + 2) & 255) << 24);
+    static float packetFloat(int slot, int first) {
+        return Float.intBitsToFloat(packetWord(slot, first) | packetWord(slot, first + 1) << 12 | (packetWord(slot, first + 2) & 255) << 24);
     }
 
-    static void verify(boolean zeroToOne, int rgb, boolean sky) throws Exception {
+    static int stablePayload(int slot, int rgb) {
+        int[] tags = {8, 9, 11, 12, 14, 15, 6, 7};
+        return tags[slot / 16] << 20 | 15 << 16 | (slot & 15) << 12
+            | (rgb >> 20 & 15) << 8 | (rgb >> 12 & 15) << 4 | (rgb >> 4 & 15);
+    }
+
+    static void verify(boolean zeroToOne, int rgb, boolean sky, int stableSlot, boolean mixed) throws Exception {
         nextBinding = 0;
         glClipControl(GL_LOWER_LEFT, zeroToOne ? GL_ZERO_TO_ONE : GL_NEGATIVE_ONE_TO_ONE);
         Matrix4f projection = new Matrix4f().perspective((float)Math.toRadians(70), (float)W / H, 512f, 0.05f, zeroToOne);
@@ -135,37 +141,53 @@ class FrameRendererGpuTest {
         sampler(capture, "Sampler0", 0, carrier);
         sampler(capture, "Sampler1", 0, carrier);
         sampler(capture, "Sampler2", 0, carrier);
-        int value = 0xAF0005 | ((rgb >> 20 & 15) << 12) | ((rgb >> 12 & 15) << 8) | ((rgb >> 4 & 15) << 4);
+        int value = stableSlot >= 0 ? stablePayload(stableSlot, rgb)
+            : 0xAF0005 | ((rgb >> 20 & 15) << 12) | ((rgb >> 12 & 15) << 8) | ((rgb >> 4 & 15) << 4);
         // VertexConsumer.putBakedQuad applies the item's pose on the CPU.
         // The shader receives the source point in Position, not model-local .5.
-        glVertexAttrib3f(0, 0, 0, -5);
+        float sourceZ = stableSlot >= 0 ? -9 : -5;
+        glVertexAttrib3f(0, 0, 0, sourceZ);
         glVertexAttrib4f(1, (value >> 16 & 255) / 255f, (value >> 8 & 255) / 255f, (value & 255) / 255f, 1);
         glVertexAttrib2f(2, .5f, .5f);
         glVertexAttribI2i(3, 0, 0);
-        glVertexAttribI2i(4, 0, 0); // Private viewer carrier slot zero.
+        glVertexAttribI2i(4, stableSlot < 0 ? 0 : 240, stableSlot < 0 ? 0 : 240); // XmasLights uses full brightness; its slot is in the payload.
         glVertexAttrib3f(6, 0, 1, 0);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0L);
-        int[] header = pixel(0, 0);
+        int packetSlot = stableSlot >= 0 ? 64 + stableSlot : 0;
+        int[] header = pixel(packetSlot % 64 * 5, packetSlot / 64 * 7);
         if (header[0] != 51 || header[1] != 187 || header[2] != 119) {
             throw new AssertionError("Light packet occluded/missing with reversed-Z " + zeroToOne + ": " + Arrays.toString(header));
         }
-        float x = packetFloat(3), y = packetFloat(6), z = packetFloat(9);
-        if (Math.abs(x) > .00001 || Math.abs(y) > .00001 || Math.abs(z + 5) > .00001)
-            throw new AssertionError("Item pose lost: expected [0,0,-5], got [" + x + "," + y + "," + z + "]");
+        float x = packetFloat(packetSlot, 3), y = packetFloat(packetSlot, 6), z = packetFloat(packetSlot, 9);
+        if (Math.abs(x) > .00001 || Math.abs(y) > .00001 || Math.abs(z - sourceZ) > .00001)
+            throw new AssertionError("Item pose lost: expected [0,0," + sourceZ + "], got [" + x + "," + y + "," + z + "]");
 
+        if (mixed) {
+            int blue = stablePayload(127, 0x0000FF);
+            glVertexAttrib3f(0, 0, 0, -9);
+            glVertexAttrib4f(1, (blue >> 16 & 255) / 255f, (blue >> 8 & 255) / 255f, (blue & 255) / 255f, 1);
+            glVertexAttribI2i(4, 240, 240);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0L);
+            if (packetWord(0, 0) != 0x7B3 || packetWord(191, 0) != 0x7B3)
+                throw new AssertionError("Native and XmasLights packets collided");
+        }
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         int lighting = program("frame_lights", zeroToOne);
         int[] lights = new int[8];
-        for (int batch = 0; batch < 8; batch++) {
-            lights[batch] = texture(GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, null, W, H);
-            framebuffer(lights[batch], 0);
+        int integration = 0, previous = scene;
+        for (int batch = 0; batch < 24; batch++) {
+            int target = texture(GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, null, W, H);
+            if (batch < 8) lights[batch] = target; else integration = target;
+            framebuffer(target, 0);
             glUseProgram(lighting);
             sampler(lighting, "SceneSampler", 0, scene);
             sampler(lighting, "DepthSampler", 1, depth);
+            sampler(lighting, "PreviousSampler", 2, batch == 8 ? scene : previous);
             int first = batch * 8;
             block(lighting, "FrameConfig", b -> b.putInt(0, first));
             glDrawArrays(GL_TRIANGLES, 0, 3);
+            previous = target;
         }
         int output = texture(GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, null, W, H);
         framebuffer(output, 0);
@@ -173,9 +195,10 @@ class FrameRendererGpuTest {
         glUseProgram(compose);
         sampler(compose, "SceneSampler", 0, scene);
         for (int i = 0; i < 8; i++) sampler(compose, "Light" + i + "Sampler", i + 1, lights[i]);
+        sampler(compose, "IntegrationSampler", 9, integration);
         glDrawArrays(GL_TRIANGLES, 0, 3);
         int[] result = pixel(W / 2, H / 2);
-        int[] expected = {rgb >> 16 & 255, rgb >> 8 & 255, rgb & 255};
+        int[] expected = {rgb >> 16 & 255, rgb >> 8 & 255, mixed ? 255 : rgb & 255};
         for (int i = 0; i < 3; i++) {
             if (sky) {
                 if (Math.abs(result[i] - 31) > 1) throw new AssertionError("Sky must remain unlit: " + Arrays.toString(result));
@@ -184,9 +207,15 @@ class FrameRendererGpuTest {
             if (expected[i] > 0 && result[i] < 80 || expected[i] == 0 && result[i] > 40)
                 throw new AssertionError("Wrong RGB for #" + Integer.toHexString(rgb) + ": " + Arrays.toString(result));
         }
+        if (stableSlot >= 0) {
+            int[] outside = pixel(W - 1, H - 1);
+            for (int channel : outside) if (Math.abs(channel - 31) > 1)
+                throw new AssertionError("XmasLights radius leaked outside eight blocks: " + Arrays.toString(outside));
+        }
         if (glGetError() != GL_NO_ERROR) throw new AssertionError("OpenGL error");
         System.out.println("GPU PASS reversed-Z " + (zeroToOne ? "[0,1]" : "[-1,1]")
-            + (sky ? " sky" : " #" + Integer.toHexString(rgb)) + " -> " + Arrays.toString(result));
+            + (sky ? " sky" : " #" + Integer.toHexString(rgb))
+            + (stableSlot >= 0 ? " XmasLights slot=" + stableSlot : mixed ? " native+XmasLights" : " native") + " -> " + Arrays.toString(result));
     }
 
     public static void main(String[] args) throws Exception {
@@ -209,8 +238,11 @@ class FrameRendererGpuTest {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, new int[] {0, 1, 2, 2, 3, 0}, GL_STATIC_DRAW);
             for (boolean zeroToOne : new boolean[] {false, true}) {
-                for (int rgb : new int[] {0xFF00FF, 0xFF0000, 0x00FF00, 0x0000FF}) verify(zeroToOne, rgb, false);
-                verify(zeroToOne, 0xFF00FF, true);
+                for (int rgb : new int[] {0xFF00FF, 0xFF0000, 0x00FF00, 0x0000FF}) verify(zeroToOne, rgb, false, -1, false);
+                verify(zeroToOne, 0xFF00FF, true, -1, false);
+                for (int slot : new int[] {0, 15, 16, 32, 48, 63, 64, 80, 96, 127}) verify(zeroToOne, 0xFF00FF, false, slot, false);
+                for (int rgb : new int[] {0xFF0000, 0x00FF00, 0x0000FF}) verify(zeroToOne, rgb, false, 127, false);
+                verify(zeroToOne, 0xFF0000, false, -1, true);
             }
         } finally {
             SDL_GL_DestroyContext(context);

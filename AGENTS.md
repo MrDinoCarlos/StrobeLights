@@ -25,3 +25,9 @@
   This hidden OpenGL regression is not a full Minecraft/mod compatibility test.
 - The 26.3 point carrier relies on CPU-transformed `Position`. Keep all four
   model vertices coincident; a literal model-local center loses the real source.
+- Keep 26.3 native slots 0..63 separate from stable integration slots 64..191.
+  XmasLights supplies its slot in the tint payload, not display brightness.
+  Preserve the external `slots3x3_depth_v1` input ABI while transporting it through
+  frame packets. GPU checks must exercise all eight integration banks and native
+  plus integration sources together; never fix availability by advertising an
+  input ABI that the shaders cannot decode.

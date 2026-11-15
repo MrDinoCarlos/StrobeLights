@@ -9,10 +9,27 @@ import org.junit.jupiter.api.Test;
 class FramePackContractTest {
     private static final Path PACK = Path.of("resource-pack");
 
+    @Test void advertisesTheStableXmasLightsAbiAndItsIndependentCapacity() throws Exception {
+        var contract = JsonParser.parseString(Files.readString(PACK.resolve(
+            "assets/strobelights/strobelights-integration.json"))).getAsJsonObject();
+        assertEquals("slots3x3_depth_v1", contract.get("stable_source_protocol").getAsString());
+        assertEquals("frame_slots_5x7_v1", contract.get("stable_source_transport").getAsString());
+        assertEquals(128, contract.get("max_integration_sources").getAsInt());
+        assertEquals(192, contract.get("max_frame_packets").getAsInt());
+        var chain = JsonParser.parseString(Files.readString(PACK.resolve(
+            "assets/minecraft/post_effect/end_of_frame.json"))).getAsJsonObject();
+        for (int i = 0; i < 24; i++) {
+            var firstSlot = chain.getAsJsonArray("passes").get(i).getAsJsonObject()
+                .getAsJsonObject("uniforms").getAsJsonArray("FrameConfig").get(0)
+                .getAsJsonObject().get("value").getAsInt();
+            assertEquals(i * 8, firstSlot);
+        }
+    }
+
     @Test void alwaysOnChainUsesMainDepthAndDistinctReadWriteTargets() throws Exception {
         var chain = JsonParser.parseString(Files.readString(PACK.resolve("assets/minecraft/post_effect/end_of_frame.json"))).getAsJsonObject();
         assertFalse(Files.exists(PACK.resolve("assets/minecraft/post_effect/transparency.json")));
-        assertEquals(10, chain.getAsJsonArray("passes").size());
+        assertEquals(26, chain.getAsJsonArray("passes").size());
         for (var entry : chain.getAsJsonArray("passes")) {
             var pass = entry.getAsJsonObject();
             var output = pass.get("output").getAsString();

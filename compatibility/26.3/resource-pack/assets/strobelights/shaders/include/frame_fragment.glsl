@@ -8,7 +8,7 @@ layout(location = 12) flat in vec4 strobeFrameProjection;
 layout(location = 13) flat in vec2 strobeFrameProjectionOffset;
 
 vec3 strobeFramePixel() {
-    ivec2 pixel = ivec2(gl_FragCoord.xy) - ivec2(strobeFrameSlot * 5, 0);
+    ivec2 pixel = ivec2(gl_FragCoord.xy) - strobePacketOrigin(strobeFrameSlot);
     int index = pixel.y * 5 + pixel.x;
     if (index == 0) return strobeWord(0x7B3u);
     if (index == 1) return strobeWord(strobeFrameValue & 4095u);

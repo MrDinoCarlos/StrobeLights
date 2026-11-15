@@ -4,6 +4,8 @@
 #include <strobelights:frame_codec.glsl>
 
 uniform sampler2D DepthSampler;
+uniform sampler2D PreviousSampler;
+layout(std140) uniform FrameConfig { int FirstSlot; };
 layout(location = 0) in vec2 texCoord;
 layout(location = 1) flat in vec4 frameLights[8];
 layout(location = 9) flat in vec4 frameProjection;
@@ -44,11 +46,14 @@ void main() {
                 flash = strength;
                 flashColor = vec3(float((value >> 9u) & 15u), float((value >> 5u) & 15u), float((value >> 1u) & 15u)) / 15.0;
             }
-        } else if (strobeSource(value) && depth > 0.0) {
-            vec3 color = vec3(float((value >> 12u) & 15u), float((value >> 8u) & 15u), float((value >> 4u) & 15u)) / 15.0;
+        } else if ((strobeSource(value) || strobeIntegration(value)) && depth > 0.0) {
+            bool integration = strobeIntegration(value);
+            uint channels = integration ? value : value >> 4u;
+            vec3 color = vec3(float((channels >> 8u) & 15u), float((channels >> 4u) & 15u), float(channels & 15u)) / 15.0;
             float energy = max(max(color.r, color.g), color.b);
             float size = float(((value >> 16u) & 15u) + 1u) * 0.25;
-            float radius = mix(2.5, 18.0, sqrt(energy)) * size;
+            float radius = integration ? 0.25 * pow(32.0, float((value >> 16u) & 15u) / 15.0)
+                : mix(2.5, 18.0, sqrt(energy)) * size;
             float separation = distance(surface, frameLights[i].xyz);
             if (energy > 0.0 && separation < radius) {
                 float falloff = pow(max(0.0, 1.0 - separation / radius), 1.4);
@@ -59,5 +64,11 @@ void main() {
     }
     // RGB occupies [0, 0.5]; alpha is the strongest directional camera flash.
     // Composition uses its color from the corresponding live packet.
-    fragColor = vec4(clamp(lightSum * 0.5, 0.0, 1.0), flash);
+    if (FirstSlot >= STROBE_NATIVE_SLOTS) {
+        vec3 previous = FirstSlot == STROBE_NATIVE_SLOTS ? vec3(0.0)
+            : strobeDecodeAccumulation(texture(PreviousSampler, texCoord));
+        fragColor = strobeEncodeAccumulation(previous + lightSum);
+    } else {
+        fragColor = vec4(clamp(lightSum * 0.5, 0.0, 1.0), flash);
+    }
 }

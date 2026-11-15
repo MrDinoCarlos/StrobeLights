@@ -63,24 +63,32 @@ explícitas y añadió el efecto permanente `end_of_frame`. Por eso no basta con
 cambiar `api-version` o `pack.mcmeta`.
 
 El port incorpora captura en `core/item`, respetando el código vanilla para
-objetos normales y las fases OIT. Cada espectador dispone de 64 slots sin
+objetos normales y las fases OIT. Cada espectador dispone de 64 slots nativos sin
 colisiones; los tokens de sombras también ocupan uno. Los slots se reutilizan
 cuando desaparecen las entidades y se limpian al desconectar.
 
+Desde 0.10.43 hay otros 128 slots independientes para la ABI estable de
+XmasLights, aceptada por XmasLights 2.9.2. Su payload determina el slot; no usa
+el brillo del display ni consume el presupuesto nativo. Ver
+[la corrección de integración](XMASLIGHTS-26.3.md).
+
 Los paquetes transportan posición y proyección como bits IEEE-754, además del
 RGB, tamaño y flash. El postprocesado reconstruye la posición en espacio de
-cámara a partir de la profundidad real. Ocho lotes de ocho carriers calculan
-la iluminación a 640×360 y la composición añade el flash direccional existente.
+cámara a partir de la profundidad real. Ocho lotes nativos y dieciséis de
+integración calculan la iluminación a 640×360; la integración acumula HDR en
+dos targets alternos. La composición añade el flash direccional existente.
 No depende de activar Fabulous en 26.3. La preferencia de TRP puede seguir
 deshabilitando RGB para un usuario.
 
 Limitaciones del port que deben revisarse dentro del juego:
 
 - Estado experimental hasta validar aspecto y rendimiento en un cliente 26.3.
-- Los siete píxeles inferiores de cada slot activo se reconstruyen desde la fila
-  contigua; puede perderse detalle fino en ese borde, antes de dibujar el HUD.
-- Resolución mínima del framebuffer: 320×8. Capacidad: 64 carriers por usuario,
-  incluidos tokens de sombras y flashes; los excedentes conservan el fallback vanilla.
+- Los slots activos ocupan hasta tres filas de siete píxeles y se reconstruyen
+  desde la siguiente fila sin transporte; puede perderse detalle fino en ese
+  borde, antes de dibujar el HUD.
+- Resolución mínima del framebuffer: 320×8 para los 64 carriers nativos,
+  incluidos tokens de sombras y flashes; 320×22 para los 128 slots de integración.
+  Los excedentes nativos conservan el fallback vanilla.
 - Las sombras son aproximaciones de pantalla y la nueva composición necesita
   pruebas visuales de agua, cristal, zoom, movimiento y luces fuera de pantalla.
 - Los packs que sustituyan `end_of_frame` o `core/item` necesitan una composición
@@ -117,5 +125,6 @@ de packs anteriores no encontró diferencias fuera de la revisión de metadatos 
 de espacios finales;
 1.20.1 añade los mismos 1.025 archivos que generaba su build original.
 El propio `PostChainConfig` del cliente oficial 26.3 también aceptó el grafo
-de diez pases. Esto no certifica el renderizado real de un cliente ni una instalación de TRP,
+de diez pases inicial. La integración de 0.10.43 amplía el grafo a 26 pases.
+Esto no certifica el renderizado real de un cliente ni una instalación de TRP,
 Nexo u OptiFine. No se ha realizado una prueba visual en Minecraft 26.3.

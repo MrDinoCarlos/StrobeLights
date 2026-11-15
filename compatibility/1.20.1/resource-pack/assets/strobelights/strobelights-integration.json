@@ -1,5 +1,5 @@
 {
-  "version": "0.10.42",
+  "version": "0.10.43",
   "render_pipeline": "light_painter_rgb",
   "marker_protocol": "typed_guarded_5px_v5"
 }

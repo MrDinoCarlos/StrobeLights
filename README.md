@@ -6,18 +6,23 @@ matching pack from the server version at startup.
 
 | Export | Maintained server/client versions | Java |
 | --- | --- | --- |
-| `StrobeLights-0.10.42+mc.v.1.20.X.jar` | 1.20.1 | 17 |
-| `StrobeLights-0.10.42+mc.v.1.21.X.jar` | 1.21.4, 1.21.10, 1.21.11 | 21 |
-| `StrobeLights-0.10.42+mc.v.26.1.X.jar` | 26.1.2 | 25 |
-| `StrobeLights-0.10.42+mc.v.26.2.X.jar` | 26.2 | 25 |
-| `StrobeLights-0.10.42+mc.v.26.3.X.jar` | 26.3 | 25 |
+| `StrobeLights-0.10.43+mc.v.1.20.X.jar` | 1.20.1 | 17 |
+| `StrobeLights-0.10.43+mc.v.1.21.X.jar` | 1.21.4, 1.21.10, 1.21.11 | 21 |
+| `StrobeLights-0.10.43+mc.v.26.1.X.jar` | 26.1.2 | 25 |
+| `StrobeLights-0.10.43+mc.v.26.2.X.jar` | 26.2 | 25 |
+| `StrobeLights-0.10.43+mc.v.26.3.X.jar` | 26.3 | 25 |
 
 `X` groups exports; it does not claim untested patch compatibility. Other
 versions are rejected explicitly rather than receiving an incompatible pack.
 Client versions must match the server's resource-pack ABI. ViaVersion does not
 make shader packs interchangeable.
 
-Version **0.10.42 fixes missing RGB on 26.3**: its world renderer uses reversed-Z
+Version **0.10.43 adds XmasLights RGB to the 26.3 renderer**. Update both
+StrobeLights and **XmasLights 2.9.2**: older XmasLights rejects newer StrobeLights
+versions, and the earlier 26.3 pack lacked the stable-source input. See
+[the integration fix and checks](docs/XMASLIGHTS-26.3.md).
+
+It also retains the 0.10.42 correction for missing native RGB: the world renderer uses reversed-Z
 (depth cleared to zero, `GREATER` comparison). The carrier now writes near depth
 one and the lighting treats zero as sky. A point carrier preserves the CPU-baked
 source position instead of incorrectly reading a model-local center. An offscreen GPU regression executes
@@ -29,9 +34,11 @@ Minecraft **26.3 has a separate RGB renderer** using the always-on
 `minecraft:end_of_frame` effect and OIT-aware item shaders. It does not use the
 removed Fabulous transparency chain. This port is **experimental pending an
 actual client visual/performance test**, even when Java and GLSL checks pass.
-It supports 64 private carriers per viewer (shadow tokens also consume slots),
-a minimum 320x8 framebuffer and eight 640x360 lighting batches. Its seven-pixel
-transport strip is restored from the adjacent scene row before HUD composition;
+It supports 64 native carriers per viewer (shadow tokens also consume slots)
+and 128 independent integration sources. Eight native and sixteen integration
+batches run at 640x360. Transport uses up to three seven-pixel rows; the minimum
+framebuffer is 320x8 for native slots, or 320x22 for every integration slot.
+Active transport pixels are restored from the next scene row before HUD composition;
 fine scene detail at that edge may therefore differ. Other packs overriding
 `end_of_frame` or the item shaders need a compatible combined pack. TRP/Nexo
 runtime integration on 26.3 still needs validation with matching plugin versions.
@@ -454,11 +461,11 @@ exactly five plugin JARs to **`build/exports/`**. The export directory is synced
 so another plugin release replaces the previous five files.
 
 ```text
-StrobeLights-0.10.42+mc.v.1.20.X.jar
-StrobeLights-0.10.42+mc.v.1.21.X.jar
-StrobeLights-0.10.42+mc.v.26.1.X.jar
-StrobeLights-0.10.42+mc.v.26.2.X.jar
-StrobeLights-0.10.42+mc.v.26.3.X.jar
+StrobeLights-0.10.43+mc.v.1.20.X.jar
+StrobeLights-0.10.43+mc.v.1.21.X.jar
+StrobeLights-0.10.43+mc.v.26.1.X.jar
+StrobeLights-0.10.43+mc.v.26.2.X.jar
+StrobeLights-0.10.43+mc.v.26.3.X.jar
 ```
 
 Standalone ZIPs are optional: `./gradlew exportResourcePack` writes them to

@@ -21,7 +21,7 @@ void main() {
         frameLights[i] = vec4(0.0);
         if (!strobePacketValid(SceneSampler, slot)) continue;
         uint value = strobeReadPayload(SceneSampler, slot);
-        if ((!strobeSource(value) && !strobeFlash(value)) || strobeShadow(value)) continue;
+        if ((!strobeSource(value) && !strobeFlash(value) && !strobeIntegration(value)) || strobeShadow(value)) continue;
         vec3 position = strobeReadPosition(SceneSampler, slot);
         if (any(isnan(position)) || any(isinf(position)) || any(greaterThan(abs(position), vec3(4096.0)))) continue;
         bool occlusion = false;

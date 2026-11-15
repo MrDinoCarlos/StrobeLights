@@ -1,8 +1,13 @@
 {
-  "version": "0.10.42",
+  "version": "0.10.43",
   "render_pipeline": "end_of_frame_rgb",
   "marker_protocol": "frame_slots_5x7_v1",
   "rgb_supported": true,
   "minecraft": "26.3",
-  "max_viewer_carriers": 64
+  "max_viewer_carriers": 64,
+  "stable_source_protocol": "slots3x3_depth_v1",
+  "stable_source_transport": "frame_slots_5x7_v1",
+  "stable_source_coordinate_limit": 1024,
+  "max_integration_sources": 128,
+  "max_frame_packets": 192
 }

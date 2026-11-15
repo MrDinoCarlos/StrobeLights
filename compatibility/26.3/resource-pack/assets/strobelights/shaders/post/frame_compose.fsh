@@ -12,6 +12,7 @@ uniform sampler2D Light4Sampler;
 uniform sampler2D Light5Sampler;
 uniform sampler2D Light6Sampler;
 uniform sampler2D Light7Sampler;
+uniform sampler2D IntegrationSampler;
 layout(location = 0) in vec2 texCoord;
 layout(location = 1) flat in vec4 frameFlash;
 layout(location = 0) out vec4 fragColor;
@@ -21,12 +22,20 @@ void main() {
     ivec2 pixel = clamp(ivec2(texCoord * vec2(extent)), ivec2(0), extent - 1);
     // Restore only live transport pixels at the lower edge, before the HUD.
     // The seven-pixel lane is inpainted from its immediately adjacent scene row.
-    if (pixel.y < 7 && pixel.x < 320 && strobePacketValid(SceneSampler, pixel.x / 5)) pixel.y = 7;
+    if (pixel.y < 21 && pixel.x < 320) {
+        int slot = (pixel.y / 7) * STROBE_NATIVE_SLOTS + pixel.x / 5;
+        if (strobePacketValid(SceneSampler, slot)) {
+            int row = pixel.y / 7 + 1;
+            while (row < 3 && strobePacketValid(SceneSampler, row * STROBE_NATIVE_SLOTS + pixel.x / 5)) row++;
+            pixel.y = row * 7;
+        }
+    }
     vec3 base = texelFetch(SceneSampler, pixel, 0).rgb;
     vec3 energy = 2.0 * (texture(Light0Sampler, texCoord).rgb + texture(Light1Sampler, texCoord).rgb
         + texture(Light2Sampler, texCoord).rgb + texture(Light3Sampler, texCoord).rgb
         + texture(Light4Sampler, texCoord).rgb + texture(Light5Sampler, texCoord).rgb
-        + texture(Light6Sampler, texCoord).rgb + texture(Light7Sampler, texCoord).rgb);
+        + texture(Light6Sampler, texCoord).rgb + texture(Light7Sampler, texCoord).rgb)
+        + strobeDecodeAccumulation(texture(IntegrationSampler, texCoord));
     vec3 illuminated = base * (vec3(1.0) + energy * 0.65) + energy * 0.22;
     float power = max(max(energy.r, energy.g), energy.b);
     if (power > 0.001) {

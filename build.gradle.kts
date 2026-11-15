@@ -5,7 +5,7 @@ import org.gradle.jvm.toolchain.JavaLanguageVersion
 plugins { id("java") }
 
 group = "es.mrdino"
-version = "0.10.42"
+version = "0.10.43"
 
 repositories {
     mavenCentral()

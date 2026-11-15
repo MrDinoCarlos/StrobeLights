@@ -97,6 +97,7 @@ public final class StrobeLightsPlugin extends JavaPlugin {
 
     /** No strobes are registered by integrations using this optional shader capability. */
     public int stableSourceProtocol() {
+        if (minecraftProfile() == MinecraftProfile.MC_26_3) return 1;
         var trp = getServer().getPluginManager().getPlugin("TRPServerEdition");
         if (minecraftProfile != null && (!minecraftProfile.supportsRgb()
             || minecraftProfile != MinecraftProfile.MC_1_21_4)) return 0;
