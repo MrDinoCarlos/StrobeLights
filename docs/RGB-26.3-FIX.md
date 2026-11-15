@@ -14,6 +14,13 @@ La corrección coloca los paquetes en profundidad **uno**, tanto con clip
 cero y conserva la reconstrucción usando los coeficientes reales de proyección.
 Los pipelines de las versiones anteriores no cambian.
 
+También se corrigió la posición: `VertexConsumer.putBakedQuad` aplica el pose
+del item en la CPU. El shader debe usar `Position`, no el centro literal
+`[0.5,0.5,0.5]`. El modelo técnico tiene cuatro vértices coincidentes en `[8,8,8]`;
+Minecraft conserva ese quad y el vertex shader lo expande en su slot de pantalla.
+Así todos los fragmentos transportan exactamente la misma posición, incluso
+entre triángulos, sin mezclar bits de vértices distintos.
+
 ## Comprobación ejecutable
 
 `scripts/gpu/FrameRendererGpuTest.java` crea un contexto OpenGL oculto y ejecuta
@@ -26,6 +33,9 @@ el gris del terreno `[31,31,31]`. Con la corrección, el magenta produce
 `[104,16,104]`; rojo, verde y azul aumentan únicamente el canal correspondiente.
 También se comprueba que el cielo no recibe iluminación. Se ejecutan los cinco
 casos en ambas convenciones de clip.
+La prueba verifica además la posición recibida: una fuente en `[0,0,-5]` debe
+conservar esas coordenadas. Detectó el segundo error porque el transporte
+anterior devolvía `[0.5,0.5,0.5]` aunque sus colores numéricos parecieran correctos.
 
 ```text
 python scripts/validate_26_3_shaders.py --vanilla-dir build/vanilla-26.3 --download-vanilla --glslang <validador>

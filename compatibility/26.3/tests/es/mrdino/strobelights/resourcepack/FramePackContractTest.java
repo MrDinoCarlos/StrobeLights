@@ -73,4 +73,13 @@ class FramePackContractTest {
             assertEquals(0xFF25D353, resized.getRGB(size / 2, size / 2));
         }
     }
+
+    @Test void pointCarrierPreservesOneCpuTransformedPositionForEveryPacketPixel() throws Exception {
+        var model = JsonParser.parseString(Files.readString(PACK.resolve(
+            "assets/strobelights/models/item/strobe_rgb_carrier.json"))).getAsJsonObject();
+        var element = model.getAsJsonArray("elements").get(0).getAsJsonObject();
+        assertEquals(element.get("from"), element.get("to"));
+        assertEquals("[8,8,8]", element.get("from").toString());
+        assertTrue(element.getAsJsonObject("faces").has("up"));
+    }
 }

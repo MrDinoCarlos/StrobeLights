@@ -23,3 +23,5 @@
 - The 26.3 renderer uses reversed-Z (clear depth zero, GREATER, near depth one).
   After GLSL expansion, run `gpuTest263` to check real capture/composition pixels.
   This hidden OpenGL regression is not a full Minecraft/mod compatibility test.
+- The 26.3 point carrier relies on CPU-transformed `Position`. Keep all four
+  model vertices coincident; a literal model-local center loses the real source.

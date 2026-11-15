@@ -22,7 +22,9 @@ bool strobeFrameVertex(vec3 position, vec4 tint, vec2 uv, ivec2 brightness, samp
     strobeFrameMarker = 1;
     strobeFrameValue = value;
     strobeFrameSlot = slot;
-    strobeFramePosition = (ModelViewMat * vec4(0.5, 0.5, 0.5, 1.0)).xyz;
+    // Minecraft applies the item's pose to Position on the CPU. The point
+    // carrier has four identical positions, keeping every packet word stable.
+    strobeFramePosition = (ModelViewMat * vec4(position, 1.0)).xyz;
     strobeFrameProjection = vec4(ProjMat[0][0], ProjMat[1][1], ProjMat[2][2], ProjMat[3][2]);
     strobeFrameProjectionOffset = vec2(ProjMat[2][0], ProjMat[2][1]);
     int corner = gl_VertexIndex % 4;

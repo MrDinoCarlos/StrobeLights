@@ -89,6 +89,15 @@ class FrameRendererGpuTest {
         return new int[] {bytes.get(0) & 255, bytes.get(1) & 255, bytes.get(2) & 255};
     }
 
+    static int packetWord(int index) {
+        int[] rgb = pixel(index % 5, index / 5);
+        return Math.round(rgb[0] / 17f) | Math.round(rgb[1] / 17f) << 4 | Math.round(rgb[2] / 17f) << 8;
+    }
+
+    static float packetFloat(int first) {
+        return Float.intBitsToFloat(packetWord(first) | packetWord(first + 1) << 12 | (packetWord(first + 2) & 255) << 24);
+    }
+
     static void verify(boolean zeroToOne, int rgb, boolean sky) throws Exception {
         nextBinding = 0;
         glClipControl(GL_LOWER_LEFT, zeroToOne ? GL_ZERO_TO_ONE : GL_NEGATIVE_ONE_TO_ONE);
@@ -114,7 +123,7 @@ class FrameRendererGpuTest {
         glUseProgram(capture);
         block(capture, "Projection", b -> matrix(b, 0, projection));
         block(capture, "DynamicTransforms", b -> {
-            matrix(b, 0, new Matrix4f().translation(-.5f, -.5f, -5.5f));
+            matrix(b, 0, new Matrix4f());
             matrix(b, 64, new Matrix4f());
             for (int i = 0; i < 4; i++) b.putFloat(128 + i * 4, 1);
         });
@@ -127,7 +136,9 @@ class FrameRendererGpuTest {
         sampler(capture, "Sampler1", 0, carrier);
         sampler(capture, "Sampler2", 0, carrier);
         int value = 0xAF0005 | ((rgb >> 20 & 15) << 12) | ((rgb >> 12 & 15) << 8) | ((rgb >> 4 & 15) << 4);
-        glVertexAttrib3f(0, .5f, .5f, .5f);
+        // VertexConsumer.putBakedQuad applies the item's pose on the CPU.
+        // The shader receives the source point in Position, not model-local .5.
+        glVertexAttrib3f(0, 0, 0, -5);
         glVertexAttrib4f(1, (value >> 16 & 255) / 255f, (value >> 8 & 255) / 255f, (value & 255) / 255f, 1);
         glVertexAttrib2f(2, .5f, .5f);
         glVertexAttribI2i(3, 0, 0);
@@ -138,6 +149,9 @@ class FrameRendererGpuTest {
         if (header[0] != 51 || header[1] != 187 || header[2] != 119) {
             throw new AssertionError("Light packet occluded/missing with reversed-Z " + zeroToOne + ": " + Arrays.toString(header));
         }
+        float x = packetFloat(3), y = packetFloat(6), z = packetFloat(9);
+        if (Math.abs(x) > .00001 || Math.abs(y) > .00001 || Math.abs(z + 5) > .00001)
+            throw new AssertionError("Item pose lost: expected [0,0,-5], got [" + x + "," + y + "," + z + "]");
 
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);

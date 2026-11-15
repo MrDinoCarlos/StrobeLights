@@ -19,7 +19,8 @@ make shader packs interchangeable.
 
 Version **0.10.42 fixes missing RGB on 26.3**: its world renderer uses reversed-Z
 (depth cleared to zero, `GREATER` comparison). The carrier now writes near depth
-one and the lighting treats zero as sky. An offscreen GPU regression executes
+one and the lighting treats zero as sky. A point carrier preserves the CPU-baked
+source position instead of incorrectly reading a model-local center. An offscreen GPU regression executes
 the actual item shader, lighting batches and composition, checking magenta,
 red, green, blue and sky with both depth conventions. See
 [the fix and GPU verification](docs/RGB-26.3-FIX.md).
