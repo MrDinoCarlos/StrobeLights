@@ -1,0 +1,851 @@
+package es.mrdino.strobelights.resourcepack;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.IOException;
+import javax.imageio.ImageIO;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.Test;
+
+class ShaderPackContractTest {
+
+    private static final Path PACK = Path.of("resource-pack");
+
+    @Test
+    void keepsTrpAndStrobeLightContractsIndependentAndPreservesNearGeometry()
+        throws IOException {
+        Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
+        Path light = PACK.resolve("assets/minecraft/shaders/post/light.fsh");
+        Path transparency = PACK.resolve(
+            "assets/minecraft/shaders/post/transparency.fsh"
+        );
+        Path pipeline = PACK.resolve("assets/minecraft/post_effect/transparency.json");
+        Path core = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+        );
+
+        assertContains(filter, "bool strobeCarrier");
+        assertContains(filter, "bool trpCarrier");
+        assertContains(filter, "float sourceMetadata");
+        assertContains(aggregate, "pos.y == 4.0");
+        assertContains(aggregate, "outColor = vec4(sampleColor.a, 0.0, 0.0, 1.0)");
+        assertContains(light, "bool trpLight");
+        assertContains(light, "int radiusBand = expansionCode * 16 + radiusLowCode");
+        assertContains(light, "lightRadius = 0.01 * pow(6400.0");
+        assertContains(light, "exp2((intensityBand - 15.0) * (16.0 / 14.0))");
+        assertContains(light, "decodeExpansionScale(expansionCode)");
+        assertContains(transparency, "bool technicalMarkerPixel");
+        assertContains(transparency, "uniform sampler2D ItemEntityLightSampler");
+        assertContains(transparency, "color.rgb += itemLight * color.a * 0.55");
+        assertContains(pipeline, "\"lightmap3\"");
+        assertContains(pipeline, "\"sampler_name\": \"ItemEntityLight\"");
+        assertContains(
+            transparency,
+            "depth < LIGHTDEPTH && technicalMarkerPixel(cSampler, coord)"
+        );
+        assertContains(core, "gl_FragDepth = gl_FragCoord.z;");
+        assertNotContains(core, "gl_FragDepth = LIGHTDEPTH + 10e-7;");
+    }
+
+    @Test
+    void trpRgbRestoresWorldPositionAndWhiteSourceColorBeforeLighting() throws IOException {
+        Path shaders = PACK.resolve("assets/minecraft/shaders");
+        Path program = Files.isRegularFile(shaders.resolve("post/light.fsh"))
+            ? shaders.resolve("post") : shaders.resolve("program");
+        assertContains(program.resolve("aggregate_6.fsh"), "mode >= 1 && mode <= 6");
+        for (String name : new String[] {"light.fsh", "light_t.fsh"}) {
+            Path shader = program.resolve(name);
+            String source = Files.readString(shader);
+            assertTrue(source.contains("bool offscreenLight = isOffscreenLight(encodedValue);"));
+            assertFalse(source.contains("bool offscreenLight = !trpLight"));
+            assertTrue(source.contains("if (trpLight && !offscreenLight)"));
+            assertTrue(source.contains("lightWorldCoord = reconstructOffscreenLight("));
+            assertTrue(source.contains("lightColor = offscreenLightColor(encodedValue);"));
+            assertTrue(source.indexOf("lightColor = offscreenLightColor(encodedValue);")
+                < source.indexOf("float lightDist = length(worldCoord - lightWorldCoord)"));
+        }
+    }
+
+    @Test
+    void packagedRevisionMatchesThePluginVersion() throws IOException {
+        String build = Files.readString(Path.of("build.gradle.kts"));
+        var matcher = Pattern.compile("(?m)^version = \"([^\"]+)\"").matcher(build);
+        assertTrue(matcher.find());
+        String version = matcher.group(1);
+        assertContains(Path.of(
+            "src/main/java/es/mrdino/strobelights/resourcepack/ResourcePackService.java"
+        ), "PACK_REVISION = \"" + version + "\"");
+        assertContains(PACK.resolve(
+            "assets/strobelights/strobelights-integration.json"
+        ), "\"version\": \"" + version + "\"");
+    }
+
+    @Test
+    void carriesAnIntegrationRevisionThatInvalidatesMergedPackCaches() throws IOException {
+        Path integration = PACK.resolve(
+            "assets/strobelights/strobelights-integration.json"
+        );
+        assertTrue(Files.isRegularFile(integration));
+        assertContains(integration, "\"version\": \"0.10.41\"");
+        assertContains(integration, "\"render_pipeline\": \"light_painter_rgb\"");
+        assertContains(integration, "\"marker_protocol\": \"typed_bitgrid_3x3_v5\"");
+    }
+
+    @Test
+    void targetsMinecraft12110AndContainsTheLightPipeline() throws IOException {
+        assertContains(PACK.resolve("pack.mcmeta"), "\"pack_format\": 69");
+        assertContains(
+            PACK.resolve("assets/minecraft/post_effect/transparency.json"),
+            "minecraft:post/light"
+        );
+        assertContains(
+            PACK.resolve("assets/minecraft/shaders/post/light.fsh"),
+            "lightDist < lightRadius"
+        );
+    }
+
+    @Test
+    void keepsTheTechnicalMarkerMicroscopicButNonDegenerateForOptiFine()
+        throws IOException {
+        assertFalse(Files.exists(
+            PACK.resolve("assets/minecraft/items/lime_stained_glass.json")
+        ));
+        assertContains(
+            PACK.resolve("assets/strobelights/items/carrier/rgb.json"),
+            "strobelights:item/strobe_rgb_carrier"
+        );
+        assertContains(
+            PACK.resolve("assets/strobelights/models/item/strobe_rgb_carrier.json"),
+            "\"from\": [7.5,8,7.5]"
+        );
+        assertContains(
+            PACK.resolve("assets/strobelights/models/item/strobe_rgb_carrier.json"),
+            "\"to\": [8.5,8,8.5]"
+        );
+        assertContains(
+            PACK.resolve("assets/strobelights/models/item/strobe_rgb_carrier.json"),
+            "\"scale\":[0.002,0.002,0.002]"
+        );
+        assertNotContains(
+            PACK.resolve("assets/strobelights/models/item/strobe_rgb_carrier.json"),
+            "\"scale\":[0.0,0.0,0.0]"
+        );
+        assertContains(
+            PACK.resolve("assets/minecraft/models/item/lp.json"),
+            "\"from\": [7.5,8,7.5]"
+        );
+        assertContains(
+            PACK.resolve("assets/minecraft/models/item/lp.json"),
+            "\"scale\":[0.002,0.002,0.002]"
+        );
+        assertNotContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            ),
+            "ModelViewMat * vec4(0.0, 0.0, 0.0, 1.0)"
+        );
+        assertContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            ),
+            "ModelViewMat * vec4(Position, 1.0)"
+        );
+        assertNotContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            ),
+            "tmp = ModelViewMat * vec4(vec3(0.5), 1.0)"
+        );
+        assertContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+            ),
+            "#define HALFMARKER tmp.z / 64.0"
+        );
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/optifine/emissive.properties"
+        )));
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/textures/misc/white_e.png"
+        )));
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/optifine/dynamic_lights.properties"
+        )));
+    }
+
+    @Test
+    void acceptsOptiFineAlphaQuantizationWithoutUsingFogAsAWorldMarkerGate()
+        throws IOException {
+        Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
+        Path core = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        );
+        assertContains(utils, "#define LIGHTALPHA (5.0 / 255.0)");
+        assertContains(utils, "#define LIGHTALPHATOLERANCE (0.5 / 255.0)");
+        assertContains(core, "vec4 markerTextureBytes = floor(tmpcol * 255.0 + 0.5)");
+        assertContains(core, "vec4(37.0, 211.0, 83.0, 5.0)");
+        assertNotContains(core, "bool markerAlpha");
+        assertNotContains(core, "markerTextureFloor");
+        assertContains(core, "int encodedValue = markerValue(Color.rgb)");
+        assertContains(
+            core,
+            "bool encodedTechnicalCarrier = isCameraFlash(encodedValue)\n"
+                + "        || isSourceLight(encodedValue);"
+        );
+        assertContains(core, "&& encodedTechnicalCarrier");
+        assertNotContains(core, "technicalCarrierGeometry");
+        assertNotContains(core, "Position.y - 8.0");
+        assertContains(core, "vertexColor = vec4(Color.rgb, 1.0)");
+        var carrier = ImageIO.read(PACK.resolve(
+            "assets/strobelights/textures/item/internal/strobe_rgb_carrier.png"
+        ).toFile());
+        assertEquals(0x0525D353, carrier.getRGB(0, 0));
+        assertNotContains(core, "bool hand = isHand(FogStart, FogEnd)");
+        assertNotContains(core, "!hand && !gui");
+        assertNotContains(
+            PACK.resolve(
+                "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+            ),
+            "bool hand = isHand(FogStart, FogEnd)"
+        );
+    }
+
+
+    @Test
+    void referencedStrobeTexturesArePresentAndStitchedIntoTheItemAtlas() throws IOException {
+        var included = new java.util.ArrayList<>(java.util.List.of("item/", "block/"));
+        String atlas = Files.readString(PACK.resolve("assets/minecraft/atlases/blocks.json"));
+        var directory = Pattern.compile("\"source\"\\s*:\\s*\"([^\"]+)\"").matcher(atlas);
+        while (directory.find()) {
+            included.add(directory.group(1) + "/");
+        }
+        try (var paths = Files.walk(PACK.resolve("assets"))) {
+            for (Path model : paths.filter(path -> path.toString().replace('\\', '/')
+                .contains("/models/") && path.toString().endsWith(".json")).toList()) {
+                var textures = Pattern.compile("\"textures\"\\s*:\\s*\\{([^}]+)\\}")
+                    .matcher(Files.readString(model));
+                while (textures.find()) {
+                    var reference = Pattern.compile("strobelights:([^\"]+)").matcher(textures.group(1));
+                    while (reference.find()) {
+                        String sprite = reference.group(1);
+                        assertTrue(Files.isRegularFile(PACK.resolve(
+                            "assets/strobelights/textures/" + sprite + ".png")),
+                            () -> model + " references a missing texture: " + sprite);
+                        assertTrue(included.stream().anyMatch(sprite::startsWith),
+                            () -> model + " texture is absent from the block/item atlas: " + sprite);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void acceptsTheExactOptiFineScaledCarrierWithoutBroadeningTheMarkerSignature() throws IOException {
+        var original = ImageIO.read(PACK.resolve(
+            "assets/strobelights/textures/item/internal/strobe_rgb_carrier.png").toFile());
+        var scaled = new java.awt.image.BufferedImage(64, 64,
+            java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var graphics = scaled.createGraphics();
+        graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+            java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        graphics.drawImage(original, 0, 0, 64, 64, null);
+        graphics.dispose();
+        assertEquals(0x0525D353, original.getRGB(0, 0));
+        assertEquals(0x0533CC66, scaled.getRGB(32, 32));
+        assertContains(PACK.resolve("assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"),
+            "vec4(51.0, 204.0, 102.0, 5.0)");
+    }
+
+    @Test
+    void visibleItemTexturesCannotImpersonateTechnicalLightMarkers() throws IOException {
+        Path visibleTextures = PACK.resolve("assets/strobelights/textures/item");
+        try (var files = Files.walk(visibleTextures)) {
+            for (Path texture : files.filter(path -> path.toString().endsWith(".png")).toList()) {
+                if (texture.startsWith(visibleTextures.resolve("internal"))) {
+                    continue; // Data carriers are deliberately invisible technical textures.
+                }
+                var image = ImageIO.read(texture.toFile());
+                for (int y = 0; y < image.getHeight(); y++) {
+                    for (int x = 0; x < image.getWidth(); x++) {
+                        int argb = image.getRGB(x, y);
+                        int alpha = argb >>> 24;
+                        int red = argb >> 16 & 0xFF;
+                        int green = argb >> 8 & 0xFF;
+                        int blue = argb & 0xFF;
+                        boolean reservedCarrier = alpha == 5
+                            && red == 37 && green == 211 && blue == 83;
+                        assertFalse(
+                            reservedCarrier,
+                            () -> texture + " contains a false technical marker"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void transportsMarkersThroughTheOptiFineCompatibleColorAttachment()
+        throws IOException {
+        Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
+        Path coreVertex = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        );
+        Path core = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+        );
+        Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
+        Path pipeline = PACK.resolve("assets/minecraft/post_effect/transparency.json");
+
+        assertNotContains(utils, "DEPTHCODEPRECISION");
+        assertNotContains(utils, "decodeLightPositionDepth");
+        assertContains(coreVertex, "flat out float marker");
+        assertContains(coreVertex, "flat out vec4 markerPayload");
+        assertContains(coreVertex, "markerPayload = vertexColor");
+        assertContains(core, "flat in float marker");
+        assertContains(core, "flat in vec4 markerPayload");
+        assertContains(core, "markerValue(markerPayload.rgb)");
+        assertNotContains(core, "markerValue(vertexColor.rgb)");
+        assertContains(core, "inverse(uvPerPixel) * (texCoord2 - vec2(0.5))");
+        assertContains(core, "fragColor = vec4(vec3(0.4), 5.0 / 255.0)");
+        assertContains(core, "fragColor = vec4(bitColor * 0.5, float(alphaByte) / 255.0)");
+        assertContains(core, "gl_FragDepth = centerDepth * LIGHTDEPTH");
+        assertNotContains(core, "fragColor = vec4(vertexColor.rgb, 1.0)");
+        assertNotContains(core, "DEPTHCODESIGNATURE");
+        assertContains(filter, "uniform sampler2D DiffuseSampler");
+        assertContains(filter, "depth / LIGHTDEPTH");
+        assertContains(filter, "int encodedValue = 0");
+        assertContains(filter, "encodedValue |= triplet << (payloadIndex * 3)");
+        assertContains(filter, "if (validCarrier)");
+        assertContains(
+            aggregate,
+            "texture(ItemEntityDepthSampler, samplepos).r / LIGHTDEPTH"
+        );
+        assertContains(pipeline, "\"vertex_shader\": \"minecraft:post/filter\"");
+        assertNotContains(pipeline, "markerdata");
+    }
+
+    @Test
+    void keepsWorldLightVerticesAtTheSavedSourceWithFrustumCullingDisabled()
+        throws IOException {
+        Path manager = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
+        );
+        assertContains(manager, "updateFixedSourceViewers(strobe, state)");
+        assertContains(manager, "spawnViewerLightDisplay(player, source");
+        assertContains(manager, "source.distanceSquared(player.getEyeLocation()) > maximumDistanceSquared");
+        assertContains(manager, "spawnFixedLightDisplay(markerLocation");
+        assertContains(manager, "display.setBillboard(Display.Billboard.CENTER)");
+        assertContains(manager, "entity.setBillboard(Display.Billboard.FIXED)");
+        assertContains(manager, "player.showEntity(plugin, display)");
+        assertContains(manager, "source.getX() - anchorX");
+        assertContains(manager, "source.getY() - anchorY");
+        assertContains(manager, "source.getZ() - anchorZ");
+        assertContains(manager, "display.setDisplayWidth(carrier.displayWidth())");
+        assertContains(manager, "display.setDisplayHeight(carrier.displayHeight())");
+        assertContains(manager, "new Vector3f(0.0f, carrier.translationY(), 0.0f)");
+        assertContains(manager, "sourceY,\n            0.0f,\n            0.0f,\n            0.0f");
+        assertContains(manager, "markerItem = technicalMarker(0)");
+        assertNotContains(manager, "state.marker.setItemStack(new ItemStack(Material.AIR))");
+        assertNotContains(manager, "displayAnchor(");
+        assertNotContains(manager, "setDisplaySourceOffset(");
+        assertNotContains(manager, "spawnOffscreenProxy(");
+    }
+
+    @Test
+    void carriesTheUpstreamMitLicense() throws IOException {
+        assertContains(PACK.resolve("LICENSE-Light-Painter.txt"), "MIT License");
+        assertContains(PACK.resolve("LICENSE-Light-Painter.txt"), "Copyright (c) 2020 Bradley Qu");
+    }
+
+    @Test
+    void containsThePlayerOnlyRgbCameraFlashPass() throws IOException {
+        Path flashShader = PACK.resolve("assets/minecraft/shaders/post/flash_apply.fsh");
+        assertContains(flashShader, "isCameraFlash");
+        assertContains(flashShader, "flashColor");
+        assertContains(flashShader, "mix(outColor.rgb, flashColor");
+        assertContains(
+            PACK.resolve("assets/minecraft/post_effect/transparency.json"),
+            "minecraft:post/flash_apply"
+        );
+        assertNotContains(flashShader, "int packed =");
+        assertNotContains(flashShader, "int packed)");
+        assertNotContains(
+            PACK.resolve("assets/minecraft/shaders/post/light.fsh"),
+            "int packed ="
+        );
+        assertNotContains(
+            PACK.resolve("assets/minecraft/shaders/post/light_t.fsh"),
+            "int packed ="
+        );
+    }
+
+    @Test
+    void reconstructsNearAndBehindLightsFromPrivateMarkers() throws IOException {
+        Path core = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        );
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
+        Path utils = PACK.resolve("assets/minecraft/shaders/include/utils.glsl");
+        assertContains(core, "2.0 / max(abs(ProjMat[1][1]), 0.0001)");
+        assertContains(core, "encodeProjectionK(projectionK)");
+        assertContains(core, "((projectionCode & 15) << 16)");
+        assertContains(aggregate, "markerConversionK = decodeProjectionK(projectionCode)");
+        assertContains(utils, "int encodeProjectionK(float value)");
+        assertContains(utils, "float decodeProjectionK(int code)");
+        assertContains(utils, "if (code == 5) return 0.400");
+        assertContains(utils, "if (code == 13) return 2.000");
+        for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
+            Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
+            assertContains(shader, "isOffscreenLight");
+            assertContains(shader, "reconstructOffscreenLight");
+            assertContains(shader, "int mode = (encodedValue >> 20) & 7");
+            assertContains(shader, "ivec2 projectionBytes");
+            assertContains(shader, "float axisInverse = 16.0");
+            assertContains(shader, "float depthInverse = 4.0");
+            assertContains(shader, "return proxyCoord");
+            assertContains(shader, "if (mode == 4)");
+            assertContains(shader, "if (mode == 5)");
+            assertContains(shader, "float markerConversionK = decodeExactProjectionK(");
+            assertContains(shader, "screenCoord * markerConversionK * depth");
+            assertNotContains(shader, "return color * intensity");
+            assertContains(shader, "if (lightDist < lightRadius");
+            assertNotContains(shader, "edgeFade");
+        }
+    }
+
+    @Test
+    void keepsAdjacentLightsAsIndependentCenters()
+        throws IOException {
+        Path centers = PACK.resolve("assets/minecraft/shaders/post/centers.fsh");
+        assertContains(centers, "bool sameEncodedMarker");
+        assertContains(centers, "vec4(1.5 / 255.0)");
+        assertContains(centers, "sameEncodedMarker(outColor, c1)");
+        assertContains(centers, "texCoord + vec2(oneTexel.x");
+    }
+
+    @Test
+    void carriesPerStrobeExpansionWithoutReducingRgbOrZoomMetadata()
+        throws IOException {
+        Path coreVertex = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        );
+        Path coreFragment = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh"
+        );
+        Path filter = PACK.resolve("assets/minecraft/shaders/post/filter.fsh");
+        Path aggregate = PACK.resolve("assets/minecraft/shaders/post/aggregate_6.fsh");
+        Path pipeline = PACK.resolve("assets/minecraft/post_effect/transparency.json");
+
+        assertContains(coreVertex, "bool isSourceLight(int encodedValue)");
+        assertContains(coreVertex, "lightExpansionCode = (encodedValue >> 16) & 15");
+        assertContains(coreVertex, "((expansionCode & 15) << 12)");
+        assertContains(coreVertex, "| (color4.r << 8)");
+        assertContains(coreVertex, "| (color4.g << 4)");
+        assertContains(coreVertex, "| color4.b");
+        assertNotContains(coreFragment, "expansionCode");
+        assertNotContains(filter, "expectedExpansionSignature");
+        assertNotContains(aggregate, "MarkerDataSampler");
+        assertContains(aggregate, "expansionCode = (encodedValue >> 12) & 15");
+        assertNotContains(pipeline, "markerdata");
+        assertContains(pipeline, "\"height\": 7");
+        for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
+            Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
+            assertContains(shader, "return (encodedValue >> 23) == 0");
+            assertContains(shader, "float((encodedValue >> 8) & 15)");
+            assertContains(shader, "float((encodedValue >> 4) & 15)");
+            assertContains(shader, "float(encodedValue & 15)");
+            assertContains(shader, "decodeExpansionScale(expansionCode)");
+        }
+    }
+
+    @Test
+    void appliesLightWithoutSceneColorBlurOrDriverDependentShadowSamplers()
+        throws IOException {
+        Path pipeline = PACK.resolve("assets/minecraft/post_effect/transparency.json");
+        assertNotContains(pipeline, "minecraft:post/blur_custom");
+        assertNotContains(pipeline, "\"sampler_name\": \"Blur\"");
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/shaders/post/blur_custom.fsh"
+        )));
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/shaders/post/blur_custom.json"
+        )));
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/shaders/post/blur_custom.vsh"
+        )));
+        for (String shaderName : new String[] {"light_apply.fsh", "light_apply_t.fsh"}) {
+            Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
+            assertNotContains(shader, "BlurSampler");
+            assertNotContains(shader, "blurColor");
+            assertContains(shader, "vec3 illumination = Intensity * lightColor");
+        }
+    }
+
+    @Test
+    void containsGuiOnlyCustomPaperIcons() throws IOException {
+        assertFalse(Files.exists(PACK.resolve("assets/minecraft/items/paper.json")));
+        Path definition = PACK.resolve("assets/strobelights/items/gui/strobe.json");
+        assertContains(definition, "strobelights:item/gui/strobe");
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/strobe.png"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/move.png"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/color_swatch.png"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/close.png"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/flash_power.png"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/no_strobes.png"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/groups.png"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/gui/expansion.png"
+        )));
+        var groupsIcon = ImageIO.read(PACK.resolve(
+            "assets/strobelights/textures/item/gui/groups.png"
+        ).toFile());
+        var expansionIcon = ImageIO.read(PACK.resolve(
+            "assets/strobelights/textures/item/gui/expansion.png"
+        ).toFile());
+        assertEquals(32, groupsIcon.getWidth());
+        assertEquals(32, groupsIcon.getHeight());
+        assertEquals(32, expansionIcon.getWidth());
+        assertEquals(32, expansionIcon.getHeight());
+        assertContains(PACK.resolve("assets/strobelights/items/gui/groups.json"),
+            "strobelights:item/gui/groups");
+        assertContains(PACK.resolve("assets/strobelights/items/gui/expansion.json"),
+            "strobelights:item/gui/expansion");
+        assertContains(PACK.resolve("assets/strobelights/items/gui/shadows.json"),
+            "strobelights:item/gui/shadows");
+        var shadowsIcon = ImageIO.read(PACK.resolve(
+            "assets/strobelights/textures/item/gui/shadows.png"
+        ).toFile());
+        assertEquals(32, shadowsIcon.getWidth());
+        assertEquals(32, shadowsIcon.getHeight());
+        Path gui = Path.of("src/main/java/es/mrdino/strobelights/ui/StrobeGui.java");
+        assertContains(gui, "title(tr(player, \"gui.delete.confirm\"), NamedTextColor.RED)");
+        assertContains(gui, "GuiIcon.DELETE");
+        assertContains(gui, "GuiIcon.GROUPS");
+        assertContains(gui, "GuiIcon.EXPANSION");
+        assertContains(gui, "EDITOR_INTENSITY_SLOT = 12");
+        assertContains(gui, "EDITOR_EXPANSION_SLOT = 13");
+        assertContains(gui, "EDITOR_REFRESH_SLOT = 14");
+        assertContains(gui, "EDITOR_MOVE_SLOT = 19");
+        assertContains(gui, "EDITOR_TELEPORT_SLOT = 20");
+        assertContains(gui, "EDITOR_GROUP_SLOT = 21");
+        assertContains(gui, "EDITOR_RENAME_SLOT = 22");
+        assertNotContains(gui, "Material.LIME_CONCRETE");
+    }
+
+    @Test
+    void keepsClassicLightingAsDefaultAndOffersAdaptiveSourceOcclusion() throws IOException {
+        Path core = PACK.resolve(
+            "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh"
+        );
+        assertContains(core, "offscreenProxy");
+        assertContains(core, "float axisScale = 0.0625");
+        assertContains(core, "float depthScale = 0.25");
+        for (String shaderName : new String[] {"light.fsh", "light_t.fsh"}) {
+            Path shader = PACK.resolve("assets/minecraft/shaders/post").resolve(shaderName);
+            assertContains(shader, "float axisInverse = 16.0");
+            assertContains(shader, "float depthInverse = 4.0");
+            assertContains(shader, "lightRadius = mix(");
+            assertContains(shader, "float radialFalloff = pow(");
+            assertNotContains(shader, "STROBELIGHTS_GEOMETRY_OCCLUSION");
+            assertContains(shader, "bool geometryOcclusion");
+            assertContains(shader, "hasGeometryOcclusionToken");
+            assertContains(shader, "tokenMetadata < 0.5");
+            assertContains(shader, "bool geometryToken = !trpLight");
+            assertContains(shader, "bool offscreenLight = isOffscreenLight(encodedValue);");
+            assertNotContains(shader, "bool offscreenLight = !trpLight");
+            assertContains(shader, "int raySteps = trpLight ? 6");
+            assertContains(shader, "bool geometryOcclusion = trpLight");
+            assertContains(shader, "markerConversionK, trpLight");
+            assertContains(shader, "rayStep <= 32");
+            assertContains(shader, "mix(lightPosition, surfacePosition, fraction)");
+            assertContains(shader, "? screenSpaceVisibility(");
+            assertNotContains(shader, "sampleIndex <= 6");
+        }
+        assertContains(Path.of("src/main/resources/config.yml"), "geometry-occlusion: false");
+        assertContains(
+            PACK.resolve("assets/minecraft/shaders/include/utils.glsl"),
+            "#define LIGHTR 18.0"
+        );
+        assertContains(
+            PACK.resolve("assets/minecraft/shaders/post/light_apply.fsh"),
+            "vec3 colorized"
+        );
+        assertContains(
+            PACK.resolve("assets/minecraft/shaders/post/light_apply.fsh"),
+            "+ illumination * 0.22"
+        );
+    }
+
+    @Test
+    void avoidsReservedIdentifiersRejectedBySomeGlsl150Drivers() throws IOException {
+        Pattern reserved = Pattern.compile(
+            "\\b(?:packed|input|output|sample|filter|common|partition|active|superp)\\b"
+        );
+        try (var shaders = Files.walk(PACK.resolve("assets/minecraft/shaders"))) {
+            for (Path shader : shaders
+                .filter(Files::isRegularFile)
+                .filter(path -> path.toString().endsWith(".vsh")
+                    || path.toString().endsWith(".fsh")
+                    || path.toString().endsWith(".glsl"))
+                .toList()) {
+                String source = Files.readString(shader);
+                assertFalse(
+                    reserved.matcher(source).find(),
+                    () -> shader + " contains a GLSL reserved identifier"
+                );
+            }
+        }
+    }
+
+    @Test
+    void containsAnIsolatedFlashbangModelAndVorbisSound() throws IOException {
+        assertFalse(Files.exists(PACK.resolve("assets/minecraft/items/snowball.json")));
+        Path definition = PACK.resolve("assets/strobelights/items/tools/flashbang.json");
+        assertContains(definition, "strobelights:item/flashbang");
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/models/item/flashbang.json"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/textures/item/flashbang.png"
+        )));
+        assertContains(
+            PACK.resolve("assets/strobelights/sounds.json"),
+            "strobelights:flashbang"
+        );
+        byte[] ogg = Files.readAllBytes(PACK.resolve(
+            "assets/strobelights/sounds/flashbang.ogg"
+        ));
+        assertTrue(ogg.length > 4);
+        assertTrue(new String(ogg, 0, 4, StandardCharsets.US_ASCII).equals("OggS"));
+
+        Path flashbangService = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/FlashbangService.java"
+        );
+        Path manager = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
+        );
+        Path config = Path.of("src/main/resources/config.yml");
+        assertContains(flashbangService, "scheduleFlightTimeout(projectile)");
+        assertContains(flashbangService, "throwable-flashbang.maximum-flight-ticks");
+        assertContains(flashbangService, "ProjectileLaunchEvent event");
+        assertContains(flashbangService, "isFlashbang(projectile.getItem())");
+        assertContains(flashbangService, "addPluginChunkTicket(plugin)");
+        assertContains(flashbangService, "scheduleDetonation(impact, delay)");
+        assertContains(flashbangService, "sceneRetentionTicks()");
+        assertContains(manager, "throwable-flashbang.scene-view-range");
+        assertNotContains(manager, "throwable-flashbang.scene-light-radius");
+        assertContains(config, "maximum-flight-ticks: 1200");
+        assertContains(config, "scene-view-range: 128.0");
+    }
+
+    @Test
+    void containsAProjectileFreeSimulatedFlareAndTintedCartridge() throws IOException {
+        assertFalse(Files.exists(PACK.resolve("assets/minecraft/items/blaze_rod.json")));
+        assertFalse(Files.exists(PACK.resolve(
+            "assets/minecraft/items/leather_horse_armor.json"
+        )));
+        Path launcherDefinition = PACK.resolve(
+            "assets/strobelights/items/tools/flare_launcher.json"
+        );
+        Path cartridgeDefinition = PACK.resolve(
+            "assets/strobelights/items/tools/flare_cartridge.json"
+        );
+        assertContains(launcherDefinition, "strobelights:item/flare_launcher");
+        assertContains(cartridgeDefinition, "strobelights:item/flare_cartridge");
+        assertContains(cartridgeDefinition, "minecraft:custom_model_data");
+        assertContains(PACK.resolve("assets/strobelights/items/tools/flare_core.json"),
+            "strobelights:item/flare_core");
+        assertContains(PACK.resolve("assets/strobelights/items/tools/flare_hot_core.json"),
+            "strobelights:item/flare_hot_core");
+
+        for (String asset : new String[] {"flare_launcher", "flare_cartridge"}) {
+            assertTrue(Files.isRegularFile(PACK.resolve(
+                "assets/strobelights/models/item/" + asset + ".json"
+            )));
+            Path texture = PACK.resolve(
+                "assets/strobelights/textures/item/" + asset + ".png"
+            );
+            assertTrue(Files.isRegularFile(texture));
+            var image = ImageIO.read(texture.toFile());
+            assertEquals(64, image.getWidth());
+            assertEquals(64, image.getHeight());
+            assertEquals(0, image.getRGB(0, 0) >>> 24);
+        }
+        Path coreTexture = PACK.resolve(
+            "assets/strobelights/textures/item/flare_core.png"
+        );
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/models/item/flare_core.json"
+        )));
+        assertTrue(Files.isRegularFile(PACK.resolve(
+            "assets/strobelights/models/item/flare_hot_core.json"
+        )));
+        var coreImage = ImageIO.read(coreTexture.toFile());
+        assertEquals(256, coreImage.getWidth());
+        assertEquals(256, coreImage.getHeight());
+        assertEquals(0, coreImage.getRGB(0, 0) >>> 24);
+        assertTrue((coreImage.getRGB(128, 128) >>> 24) > 240);
+        Path soundDefinition = PACK.resolve("assets/strobelights/sounds.json");
+        for (String sound : new String[] {
+            "flare_reload_open",
+            "flare_reload_insert",
+            "flare_reload_close",
+            "flare_fire",
+            "flare_flight",
+            "flare_ignite",
+            "flare_burn"
+        }) {
+            assertContains(soundDefinition, "\"" + sound + "\"");
+            assertTrue(Files.isRegularFile(PACK.resolve(
+                "assets/strobelights/sounds/" + sound + ".ogg"
+            )));
+        }
+
+        Path service = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/FlareService.java"
+        );
+        Path manager = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
+        );
+        Path config = Path.of("src/main/resources/config.yml");
+        assertContains(service, "new ItemStack(Material.BLAZE_ROD)");
+        assertContains(service, "new ItemStack(Material.LEATHER_HORSE_ARMOR)");
+        assertContains(service, "setColors(List.of(tint))");
+        assertContains(service, "event.setCancelled(true)");
+        assertContains(service, "world.spawn(location, ItemDisplay.class");
+        assertContains(service, "FLARE_TELEPORT_DURATION_TICKS = 2");
+        assertContains(service, "FLARE_SURFACE_CLEARANCE = 0.30");
+        assertContains(service, "setTeleportDuration(FLARE_TELEPORT_DURATION_TICKS)");
+        assertContains(service, "Float.compare(scale, previousScale) != 0");
+        assertContains(service, "collision.getHitBlockFace().getDirection()");
+        assertContains(service, "impactOutsideSurface(");
+        assertNotContains(service, "normalize().multiply(0.025)");
+        assertNotContains(service, "setTeleportDuration(1)");
+        assertContains(service, "strobelights:flare_reload_open");
+        assertContains(service, "strobelights:flare_fire");
+        assertNotContains(service, "Particle.");
+        assertNotContains(service, "tickBurstSparks(burn)");
+        assertContains(service, "flare.reload-required");
+        assertNotContains(service, "Material.CROSSBOW");
+        assertNotContains(service, "Firework");
+        assertContains(config, "reload-required: true");
+        assertContains(config, "burn-duration-ticks: 800");
+        assertContains(config, "burn-size: 3.2");
+        assertContains(config, "view-range: 256.0");
+        assertContains(config, "ignition-velocity-retention: 0.45");
+        assertContains(config, "minimum-horizontal-speed: 0.035");
+        assertContains(config, "horizontal-drag: 0.992");
+        assertContains(config, "gravity: 0.0035");
+        assertContains(config, "terminal-fall-speed: 0.06");
+        assertContains(config, "wind-acceleration: 0.00018");
+        assertContains(config, "scene-light-expansion: 4.0");
+        assertContains(config, "flight-light-expansion: 2.0");
+        assertContains(config, "maximum-duration-ticks: 50");
+        assertContains(config, "strength-percent: 85");
+        assertContains(config, "config-version: 10");
+        assertContains(config, "ground-projection:");
+        assertContains(config, "maximum-drop-distance: 128.0");
+        assertContains(config, "scene-view-range: 192.0");
+        assertNotContains(config, "particle-count");
+        assertNotContains(config, "\n    fall-speed:");
+        assertNotContains(config, "\n    drift-speed:");
+        assertNotContains(service, "flare.trail-points-per-block");
+        assertContains(service, "nextBurnVelocity(");
+        assertContains(service, "burn.grounded = true");
+        assertContains(service, "moveFlareLight(burn.lightId, burn.location)");
+        assertContains(service, "moveFlareGroundLight(burn.groundLightId, burn.location)");
+        assertNotContains(service, "refreshFlareCameraGlare(burn.location, burn.color.rgb)");
+        assertContains(manager, "public void moveFlareLight(UUID id, Location location)");
+        assertContains(manager, "public UUID beginFlareGroundLight(Location flareLocation, int rgb)");
+        assertContains(manager, "public void moveFlareGroundLight(UUID id, Location flareLocation)");
+        assertContains(manager, "new Vector(0.0, -1.0, 0.0)");
+        assertContains(manager, "public UUID beginFlareFlightLight(Location location, int rgb)");
+        assertContains(manager, "SCENE_FLASH_TELEPORT_DURATION_TICKS = 2");
+        assertContains(manager, "setTeleportDuration(SCENE_FLASH_TELEPORT_DURATION_TICKS)");
+        assertContains(manager, "public void refreshFlareCameraGlare(Location explosion, int rgb)");
+        Path plugin = Path.of(
+            "src/main/java/es/mrdino/strobelights/StrobeLightsPlugin.java"
+        );
+        assertContains(plugin, "migrateConfiguration();");
+        assertContains(plugin, "burn-duration-ticks\", 600, 800");
+        assertContains(plugin, "render.display-view-range\", 128.0, 192.0");
+        assertContains(plugin, "render.display-view-range\", 192.0, 512.0");
+        assertContains(plugin, "flare.visual.view-range\", 192.0, 256.0");
+        assertFalse(Pattern.compile(
+            "Particle\\.FLASH,[\\s\\S]{0,180}Color\\."
+        ).matcher(Files.readString(manager, StandardCharsets.UTF_8)).find());
+
+        Path launcherModel = PACK.resolve(
+            "assets/strobelights/models/item/flare_launcher.json"
+        );
+        assertContains(launcherModel, "\"firstperson_righthand\"");
+        assertContains(launcherModel, "\"scale\": [0.32, 0.32, 0.32]");
+        assertContains(launcherModel, "\"rotation\": [0, -90, -35]");
+        assertContains(launcherModel, "\"rotation\": [0, 90, 35]");
+    }
+
+    @Test
+    void keepsRgbSourcesAndCameraEffectsIndependentOfGeometryOcclusion() throws IOException {
+        Path manager = Path.of(
+            "src/main/java/es/mrdino/strobelights/service/StrobeManager.java"
+        );
+        Path config = Path.of("src/main/resources/config.yml");
+        assertContains(manager, "boolean visible = nearby;");
+        assertNotContains(manager, "sourceBlockedForPlayer");
+        assertNotContains(manager, "blockedByGeometry");
+        assertNotContains(manager, "blocksLight");
+        assertContains(manager, "material == Material.BARRIER || material == Material.LIGHT");
+        assertContains(manager, "rayTraceBlocksIgnoringTechnicalBlocks(");
+        assertContains(
+            Path.of("src/main/java/es/mrdino/strobelights/service/FlareService.java"),
+            "StrobeManager.rayTraceBlocksIgnoringTechnicalBlocks("
+        );
+        assertContains(
+            Path.of("src/main/java/es/mrdino/strobelights/command/StrobeCommand.java"),
+            "StrobeManager.rayTraceBlocksIgnoringTechnicalBlocks("
+        );
+        assertNotContains(manager, "requireLineOfSight");
+        assertNotContains(config, "require-line-of-sight");
+    }
+
+    private static void assertContains(Path file, String expected) throws IOException {
+        assertTrue(read(file).contains(expected), () -> file + " no contiene " + expected);
+    }
+
+    private static void assertNotContains(Path file, String forbidden) throws IOException {
+        assertFalse(
+            read(file).contains(forbidden),
+            () -> file + " contiene la palabra GLSL reservada " + forbidden
+        );
+    }
+
+    private static String read(Path file) throws IOException {
+        return Files.readString(file).replace("\r\n", "\n");
+    }
+
+    private static int countOccurrences(String text, String expected) {
+        return text.split(Pattern.quote(expected), -1).length - 1;
+    }
+}

@@ -1,0 +1,8 @@
+{
+  "version": "0.10.41",
+  "render_pipeline": "end_of_frame_rgb",
+  "marker_protocol": "frame_slots_5x7_v1",
+  "rgb_supported": true,
+  "minecraft": "26.3",
+  "max_viewer_carriers": 64
+}

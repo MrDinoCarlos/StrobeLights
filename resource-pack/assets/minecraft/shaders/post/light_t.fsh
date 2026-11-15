@@ -199,7 +199,7 @@ void main() {
     float oDepth = texture(DiffuseDepthSampler, texCoord).r;
     float compDepth = texture(CompareDepthSampler, texCoord).r;
     float depth = LinearizeDepth(oDepth);
-    if (oDepth < compDepth && depth < Range + 64.0) {
+    if (oDepth < compDepth && depth < max(Range + 64.0, STROBE_STABLE_POSITION_LIMIT)) {
         vec4 aggColor = vec4(0.0, 0.0, 0.0, 1.0);
 
         vec2 pixCoord = texCoord;
@@ -211,14 +211,10 @@ void main() {
             vec4 zvec = texture(LightsSampler, (vec2(float(i), 2.0) + 0.5) * oneTexelAux1);
             vec3 lightWorldCoord = vec3(decodeInt(xvec), decodeInt(yvec), decodeInt(zvec)) / FIXEDPOINT;
             vec3 lightColor = texture(LightsSampler, (vec2(float(i), 3.0) + 0.5) * oneTexelAux1).rgb;
-            int expansionCode = int(floor(texture(
-                LightsSampler,
-                (vec2(float(i), 4.0) + 0.5) * oneTexelAux1
-            ).r * 15.0 + 0.5));
-            float sourceMetadata = texture(
-                LightsSampler,
-                (vec2(float(i), 5.0) + 0.5) * oneTexelAux1
-            ).r;
+            vec4 radiusData = texture(LightsSampler, (vec2(float(i), 4.0) + 0.5) * oneTexelAux1);
+            vec4 sourceData = texture(LightsSampler, (vec2(float(i), 5.0) + 0.5) * oneTexelAux1);
+            int expansionCode = int(floor(radiusData.r * 15.0 + 0.5));
+            float sourceMetadata = sourceData.r;
             bool trpLight = sourceMetadata > 0.0 && sourceMetadata < 0.5;
             int encodedValue = markerValue(lightColor);
             if (isCameraFlash(encodedValue)) {
@@ -247,9 +243,11 @@ void main() {
             }
             bool geometryOcclusion = trpLight
                 || (!stableSource && hasGeometryOcclusionToken(lightWorldCoord));
+            float sourceDepth = stableSource
+                ? strobeStableLinearizeDepth(oDepth, radiusData.gba, sourceData.gba) : depth;
             vec3 worldCoord = vec3(
-                screenCoord * markerConversionK * depth,
-                depth
+                screenCoord * markerConversionK * sourceDepth,
+                sourceDepth
             );
             float encodedIntensity = clamp(
                 max(max(lightColor.r, lightColor.g), lightColor.b),
@@ -292,7 +290,8 @@ void main() {
             }
             float lightDist = length(worldCoord - lightWorldCoord);
             if (lightDist < lightRadius) {
-                float rangeFade = clamp(Range - length(lightWorldCoord), 0.0, 6.0) / 6.0;
+                // Integration sources follow sent chunks; native strobes retain their own range.
+                float rangeFade = stableSource ? 1.0 : clamp(Range - length(lightWorldCoord), 0.0, 6.0) / 6.0;
                 float radialFalloff = pow(
                     clamp(1.0 - lightDist / lightRadius, 0.0, 1.0),
                     falloffPower

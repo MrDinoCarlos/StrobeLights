@@ -1,6 +1,7 @@
 package es.mrdino.strobelights;
 
 import es.mrdino.strobelights.command.StrobeCommand;
+import es.mrdino.strobelights.compatibility.MinecraftProfile;
 import es.mrdino.strobelights.i18n.Messages;
 import es.mrdino.strobelights.model.Strobe;
 import es.mrdino.strobelights.resourcepack.ResourcePackService;
@@ -18,6 +19,8 @@ public final class StrobeLightsPlugin extends JavaPlugin {
 
     private static final int CONFIG_VERSION = 10;
 
+    private MinecraftProfile minecraftProfile;
+
     private StrobeRepository repository;
     private Messages messages;
     private StrobeManager manager;
@@ -28,6 +31,20 @@ public final class StrobeLightsPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        try {
+            minecraftProfile = MinecraftProfile.forVersion(getServer().getMinecraftVersion());
+            String pack = "embedded/" + minecraftProfile.packName();
+            try (var embedded = getResource(pack)) {
+                if (embedded == null) {
+                    throw new IllegalArgumentException("This JAR does not include Minecraft "
+                        + minecraftProfile.version() + "; install the " + minecraftProfile.family() + " JAR.");
+                }
+            }
+        } catch (IllegalArgumentException | java.io.IOException unsupported) {
+            getLogger().severe(unsupported.getMessage());
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
         saveDefaultConfig();
         migrateConfiguration();
         getConfig().options().copyDefaults(true);
@@ -53,7 +70,10 @@ public final class StrobeLightsPlugin extends JavaPlugin {
         resourcePack.start();
 
         getLogger().info("StrobeLights ready: " + manager.size()
-            + " strobe(s) loaded. Light Painter RGB 3D is active for Fabulous graphics.");
+            + " strobe(s) loaded for Minecraft " + minecraftProfile.version() + ". "
+            + (minecraftProfile.supportsRgb()
+                ? "Light Painter RGB 3D is available with the matching client renderer."
+                : "Vanilla lighting mode; Minecraft 26.3 removed the Fabulous shader pipeline."));
     }
 
     @Override
@@ -78,9 +98,15 @@ public final class StrobeLightsPlugin extends JavaPlugin {
     /** No strobes are registered by integrations using this optional shader capability. */
     public int stableSourceProtocol() {
         var trp = getServer().getPluginManager().getPlugin("TRPServerEdition");
+        if (minecraftProfile != null && (!minecraftProfile.supportsRgb()
+            || minecraftProfile != MinecraftProfile.MC_1_21_4)) return 0;
         if (trp == null || !trp.isEnabled()) return 1;
         try { return Integer.valueOf(1).equals(trp.getClass().getMethod("stableSourceProtocol").invoke(trp)) ? 1 : 0; }
         catch (ReflectiveOperationException failure) { return 0; }
+    }
+
+    public MinecraftProfile minecraftProfile() {
+        return minecraftProfile;
     }
 
     public StrobeManager manager() {

@@ -1,6 +1,8 @@
 // STROBE_STABLE_SLOT_V1: collision-free, backwards-compatible integration sources.
 #ifndef STROBE_STABLE_SLOT_COMMON
 #define STROBE_STABLE_SLOT_COMMON
+// Covers 32 sent chunks in every direction, including diagonals and camera rotation.
+const float STROBE_STABLE_POSITION_LIMIT = 1024.0;
 bool strobeStableValue(int value) {
     int bank = (value >> 20) & 15;
     return bank == 6 || bank == 7 || bank == 8 || bank == 9
@@ -35,13 +37,24 @@ int strobeStableSourceValue(int value) {
     int tag = bank == 0 ? 8 : bank == 1 ? 9 : bank == 2 ? 11 : bank == 3 ? 12 : bank == 4 ? 14 : bank == 5 ? 15 : bank == 6 ? 6 : 7;
     return (tag << 20) | (((value >> 19) & 15) << 16) | ((slot & 15) << 12) | (value & 4095);
 }
-float strobeStablePosition(vec3 colour) { return float(strobeStableInteger(colour)) / 4096.0 - 512.0; }
-vec3 strobeStablePacketColour(int index, int value, int projection, vec3 position) {
+float strobeStablePosition(vec3 colour) { return float(strobeStableInteger(colour)) / 4096.0 - STROBE_STABLE_POSITION_LIMIT; }
+// Preserve the actual depth projection. Minecraft's far plane changes with
+// render distance; reconstructing all clients with FAR=1024 moves distant light.
+ivec2 strobeStableDepthProjection(mat4 projection) {
+    return ivec2(int(floor((-projection[2][2] - 1.0) * 8388608.0 + 0.5)),
+                 int(abs(projection[3][2]) * 134217728.0));
+}
+float strobeStableLinearizeDepth(float depth, vec3 depthA, vec3 depthB) {
+    float a = -1.0 - float(strobeStableInteger(depthA)) / 8388608.0;
+    float b = -float(strobeStableInteger(depthB)) / 134217728.0;
+    return b / (depth * 2.0 - 1.0 + a);
+}
+vec3 strobeStablePacketColour(int index, int value, int projection, vec3 position, ivec2 depthProjection) {
     if (index == 0) return strobeStableBytes(strobeStablePacketValue(value));
-    if (index >= 1 && index <= 3) return strobeStableBytes(int(floor((clamp(position[index - 1], -512.0, 512.0) + 512.0) * 4096.0 + 0.5)));
+    if (index >= 1 && index <= 3) return strobeStableBytes(int(floor((clamp(position[index - 1], -STROBE_STABLE_POSITION_LIMIT, STROBE_STABLE_POSITION_LIMIT) + STROBE_STABLE_POSITION_LIMIT) * 4096.0 + 0.5)));
     if (index == 4) return vec3(float((projection >> 8) & 255), float(projection & 255), 197.0) / 255.0;
-    if (index == 5) return strobeStableBytes((strobeStablePacketValue(value) ^ (projection << 7) ^ 0x5AC3A5) & 0x7FFFFF);
-    return index == 6 ? vec3(71.0, 163.0, 247.0) / 255.0 : vec3(109.0, 193.0, 37.0) / 255.0;
+    if (index == 5) return strobeStableBytes((strobeStablePacketValue(value) ^ (projection << 7) ^ depthProjection.x ^ depthProjection.y ^ 0x5AC3A5) & 0x7FFFFF);
+    return strobeStableBytes(index == 6 ? depthProjection.x : depthProjection.y);
 }
 vec3 strobeStableColor(int value) {
     return vec3(float((value >> 8) & 15), float((value >> 4) & 15), float(value & 15)) / 15.0;

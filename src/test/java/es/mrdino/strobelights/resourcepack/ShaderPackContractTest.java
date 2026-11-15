@@ -55,7 +55,7 @@ class ShaderPackContractTest {
             "assets/strobelights/strobelights-integration.json"
         );
         assertTrue(Files.isRegularFile(integration));
-        assertContains(integration, "\"version\": \"0.10.38\"");
+        assertContains(integration, "\"version\": \"0.10.41\"");
         assertContains(integration, "\"render_pipeline\": \"light_painter_rgb\"");
         assertContains(integration, "\"marker_protocol\": \"typed_bitgrid_3x3_v5\"");
     }
@@ -399,7 +399,7 @@ class ShaderPackContractTest {
             assertContains(shader, "if (mode == 4)");
             assertContains(shader, "if (mode == 5)");
             assertContains(shader, "float markerConversionK = decodeExactProjectionK(");
-            assertContains(shader, "screenCoord * markerConversionK * depth");
+            assertContains(shader, "screenCoord * markerConversionK * sourceDepth");
             assertNotContains(shader, "return color * intensity");
             assertContains(shader, "if (lightDist < lightRadius");
             assertNotContains(shader, "edgeFade");

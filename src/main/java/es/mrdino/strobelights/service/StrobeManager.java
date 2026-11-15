@@ -69,6 +69,8 @@ public final class StrobeManager implements Listener {
     private static final double CAMERA_FLASH_MARKER_DISTANCE = 0.75;
     private static final double CAMERA_FLASH_MARKER_SIDE = 0.22;
 
+    private final FrameCarrierSlots frameSlots = new FrameCarrierSlots();
+    private boolean frameCapacityWarned;
     private final StrobeLightsPlugin plugin;
     private final StrobeRepository repository;
     private final TrpGraphicsCompatibility trpGraphics;
@@ -131,6 +133,7 @@ public final class StrobeManager implements Listener {
     }
 
     public void shutdown() {
+        frameSlots.clear();
         HandlerList.unregisterAll(this);
         if (task != null) {
             task.cancel();
@@ -1109,6 +1112,7 @@ public final class StrobeManager implements Listener {
     }
 
     public void clearPlayer(Player player) {
+        frameSlots.forget(player.getUniqueId());
         UUID playerId = player.getUniqueId();
         manualDiscovery.remove(playerId);
         activeDiscoveryPlayers.remove(playerId);
@@ -1309,6 +1313,11 @@ public final class StrobeManager implements Listener {
         Location source,
         Consumer<ItemDisplay> initializer
     ) {
+        if (sourceAnchoredCarriers()) {
+            ItemDisplay display = spawnFixedLightDisplay(source, initializer);
+            player.showEntity(plugin, display);
+            return display;
+        }
         ViewerRenderCarrier carrier = viewerRenderCarrier(source, player.getEyeLocation());
         Location anchor = viewerRenderCarrierAnchor(source.getWorld(), carrier);
         ItemDisplay display = anchor.getWorld().spawn(anchor, ItemDisplay.class, entity -> {
@@ -1328,15 +1337,20 @@ public final class StrobeManager implements Listener {
             applyViewerRenderCarrier(entity, carrier);
             initializer.accept(entity);
         });
+        applyFrameSlot(player, display);
         player.showEntity(plugin, display);
         return display;
     }
 
-    private static void positionViewerLightDisplay(
+    private void positionViewerLightDisplay(
         ItemDisplay display,
         Location source,
         Player player
     ) {
+        if (sourceAnchoredCarriers()) {
+            positionFixedLightDisplay(display, source);
+            return;
+        }
         ViewerRenderCarrier carrier = viewerRenderCarrier(source, player.getEyeLocation());
         display.teleport(viewerRenderCarrierAnchor(source.getWorld(), carrier));
         applyViewerRenderCarrier(display, carrier);
@@ -1389,10 +1403,17 @@ public final class StrobeManager implements Listener {
         ));
     }
 
-    private static boolean viewerRenderCarrierChanged(
+    private boolean viewerRenderCarrierChanged(
         ItemDisplay display,
         ViewerRenderCarrier expected
     ) {
+        if (sourceAnchoredCarriers()) {
+            Location source = new Location(display.getWorld(),
+                expected.anchorX() + expected.translationX(),
+                expected.anchorY() + expected.translationY(),
+                expected.anchorZ() + expected.translationZ());
+            return fixedLightDisplayChanged(display, source);
+        }
         Location current = display.getLocation();
         Vector3f translation = display.getTransformation().getTranslation();
         return current.getX() != expected.anchorX()
@@ -1401,6 +1422,35 @@ public final class StrobeManager implements Listener {
             || Float.compare(translation.x(), expected.translationX()) != 0
             || Float.compare(translation.y(), expected.translationY()) != 0
             || Float.compare(translation.z(), expected.translationZ()) != 0;
+    }
+
+    private void applyFrameSlot(Player player, ItemDisplay display) {
+        if (plugin.minecraftProfile() != es.mrdino.strobelights.compatibility.MinecraftProfile.MC_26_3) return;
+        int slot = frameSlots.assign(player.getUniqueId(), display);
+        if (slot < 0) {
+            display.setItemStack(new ItemStack(Material.AIR));
+            display.setBrightness(new Display.Brightness(15, 15));
+            if (!frameCapacityWarned) {
+                frameCapacityWarned = true;
+                plugin.getLogger().warning("26.3 RGB packet capacity reached (64 carriers per viewer, including shadow tokens). Vanilla lighting remains available.");
+            }
+            return;
+        }
+        display.setBrightness(new Display.Brightness(slot & 15, slot >> 4));
+    }
+
+    private boolean fixedLightDisplayChanged(ItemDisplay display, Location source) {
+        FixedRenderCarrier carrier = fixedRenderCarrier(source);
+        Location anchor = fixedRenderCarrierAnchor(source, carrier);
+        return display.getWorld() != anchor.getWorld()
+            || display.getLocation().distanceSquared(anchor) > 1.0e-8
+            || Float.compare(display.getTransformation().getTranslation().y(), carrier.translationY()) != 0
+            || Float.compare(display.getDisplayWidth(), carrier.displayWidth()) != 0
+            || Float.compare(display.getDisplayHeight(), carrier.displayHeight()) != 0;
+    }
+
+    private boolean sourceAnchoredCarriers() {
+        return plugin.minecraftProfile() != null && plugin.minecraftProfile().sourceAnchored();
     }
 
     private FixedRenderCarrier fixedRenderCarrier(Location source) {
@@ -1708,10 +1758,17 @@ public final class StrobeManager implements Listener {
 
     private boolean canRenderRgb(Player player) {
         return (plugin.resourcePack() == null || plugin.resourcePack().isLoaded(player))
+            && (plugin.minecraftProfile() == null || plugin.minecraftProfile().supportsRgb())
             && trpGraphics.allowsRgb(player.getUniqueId());
     }
 
     private void updateFixedSourceViewers(Strobe strobe, RuntimeState state) {
+        if (strobe.lightLevel() <= 0
+            || !strobe.enabled() && state.pulseTicks <= 0 && !state.lit) {
+            state.clearViewerCarriers();
+            state.clearOcclusionCarriers();
+            return;
+        }
         Location source = fixedSourceLocation(strobe);
         if (source == null) {
             state.clearViewerCarriers();
@@ -2340,6 +2397,7 @@ public final class StrobeManager implements Listener {
                 player.getUniqueId().toString()
             );
         });
+        applyFrameSlot(player, marker);
         player.showEntity(plugin, marker);
         return marker;
     }

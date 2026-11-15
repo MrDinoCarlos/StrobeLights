@@ -1,6 +1,40 @@
-# StrobeLights — Paper 1.21.4
+# StrobeLights — Paper version families
 
-Version 0.10.38 adds independent, validated source slots for XmasLights 2.8.
+All maintained versions now build from **one `main` branch**. Install one JAR
+for your family; it contains the individual resource packs and selects the
+matching pack from the server version at startup.
+
+| Export | Maintained server/client versions | Java |
+| --- | --- | --- |
+| `StrobeLights-0.10.41+mc.v.1.20.X.jar` | 1.20.1 | 17 |
+| `StrobeLights-0.10.41+mc.v.1.21.X.jar` | 1.21.4, 1.21.10, 1.21.11 | 21 |
+| `StrobeLights-0.10.41+mc.v.26.X.jar` | 26.1.2, 26.2, 26.3 | 25 |
+
+`X` groups exports; it does not claim untested patch compatibility. Other
+versions are rejected explicitly rather than receiving an incompatible pack.
+Client versions must match the server's resource-pack ABI. ViaVersion does not
+make shader packs interchangeable.
+
+Minecraft **26.3 has a separate RGB renderer** using the always-on
+`minecraft:end_of_frame` effect and OIT-aware item shaders. It does not use the
+removed Fabulous transparency chain. This port is **experimental pending an
+actual client visual/performance test**, even when Java and GLSL checks pass.
+It supports 64 private carriers per viewer (shadow tokens also consume slots),
+a minimum 320x8 framebuffer and eight 640x360 lighting batches. Its seven-pixel
+transport strip is restored from the adjacent scene row before HUD composition;
+fine scene detail at that edge may therefore differ. Other packs overriding
+`end_of_frame` or the item shaders need a compatible combined pack. TRP/Nexo
+runtime integration on 26.3 still needs validation with matching plugin versions.
+
+See [build structure and validation](docs/RESTRUCTURING.md) for the migration,
+source layout and checks. The rendering-mode descriptions below apply to the
+legacy Fabulous pipelines unless explicitly marked 26.3.
+
+Version 0.10.39 extends the validated integration slots for XmasLights 2.8.5.
+Integration positions cover +/-1024 blocks, including diagonal 30/32-chunk views.
+Packets also preserve the actual camera depth projection, including the 30/32-chunk
+far planes. Their RGB energy no longer fades at the native strobe distance limit. Native
+strobes retain their existing range. The carrier item ABI remains slots3x3_depth_v1.
 Dense strings no longer overlap their technical RGB pixels when viewed from
 a distance. Position, color and radius are transmitted separately; the new
 packets are removed during Fabulous composition, including over other models.
@@ -23,7 +57,7 @@ emit visible vanilla effects.
 
 ## Requirements and rendering modes
 
-- Paper 1.21.4 and Java 21.
+- A maintained Paper version and its Java runtime from the table above.
 - Players must accept the resource pack sent by the server (3D shaders and GUI icons).
 - **Vanilla or OptiFine with Fabulous graphics:** full screen-space 3D RGB lighting.
 - **OptiFine:** external shaderpacks must remain disabled so Minecraft can run the
@@ -218,7 +252,7 @@ Launchers created by 0.10.0 upgrade on their next click.
 The ZIP is embedded in the plugin JAR and is also exported to:
 
 ```text
-plugins/StrobeLights/resource-pack/StrobeLights-ResourcePack-1.21.4.zip
+plugins/StrobeLights/resource-pack/StrobeLights-ResourcePack-<selected-version>.zip
 ```
 
 Replace `serverip.com` with the public server address and expose the chosen HTTP
@@ -398,13 +432,29 @@ Replace it with the server's public IP or hostname before inviting players.
 
 ## Build output
 
-Plugin JARs follow this naming scheme:
+Install JDKs 17, 21 and 25. Run the wrapper with Java 17 or newer:
 
 ```text
-StrobeLights-<plugin-version>+mc.v.<minecraft-version>.jar
+./gradlew clean build
 ```
 
-For this build: `StrobeLights-0.10.32+mc.v.1.21.4.jar`.
+On Windows use `gradlew.bat clean build`. This compiles and tests all seven
+Paper APIs, checks family descriptors/bytecode/embedded packs and exports
+exactly three plugin JARs to **`build/exports/`**. The export directory is synced,
+so another plugin release replaces the previous three files.
+
+```text
+StrobeLights-0.10.41+mc.v.1.20.X.jar
+StrobeLights-0.10.41+mc.v.1.21.X.jar
+StrobeLights-0.10.41+mc.v.26.X.jar
+```
+
+Standalone ZIPs are optional: `./gradlew exportResourcePack` writes them to
+`build/distributions/resource-packs/`. Normal builds keep these packs embedded.
+Build intermediates in `build/intermediates/` are not release downloads.
+
+GitHub Actions runs all API suites plus the separate 26.3 GLSL validation job.
+The `StrobeLights-family-jars` artifact contains only the three family JARs.
 
 Light Painter attribution and MIT license are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

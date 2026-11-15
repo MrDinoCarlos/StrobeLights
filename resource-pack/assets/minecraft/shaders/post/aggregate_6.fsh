@@ -169,6 +169,7 @@ void main() {
         bool stableSource = strobeStableMetadata(sampleColor.a);
         float markerConversionK = conversionK;
         int expansionCode = 3;
+        vec3 stableDepthA = vec3(0.0), stableDepthB = vec3(0.0);
         if (!stableSource && isOffscreenLight(encodedValue)) {
             int projectionCode = (encodedValue >> 16) & 15;
             expansionCode = (encodedValue >> 12) & 15;
@@ -187,6 +188,8 @@ void main() {
                 strobeStablePosition(texture(ItemEntitySampler, center + vec2(-1.0, 0.0) * pixelSize).rgb));
             ivec3 projectionBytes = ivec3(floor(texture(ItemEntitySampler, center + vec2(1.0, 0.0) * pixelSize).rgb * 255.0 + 0.5));
             projectionCode16 = (projectionBytes.r << 8) | projectionBytes.g;
+            stableDepthA = texture(ItemEntitySampler, center + vec2(0.0, 1.0) * pixelSize).rgb;
+            stableDepthB = texture(ItemEntitySampler, center + vec2(1.0, 1.0) * pixelSize).rgb;
             expansionCode = (encodedValue >> 16) & 15;
         } else if (isOffscreenLight(encodedValue)) {
             bool trpLight = sampleColor.a > 0.0 && sampleColor.a < 0.5;
@@ -204,11 +207,13 @@ void main() {
         } else if (pos.y == 3.0) {
             outColor = sampleColor;
         } else if (pos.y == 4.0) {
-            outColor = vec4(float(expansionCode) / 15.0, 0.0, 0.0, 1.0);
+            outColor = stableSource ? vec4(float(expansionCode) / 15.0, stableDepthA)
+                : vec4(float(expansionCode) / 15.0, 0.0, 0.0, 1.0);
         } else if (pos.y == 5.0) {
             // 1.0 identifies a native StrobeLights emitter. TRP stores
             // (radiusLowNibble + 1) / 255 here.
-            outColor = vec4(sampleColor.a, 0.0, 0.0, 1.0);
+            outColor = stableSource ? vec4(sampleColor.a, stableDepthB)
+                : vec4(sampleColor.a, 0.0, 0.0, 1.0);
         } else {
             outColor = vec4(float((projectionCode16 >> 8) & 255),
                 float(projectionCode16 & 255), 0.0, 255.0) / 255.0;

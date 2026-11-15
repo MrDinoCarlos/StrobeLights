@@ -1,0 +1,315 @@
+{
+  "targets": {
+    "light0": {
+      "width": 640,
+      "height": 360
+    },
+    "light1": {
+      "width": 640,
+      "height": 360
+    },
+    "light2": {
+      "width": 640,
+      "height": 360
+    },
+    "light3": {
+      "width": 640,
+      "height": 360
+    },
+    "light4": {
+      "width": 640,
+      "height": 360
+    },
+    "light5": {
+      "width": 640,
+      "height": 360
+    },
+    "light6": {
+      "width": 640,
+      "height": 360
+    },
+    "light7": {
+      "width": 640,
+      "height": 360
+    },
+    "composed": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "strobelights:post/frame_lights",
+      "fragment_shader": "strobelights:post/frame_lights",
+      "inputs": [
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "light0",
+      "uniforms": {
+        "FrameConfig": [
+          {
+            "name": "FirstSlot",
+            "type": "int",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "strobelights:post/frame_lights",
+      "fragment_shader": "strobelights:post/frame_lights",
+      "inputs": [
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "light1",
+      "uniforms": {
+        "FrameConfig": [
+          {
+            "name": "FirstSlot",
+            "type": "int",
+            "value": 8
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "strobelights:post/frame_lights",
+      "fragment_shader": "strobelights:post/frame_lights",
+      "inputs": [
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "light2",
+      "uniforms": {
+        "FrameConfig": [
+          {
+            "name": "FirstSlot",
+            "type": "int",
+            "value": 16
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "strobelights:post/frame_lights",
+      "fragment_shader": "strobelights:post/frame_lights",
+      "inputs": [
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "light3",
+      "uniforms": {
+        "FrameConfig": [
+          {
+            "name": "FirstSlot",
+            "type": "int",
+            "value": 24
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "strobelights:post/frame_lights",
+      "fragment_shader": "strobelights:post/frame_lights",
+      "inputs": [
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "light4",
+      "uniforms": {
+        "FrameConfig": [
+          {
+            "name": "FirstSlot",
+            "type": "int",
+            "value": 32
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "strobelights:post/frame_lights",
+      "fragment_shader": "strobelights:post/frame_lights",
+      "inputs": [
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "light5",
+      "uniforms": {
+        "FrameConfig": [
+          {
+            "name": "FirstSlot",
+            "type": "int",
+            "value": 40
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "strobelights:post/frame_lights",
+      "fragment_shader": "strobelights:post/frame_lights",
+      "inputs": [
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "light6",
+      "uniforms": {
+        "FrameConfig": [
+          {
+            "name": "FirstSlot",
+            "type": "int",
+            "value": 48
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "strobelights:post/frame_lights",
+      "fragment_shader": "strobelights:post/frame_lights",
+      "inputs": [
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "light7",
+      "uniforms": {
+        "FrameConfig": [
+          {
+            "name": "FirstSlot",
+            "type": "int",
+            "value": 56
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "strobelights:post/frame_compose",
+      "fragment_shader": "strobelights:post/frame_compose",
+      "inputs": [
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Light0",
+          "target": "light0",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Light1",
+          "target": "light1",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Light2",
+          "target": "light2",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Light3",
+          "target": "light3",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Light4",
+          "target": "light4",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Light5",
+          "target": "light5",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Light6",
+          "target": "light6",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Light7",
+          "target": "light7",
+          "bilinear": true
+        }
+      ],
+      "output": "composed"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "minecraft:post/blit",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "composed"
+        }
+      ],
+      "output": "minecraft:main",
+      "uniforms": {
+        "BlitConfig": [
+          {
+            "name": "ColorModulate",
+            "type": "vec4",
+            "value": [
+              1,
+              1,
+              1,
+              1
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

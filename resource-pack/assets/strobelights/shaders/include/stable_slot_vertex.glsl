@@ -9,8 +9,14 @@ bool strobeStableSlotVertex(vec3 position, vec4 colour, vec2 uv, sampler2D carri
     int value = (int(floor(colour.r * 255.0 + 0.5)) << 16)
         | (int(floor(colour.g * 255.0 + 0.5)) << 8) | int(floor(colour.b * 255.0 + 0.5));
     ivec4 texel = ivec4(floor(texture(carrierTexture, uv) * 255.0 + 0.5));
+    // OptiFine resizes atlas sprites through Java2D SRC_OVER. At alpha 5,
+    // premultiplication rounds (37,211,83) to (51,204,102), even with nearest
+    // filtering. Accept that exact signature too, as the native carrier does.
+    // Keep alpha and the encoded slot tag strict; this is not a colour tolerance.
+    bool carrierTexel = all(equal(texel, ivec4(37, 211, 83, 5)))
+        || all(equal(texel, ivec4(51, 204, 102, 5)));
     if (abs(projection[2][3]) < 0.000001 || !strobeStableValue(value)
-        || !all(equal(texel, ivec4(37, 211, 83, 5)))) return false;
+        || !carrierTexel) return false;
     vec4 source = modelView * vec4(position, 1.0);
     strobeStableViewPosition = vec3(source.x, source.y, -source.z);
     strobeStablePayload = colour.rgb;

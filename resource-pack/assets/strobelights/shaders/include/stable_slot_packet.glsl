@@ -11,15 +11,20 @@ bool strobeStablePacket(sampler2D image, vec2 center) {
     ivec4 projectionBytes = strobeStableTexel(image, center + vec2(1.0, 0.0) * pixel);
     if (!strobeStableValue(value) || projectionBytes.b != 197 || projectionBytes.a != 255) return false;
     int projection = (projectionBytes.r << 8) | projectionBytes.g;
+    ivec2 depthProjection = ivec2(
+        strobeStableInteger(texture(image, center + vec2(0.0, 1.0) * pixel).rgb),
+        strobeStableInteger(texture(image, center + vec2(1.0, 1.0) * pixel).rgb));
+    if (depthProjection.x <= 0 || depthProjection.x > 32768
+        || depthProjection.y < 6000000 || depthProjection.y >= 15625000) return false;
     int index = 0;
     for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
         if (x == 0 && y == 0) continue;
         ivec4 sampleBytes = strobeStableTexel(image, center + vec2(float(x), float(y)) * pixel);
         if (sampleBytes.a != 255) return false;
         if (index >= 1 && index <= 3) {
-            if (sampleBytes.r * 62500 + sampleBytes.g * 250 + sampleBytes.b > 4194304) return false;
+            if (sampleBytes.r * 62500 + sampleBytes.g * 250 + sampleBytes.b > int(STROBE_STABLE_POSITION_LIMIT * 8192.0)) return false;
         } else {
-            ivec3 expected = ivec3(floor(strobeStablePacketColour(index, value, projection, vec3(0.0)) * 255.0 + 0.5));
+            ivec3 expected = ivec3(floor(strobeStablePacketColour(index, value, projection, vec3(0.0), depthProjection) * 255.0 + 0.5));
             if (!all(equal(sampleBytes.rgb, expected))) return false;
         }
         index++;

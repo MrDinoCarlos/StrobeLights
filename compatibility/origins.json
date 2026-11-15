@@ -1,0 +1,27 @@
+{
+  "1.21.4": {
+    "branch": "master",
+    "commit": "ad0d1c17f8b1e1fee6dca5a79e78ef8231d63723",
+    "local_revision": "0.10.41"
+  },
+  "1.20.1": {
+    "branch": "paper-1.20.1",
+    "commit": "a77f963cd402b1d0e0f18c3ef5c28d8d6055e984"
+  },
+  "1.21.10": {
+    "branch": "paper-1.21.10",
+    "commit": "a5dbbc03ba7c53922969363d0db2be3ef1bd15ad"
+  },
+  "1.21.11": {
+    "branch": "paper-1.21.11",
+    "commit": "68903f4e19138a1cd1a322bd6ae9315d7ad0e14b"
+  },
+  "26.1.2": {
+    "branch": "paper-26.1.2",
+    "commit": "5c9274a06f956ddce7d90f784ca8e09ba9fc633b"
+  },
+  "26.2": {
+    "branch": "paper-26.2",
+    "commit": "6788d1c13cc3149349a8005ba913f85810dc87a0"
+  }
+}

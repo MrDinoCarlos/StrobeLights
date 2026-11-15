@@ -21,6 +21,6 @@ void strobeStableSlotFragment(out vec4 outputColour, mat4 projection) {
     } else {
         int index = cellIndex < 4 ? cellIndex : cellIndex - 1;
         int projectionCode = strobeStableProjectionK(2.0 / max(abs(projection[1][1]), 0.0001));
-        outputColour = vec4(strobeStablePacketColour(index, value, projectionCode, strobeStableViewPosition), 1.0);
+        outputColour = vec4(strobeStablePacketColour(index, value, projectionCode, strobeStableViewPosition, strobeStableDepthProjection(projection)), 1.0);
     }
 }

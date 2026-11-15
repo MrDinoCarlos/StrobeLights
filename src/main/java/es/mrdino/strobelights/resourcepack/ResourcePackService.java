@@ -53,15 +53,14 @@ import org.bukkit.plugin.Plugin;
 /** Loads, hosts and sends the Light Painter shader and GUI icon resource pack. */
 public final class ResourcePackService implements Listener {
 
-    private static final String PACK_REVISION = "0.10.38";
+    private static final String PACK_REVISION = "0.10.41";
     private static final String DEFAULT_PUBLIC_URL =
         "http://serverip.com:8250/strobelights/{token}.zip";
-    private static final String EMBEDDED_PACK =
-        "embedded/StrobeLights-ResourcePack-1.21.4.zip";
+
 
     private final StrobeLightsPlugin plugin;
     private final Listener nexoPackListener = new Listener() { };
-    private final Set<UUID> loadedPlayers = ConcurrentHashMap.newKeySet();
+    private final PackLoadTracker packLoads = new PackLoadTracker();
     private final Set<UUID> deliveryAttemptedPlayers = ConcurrentHashMap.newKeySet();
     private final Set<UUID> compatibilityNotifiedPlayers = ConcurrentHashMap.newKeySet();
     private EmbeddedPackServer httpServer;
@@ -282,7 +281,7 @@ public final class ResourcePackService implements Listener {
         nexoSourcePackBytes = null;
         nexoPackServerDelegate = null;
         nexoPackServerProxy = null;
-        loadedPlayers.clear();
+        packLoads.clear();
         deliveryAttemptedPlayers.clear();
         closeEmbeddedServer();
     }
@@ -293,7 +292,7 @@ public final class ResourcePackService implements Listener {
             active,
             nexoManaged,
             deliveryAttemptedPlayers.contains(playerId),
-            loadedPlayers.contains(playerId)
+            packLoads.isLoaded(playerId)
         );
     }
 
@@ -308,6 +307,24 @@ public final class ResourcePackService implements Listener {
 
     public String revision() {
         return PACK_REVISION;
+    }
+
+    /** Read-only integration diagnostic; never consults TRP graphics preferences. */
+    public String diagnostic(Player player) {
+        return "provider=" + (nexoManaged ? "NEXO" : trpManaged ? "TRP" : "STROBELIGHTS")
+            + ", active=" + active + ", ready=" + isLoaded(player)
+            + ", expected=" + expectedPackId() + ", status=" + packLoads.status(player.getUniqueId());
+    }
+
+    private UUID expectedPackId() {
+        if (!nexoManaged) return trpManaged ? null : packId;
+        if (nexoPlugin == null) return null;
+        try {
+            Object server = nexoPlugin.getClass().getMethod("packServer").invoke(nexoPlugin);
+            if (server == null) return null;
+            Object info = server.getClass().getMethod("packInfo").invoke(server);
+            return PackTransport.nexoId(info);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) { return null; }
     }
 
     /** Re-registers this immutable pack when TRP initializes or reloads after StrobeLights. */
@@ -335,7 +352,7 @@ public final class ResourcePackService implements Listener {
             resendWithTrp(player);
             return;
         }
-        loadedPlayers.remove(player.getUniqueId());
+        packLoads.forget(player.getUniqueId());
         sendLater(player);
     }
 
@@ -343,22 +360,23 @@ public final class ResourcePackService implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
-        loadedPlayers.remove(playerId);
+        // Pack confirmation may arrive before join during login/reconfiguration.
+        // Quit/stop clear the connection state; join must preserve its confirmation.
         deliveryAttemptedPlayers.remove(playerId);
         compatibilityNotifiedPlayers.remove(playerId);
         if (nexoManaged || trpManaged || !active) {
-            plugin.manager().setMarkersVisible(player, !active);
+            plugin.manager().setMarkersVisible(player, isLoaded(player));
             return;
         }
-        plugin.manager().setMarkersVisible(player, false);
-        sendLater(player);
+        plugin.manager().setMarkersVisible(player, isLoaded(player));
+        if (!isLoaded(player)) sendLater(player);
         warnAdministratorLater(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
-        loadedPlayers.remove(playerId);
+        packLoads.forget(playerId);
         deliveryAttemptedPlayers.remove(playerId);
         compatibilityNotifiedPlayers.remove(playerId);
     }
@@ -368,29 +386,35 @@ public final class ResourcePackService implements Listener {
         if (!active) {
             return;
         }
-        boolean sharedPack = nexoManaged || trpManaged;
-        if (!sharedPack && !event.getID().equals(packId)) {
+        Player player = event.getPlayer();
+        UUID eventPackId = PackTransport.id(event, packId);
+        if (eventPackId == null) return;
+        // Nexo exposes the actual final pack UUID. Remember accepted generations
+        // too, since a new build can publish before the previous download completes.
+        // Older embedded TRP hosts expose no pack ID: retain per-ID accounting there.
+        if (!packLoads.update(player.getUniqueId(), eventPackId, event.getStatus(),
+                expectedPackId(), (trpManaged && !nexoManaged)
+                    || plugin.minecraftProfile() == es.mrdino.strobelights.compatibility.MinecraftProfile.MC_1_20_1 && nexoManaged)) {
             return;
         }
-        Player player = event.getPlayer();
-        switch (event.getStatus()) {
-            case SUCCESSFULLY_LOADED -> {
-                loadedPlayers.add(player.getUniqueId());
+        switch (event.getStatus().name()) {
+            case "SUCCESSFULLY_LOADED" -> {
                 plugin.manager().setMarkersVisible(player, true);
+                plugin.getLogger().info("RGB pack loaded for " + player.getName() + ": " + eventPackId);
                 player.sendMessage(Component.text(
                     plugin.messages().text(player, "resource-pack.loaded", "revision", PACK_REVISION),
                     NamedTextColor.GREEN
                 ));
                 sendCompatibilityNoticeLater(player);
             }
-            case DECLINED, FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD, DISCARDED -> {
-                loadedPlayers.remove(player.getUniqueId());
-                plugin.manager().setMarkersVisible(player, false);
+            case "DECLINED", "FAILED_DOWNLOAD", "INVALID_URL", "FAILED_RELOAD", "DISCARDED" -> {
+                boolean ready = isLoaded(player);
+                plugin.manager().setMarkersVisible(player, ready);
                 plugin.getLogger().warning(
                     "Resource pack " + event.getStatus().name().toLowerCase()
                         + " for " + player.getName()
-                        + "; RGB markers remain available for a previously loaded or "
-                        + "proxy-managed combined pack."
+                        + "; pack=" + eventPackId + "; RGB ready=" + ready
+                        + (ready ? " (another renderer pack remains loaded)." : " (no renderer pack loaded).")
                 );
             }
             default -> {
@@ -412,12 +436,13 @@ public final class ResourcePackService implements Listener {
                 NamedTextColor.AQUA
             );
             deliveryAttemptedPlayers.add(player.getUniqueId());
-            player.setResourcePack(packId, publicUrl, sha1, prompt, required);
+            PackTransport.send(player, packId, publicUrl, sha1, prompt, required);
         }, sendDelayTicks);
     }
 
     private void sendCompatibilityNoticeLater(Player player) {
-        if (!plugin.getConfig().getBoolean("client-compatibility-notices.enabled", false)) {
+        if (plugin.minecraftProfile() == es.mrdino.strobelights.compatibility.MinecraftProfile.MC_26_3
+            || !plugin.getConfig().getBoolean("client-compatibility-notices.enabled", false)) {
             return;
         }
         long delayTicks = Math.max(0L, Math.min(
@@ -428,7 +453,7 @@ public final class ResourcePackService implements Listener {
             UUID playerId = player.getUniqueId();
             if (!active
                 || !player.isOnline()
-                || !loadedPlayers.contains(playerId)
+                || !packLoads.isLoaded(playerId)
                 || !compatibilityNotifiedPlayers.add(playerId)) {
                 return;
             }
@@ -615,9 +640,9 @@ public final class ResourcePackService implements Listener {
     }
 
     private byte[] readEmbeddedPack() {
-        try (InputStream input = plugin.getResource(EMBEDDED_PACK)) {
+        try (InputStream input = plugin.getResource("embedded/" + plugin.minecraftProfile().packName())) {
             if (input == null) {
-                throw new IllegalStateException("Missing " + EMBEDDED_PACK + " inside the JAR");
+                throw new IllegalStateException("Missing embedded/" + plugin.minecraftProfile().packName() + " inside the JAR");
             }
             return input.readAllBytes();
         } catch (IOException exception) {
@@ -630,7 +655,7 @@ public final class ResourcePackService implements Listener {
     }
 
     private Path exportPack(byte[] bytes) {
-        return exportPack(bytes, "StrobeLights-ResourcePack-1.21.4.zip");
+        return exportPack(bytes, plugin.minecraftProfile().packName());
     }
 
     private Path exportPack(byte[] bytes, String fileName) {
@@ -1195,6 +1220,9 @@ public final class ResourcePackService implements Listener {
 
     static byte[] prepareTrpOverlay(byte[] packBytes) throws IOException {
         Map<String, byte[]> entries = readZipEntries(packBytes, false);
+        if (entries.containsKey("assets/minecraft/post_effect/end_of_frame.json")) {
+            return writeZipEntries(entries);
+        }
         for (String core : List.of(
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh",
             "assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.fsh",
@@ -1241,6 +1269,7 @@ public final class ResourcePackService implements Listener {
 
     static boolean isNexoRenderPipelineEntry(String path) {
         return path.equals("assets/minecraft/post_effect/transparency.json")
+            || path.equals("assets/minecraft/post_effect/end_of_frame.json")
             || path.equals("assets/strobelights/strobelights-integration.json")
             || path.startsWith("assets/strobelights/shaders/")
             || path.startsWith("assets/minecraft/shaders/");
@@ -1377,7 +1406,7 @@ public final class ResourcePackService implements Listener {
                 .sorted(Comparator.comparing(InetAddress::getHostAddress))
                 .toList();
             if (!addresses.isEmpty()) {
-                return addresses.getFirst().getHostAddress();
+                return addresses.get(0).getHostAddress();
             }
         } catch (IOException exception) {
             plugin.getLogger().warning("Could not detect the LAN IP: " + exception.getMessage());

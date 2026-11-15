@@ -1,0 +1,39 @@
+#version 330
+
+uniform sampler2D DiffuseSampler;
+layout(std140) uniform SamplerInfo {
+    vec2 OutSize;
+    vec2 DiffuseSize;
+};
+const float Step = 8.0;
+const float Test = 0.0;
+
+in vec2 texCoord;
+flat in vec2 oneTexel;
+
+out vec4 outColor;
+
+void main() {
+    outColor = vec4(0.0);
+    vec2 samplepos = gl_FragCoord.xy - 0.5;
+    samplepos = vec2(samplepos.x * Step, samplepos.y);
+    if (samplepos.x < DiffuseSize.x) {
+        float tmpCounter = 0.0;
+        for (int i = 0; i < int(Step); i += 1) {
+            tmpCounter += step(
+                0.5 / 255.0,
+                texture(DiffuseSampler, (vec2(samplepos.x + float(i), samplepos.y) + 0.5) * oneTexel).a
+            );
+        }
+        tmpCounter /= 255.0;
+        outColor = vec4(vec3(tmpCounter), 1.0);
+        if (Test > 0.5) {
+            outColor.rgb /= tmpCounter == 0.0 ? 1.0 : outColor.r;
+            outColor.rgb += vec3(0.2, 0.0, 0.0);
+        }
+    }
+
+    if (abs(gl_FragCoord.x - 1.0) < 0.01) {
+        outColor.rgb = vec3(0.0, 1.0, 0.0);
+    }
+}
